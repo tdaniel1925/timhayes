@@ -10,6 +10,7 @@ import Checkout from './pages/Checkout';
 import CallDetail from './pages/CallDetail';
 import AdminSetupRequests from './pages/AdminSetupRequests';
 import Notifications from './pages/Notifications';
+import UserManagement from './pages/UserManagement';
 
 // Protected Route component
 function ProtectedRoute({ children }) {
@@ -115,6 +116,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Notifications />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute>
+            <UserManagement />
           </ProtectedRoute>
         }
       />

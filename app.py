@@ -24,6 +24,8 @@ import threading
 from urllib.parse import quote
 from sqlalchemy import and_, func, extract
 from collections import defaultdict
+import csv
+import io
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -584,13 +586,21 @@ def receive_cdr(subdomain):
 @app.route('/api/calls', methods=['GET'])
 @jwt_required()
 def get_calls():
-    """Get paginated calls for current tenant"""
+    """Get paginated calls for current tenant with advanced filtering"""
     claims = get_jwt()
     tenant_id = claims.get('tenant_id')
 
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 25, type=int)
     search = request.args.get('search', '')
+
+    # Advanced filters
+    status = request.args.get('status', '')
+    sentiment = request.args.get('sentiment', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    min_duration = request.args.get('min_duration', type=int)
+    max_duration = request.args.get('max_duration', type=int)
 
     query = CDRRecord.query.filter_by(tenant_id=tenant_id)
 
@@ -602,6 +612,36 @@ def get_calls():
                 CDRRecord.dst.like(f'%{search}%'),
                 CDRRecord.caller_name.like(f'%{search}%')
             )
+        )
+
+    # Status filter
+    if status:
+        query = query.filter(CDRRecord.disposition == status)
+
+    # Date range filters
+    if date_from:
+        from datetime import datetime
+        date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+        query = query.filter(CDRRecord.received_at >= date_from_obj)
+
+    if date_to:
+        from datetime import datetime, timedelta
+        date_to_obj = datetime.strptime(date_to, '%Y-%m-%d')
+        # Include the entire day
+        date_to_obj = date_to_obj + timedelta(days=1)
+        query = query.filter(CDRRecord.received_at < date_to_obj)
+
+    # Duration filters
+    if min_duration is not None:
+        query = query.filter(CDRRecord.duration >= min_duration)
+
+    if max_duration is not None:
+        query = query.filter(CDRRecord.duration <= max_duration)
+
+    # Sentiment filter (requires join with transcription and sentiment tables)
+    if sentiment:
+        query = query.join(CDRRecord.transcription).join(Transcription.sentiment).filter(
+            Sentiment.sentiment == sentiment
         )
 
     # Pagination
@@ -1138,6 +1178,14 @@ def admin_activate_setup_request(id):
 
         logger.info(f"Account activated: {setup_request.company_name} (tenant_id: {tenant.id})")
 
+        # Send welcome email to new admin
+        send_welcome_email(
+            setup_request.contact_email,
+            setup_request.contact_name,
+            temp_password,
+            setup_request.company_name
+        )
+
         return jsonify({
             'message': 'Account activated successfully',
             'tenant_id': tenant.id,
@@ -1338,6 +1386,191 @@ def create_notification_rule():
 
 
 # ============================================================================
+# USER MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@app.route('/api/users', methods=['GET'])
+@jwt_required()
+def get_users():
+    """Get all users in tenant (admin only)"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+    role = claims.get('role')
+
+    if role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    users = User.query.filter_by(tenant_id=tenant_id).all()
+
+    return jsonify({
+        'users': [{
+            'id': u.id,
+            'email': u.email,
+            'full_name': u.full_name,
+            'role': u.role,
+            'is_active': u.is_active,
+            'created_at': u.created_at.isoformat(),
+            'last_login': u.last_login.isoformat() if u.last_login else None
+        } for u in users]
+    }), 200
+
+
+@app.route('/api/users', methods=['POST'])
+@jwt_required()
+def create_user():
+    """Create new user (admin only)"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+    role = claims.get('role')
+
+    if role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    data = request.get_json()
+
+    required = ['email', 'full_name', 'password']
+    if not all(field in data for field in required):
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    if User.query.filter_by(email=data['email']).first():
+        return jsonify({'error': 'Email already exists'}), 400
+
+    try:
+        user = User(
+            tenant_id=tenant_id,
+            email=data['email'],
+            full_name=data['full_name'],
+            role=data.get('role', 'user'),
+            is_active=data.get('is_active', True)
+        )
+        user.set_password(data['password'])
+
+        db.session.add(user)
+        db.session.commit()
+
+        logger.info(f"User created: {user.email} (tenant_id: {tenant_id})")
+
+        # Get tenant info for welcome email
+        tenant = Tenant.query.get(tenant_id)
+
+        # Send welcome email
+        send_welcome_email(
+            user.email,
+            user.full_name,
+            data['password'],  # Temporary password
+            tenant.company_name if tenant else 'AudiaPro'
+        )
+
+        return jsonify({
+            'id': user.id,
+            'email': user.email,
+            'message': 'User created successfully'
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"User creation error: {e}", exc_info=True)
+        return jsonify({'error': f'Failed to create user: {str(e)}'}), 500
+
+
+@app.route('/api/users/<int:user_id>', methods=['PUT'])
+@jwt_required()
+def update_user(user_id):
+    """Update user (admin only)"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+    role = claims.get('role')
+
+    if role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    user_to_update = User.query.filter_by(id=user_id, tenant_id=tenant_id).first()
+    if not user_to_update:
+        return jsonify({'error': 'User not found'}), 404
+
+    data = request.get_json()
+
+    if 'full_name' in data:
+        user_to_update.full_name = data['full_name']
+    if 'role' in data:
+        user_to_update.role = data['role']
+    if 'is_active' in data:
+        user_to_update.is_active = data['is_active']
+
+    db.session.commit()
+
+    return jsonify({'message': 'User updated successfully'}), 200
+
+
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+@jwt_required()
+def delete_user(user_id):
+    """Delete user (admin only)"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+    role = claims.get('role')
+    current_user_id = get_jwt_identity()
+
+    if role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    if user_id == current_user_id:
+        return jsonify({'error': 'Cannot delete your own account'}), 400
+
+    user_to_delete = User.query.filter_by(id=user_id, tenant_id=tenant_id).first()
+    if not user_to_delete:
+        return jsonify({'error': 'User not found'}), 404
+
+    try:
+        db.session.delete(user_to_delete)
+        db.session.commit()
+
+        logger.info(f"User deleted: {user_to_delete.email} (id: {user_id})")
+
+        return jsonify({'message': 'User deleted successfully'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"User deletion error: {e}", exc_info=True)
+        return jsonify({'error': f'Failed to delete user: {str(e)}'}), 500
+
+
+@app.route('/api/users/<int:user_id>/reset-password', methods=['POST'])
+@jwt_required()
+def reset_user_password(user_id):
+    """Reset user password (admin only)"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+    role = claims.get('role')
+
+    if role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    user_to_update = User.query.filter_by(id=user_id, tenant_id=tenant_id).first()
+    if not user_to_update:
+        return jsonify({'error': 'User not found'}), 404
+
+    data = request.get_json()
+    new_password = data.get('password')
+
+    if not new_password or len(new_password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters'}), 400
+
+    try:
+        user_to_update.set_password(new_password)
+        db.session.commit()
+
+        logger.info(f"Password reset for user: {user_to_update.email}")
+
+        return jsonify({'message': 'Password reset successfully'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Password reset error: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to reset password'}), 500
+
+
+# ============================================================================
 # FRONTEND SERVING
 # ============================================================================
 
@@ -1361,6 +1594,353 @@ def serve_frontend(path):
                 'signup': 'POST /api/auth/signup'
             }
         }), 200
+
+
+# ============================================================================
+# EXPORT AND REPORTING ENDPOINTS
+# ============================================================================
+
+@app.route('/api/export/calls/csv', methods=['GET'])
+@jwt_required()
+def export_calls_csv():
+    """Export calls to CSV with applied filters"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+
+    search = request.args.get('search', '')
+    status = request.args.get('status', '')
+    sentiment = request.args.get('sentiment', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+    min_duration = request.args.get('min_duration', type=int)
+    max_duration = request.args.get('max_duration', type=int)
+
+    # Build query with filters (same logic as get_calls)
+    query = CDRRecord.query.filter_by(tenant_id=tenant_id)
+
+    if search:
+        query = query.filter(
+            db.or_(
+                CDRRecord.src.like(f'%{search}%'),
+                CDRRecord.dst.like(f'%{search}%'),
+                CDRRecord.caller_name.like(f'%{search}%')
+            )
+        )
+
+    if status:
+        query = query.filter(CDRRecord.disposition == status)
+
+    if date_from:
+        date_from_obj = datetime.strptime(date_from, '%Y-%m-%d')
+        query = query.filter(CDRRecord.received_at >= date_from_obj)
+
+    if date_to:
+        date_to_obj = datetime.strptime(date_to, '%Y-%m-%d')
+        date_to_obj = date_to_obj + timedelta(days=1)
+        query = query.filter(CDRRecord.received_at < date_to_obj)
+
+    if min_duration is not None:
+        query = query.filter(CDRRecord.duration >= min_duration)
+
+    if max_duration is not None:
+        query = query.filter(CDRRecord.duration <= max_duration)
+
+    if sentiment:
+        query = query.join(CDRRecord.transcription).join(Transcription.sentiment).filter(
+            Sentiment.sentiment == sentiment
+        )
+
+    # Get all matching calls
+    calls = query.order_by(CDRRecord.received_at.desc()).all()
+
+    # Create CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write header
+    writer.writerow([
+        'Call ID', 'Date/Time', 'From', 'To', 'Caller Name',
+        'Duration (s)', 'Status', 'Sentiment', 'Sentiment Score',
+        'Transcription', 'Has Recording'
+    ])
+
+    # Write data
+    for call in calls:
+        sentiment_val = call.transcription.sentiment.sentiment if call.transcription and call.transcription.sentiment else ''
+        sentiment_score = call.transcription.sentiment.sentiment_score if call.transcription and call.transcription.sentiment else ''
+        transcription = call.transcription.transcription_text if call.transcription else ''
+
+        writer.writerow([
+            call.uniqueid,
+            call.received_at.strftime('%Y-%m-%d %H:%M:%S') if call.received_at else '',
+            call.src or '',
+            call.dst or '',
+            call.caller_name or '',
+            call.duration or 0,
+            call.disposition or '',
+            sentiment_val,
+            f'{sentiment_score:.2f}' if sentiment_score else '',
+            transcription,
+            'Yes' if call.recordfiles else 'No'
+        ])
+
+    # Create response
+    output.seek(0)
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=f'calls_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+    )
+
+
+@app.route('/api/export/email-report', methods=['POST'])
+@jwt_required()
+def email_report():
+    """Email a call report to specified address"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+    user_id = claims.get('sub')
+
+    data = request.get_json()
+    recipient_email = data.get('email')
+    search = data.get('search', '')
+    filters = data.get('filters', {})
+
+    if not recipient_email:
+        return jsonify({'error': 'Email address required'}), 400
+
+    # Get tenant and user info
+    tenant = Tenant.query.get(tenant_id)
+    user = User.query.get(user_id)
+
+    try:
+        # Import resend here to avoid issues if not installed
+        import resend
+        resend.api_key = os.getenv('RESEND_API_KEY')
+
+        # Build query with filters
+        query = CDRRecord.query.filter_by(tenant_id=tenant_id)
+
+        if search:
+            query = query.filter(
+                db.or_(
+                    CDRRecord.src.like(f'%{search}%'),
+                    CDRRecord.dst.like(f'%{search}%'),
+                    CDRRecord.caller_name.like(f'%{search}%')
+                )
+            )
+
+        if filters.get('status'):
+            query = query.filter(CDRRecord.disposition == filters['status'])
+
+        if filters.get('sentiment'):
+            query = query.join(CDRRecord.transcription).join(Transcription.sentiment).filter(
+                Sentiment.sentiment == filters['sentiment']
+            )
+
+        # Get stats
+        total_calls = query.count()
+        calls_sample = query.order_by(CDRRecord.received_at.desc()).limit(10).all()
+
+        # Build email HTML
+        email_html = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Call Report - {tenant.company_name}</h2>
+            <p>Report generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <p>Requested by: {user.email}</p>
+
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+              <h3 style="margin-top: 0;">Summary</h3>
+              <p><strong>Total Calls:</strong> {total_calls}</p>
+              {f'<p><strong>Status Filter:</strong> {filters.get("status")}</p>' if filters.get('status') else ''}
+              {f'<p><strong>Sentiment Filter:</strong> {filters.get("sentiment")}</p>' if filters.get('sentiment') else ''}
+            </div>
+
+            <h3>Recent Calls (Latest 10)</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="background: #333; color: white;">
+                  <th style="padding: 10px; text-align: left;">From</th>
+                  <th style="padding: 10px; text-align: left;">To</th>
+                  <th style="padding: 10px; text-align: left;">Duration</th>
+                  <th style="padding: 10px; text-align: left;">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+        """
+
+        for call in calls_sample:
+            mins = call.duration // 60 if call.duration else 0
+            secs = call.duration % 60 if call.duration else 0
+            duration_str = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
+
+            email_html += f"""
+                <tr style="border-bottom: 1px solid #ddd;">
+                  <td style="padding: 10px;">{call.src or '-'}</td>
+                  <td style="padding: 10px;">{call.dst or '-'}</td>
+                  <td style="padding: 10px;">{duration_str}</td>
+                  <td style="padding: 10px;">{call.disposition or '-'}</td>
+                </tr>
+            """
+
+        email_html += """
+              </tbody>
+            </table>
+
+            <p style="margin-top: 30px; color: #666; font-size: 12px;">
+              This report was generated by AudiaPro. For a full export, use the CSV export feature in your dashboard.
+            </p>
+          </body>
+        </html>
+        """
+
+        # Send email
+        params = {
+            "from": os.getenv('RESEND_FROM_EMAIL', 'reports@audiapro.com'),
+            "to": [recipient_email],
+            "subject": f"Call Report - {tenant.company_name}",
+            "html": email_html
+        }
+
+        email_response = resend.Emails.send(params)
+
+        logger.info(f"Report email sent to {recipient_email} for tenant {tenant_id}")
+
+        return jsonify({
+            'success': True,
+            'message': f'Report sent to {recipient_email}',
+            'email_id': email_response.get('id')
+        }), 200
+
+    except ImportError:
+        logger.error("Resend library not installed")
+        return jsonify({'error': 'Email service not configured'}), 500
+    except Exception as e:
+        logger.error(f"Failed to send report email: {e}")
+        return jsonify({'error': 'Failed to send email'}), 500
+
+
+# ============================================================================
+# EMAIL AND SMS NOTIFICATION HELPERS
+# ============================================================================
+
+def send_welcome_email(user_email, user_name, temp_password, company_name):
+    """Send welcome email to new user"""
+    try:
+        import resend
+        resend.api_key = os.getenv('RESEND_API_KEY')
+
+        email_html = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Welcome to AudiaPro!</h2>
+            <p>Hi {user_name},</p>
+            <p>Your account has been created for <strong>{company_name}</strong>.</p>
+
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+              <h3 style="margin-top: 0;">Your Login Credentials</h3>
+              <p><strong>Email:</strong> {user_email}</p>
+              <p><strong>Temporary Password:</strong> {temp_password}</p>
+            </div>
+
+            <p>Please log in and change your password immediately.</p>
+            <p><a href="{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/login" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Log In Now</a></p>
+
+            <p style="margin-top: 30px; color: #666; font-size: 12px;">
+              If you have any questions, please contact your administrator.
+            </p>
+          </body>
+        </html>
+        """
+
+        params = {
+            "from": os.getenv('RESEND_FROM_EMAIL', 'welcome@audiapro.com'),
+            "to": [user_email],
+            "subject": f"Welcome to AudiaPro - {company_name}",
+            "html": email_html
+        }
+
+        resend.Emails.send(params)
+        logger.info(f"Welcome email sent to {user_email}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send welcome email: {e}")
+        return False
+
+
+def send_sms_alert(phone_number, message):
+    """Send SMS alert via Twilio"""
+    try:
+        from twilio.rest import Client
+
+        account_sid = os.getenv('TWILIO_ACCOUNT_SID')
+        auth_token = os.getenv('TWILIO_AUTH_TOKEN')
+        from_number = os.getenv('TWILIO_FROM_NUMBER')
+
+        if not all([account_sid, auth_token, from_number]):
+            logger.warning("Twilio not configured - SMS not sent")
+            return False
+
+        client = Client(account_sid, auth_token)
+
+        message = client.messages.create(
+            body=message,
+            from_=from_number,
+            to=phone_number
+        )
+
+        logger.info(f"SMS sent to {phone_number}: {message.sid}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send SMS: {e}")
+        return False
+
+
+def send_urgent_notification(user_email, user_phone, subject, message_text):
+    """Send urgent notification via email and SMS"""
+    # Send email
+    try:
+        import resend
+        resend.api_key = os.getenv('RESEND_API_KEY')
+
+        email_html = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #dc3545; color: white; padding: 15px; border-radius: 5px 5px 0 0;">
+              <h2 style="margin: 0;">Urgent Alert</h2>
+            </div>
+            <div style="padding: 20px; border: 1px solid #dc3545; border-top: none; border-radius: 0 0 5px 5px;">
+              <h3>{subject}</h3>
+              <p>{message_text}</p>
+              <p style="margin-top: 20px; color: #666; font-size: 12px;">
+                This is an automated alert from AudiaPro.
+              </p>
+            </div>
+          </body>
+        </html>
+        """
+
+        params = {
+            "from": os.getenv('RESEND_FROM_EMAIL', 'alerts@audiapro.com'),
+            "to": [user_email],
+            "subject": f"URGENT: {subject}",
+            "html": email_html
+        }
+
+        resend.Emails.send(params)
+        logger.info(f"Urgent email sent to {user_email}")
+
+    except Exception as e:
+        logger.error(f"Failed to send urgent email: {e}")
+
+    # Send SMS if phone number provided
+    if user_phone:
+        sms_text = f"URGENT: {subject}\n{message_text}"
+        send_sms_alert(user_phone, sms_text)
 
 
 # ============================================================================

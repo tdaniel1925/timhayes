@@ -6,9 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import {
   Phone, TrendingUp, MessageSquare, BarChart3, Download,
-  ChevronLeft, ChevronRight, Search, Settings
+  ChevronLeft, ChevronRight, Search, Settings, Filter, X, FileText, Mail
 } from 'lucide-react';
 import {
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area,
@@ -33,14 +35,25 @@ export default function Dashboard() {
   const [searchInput, setSearchInput] = useState('');
   const perPage = 25;
 
+  // Filter state
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    status: '',
+    sentiment: '',
+    dateFrom: '',
+    dateTo: '',
+    minDuration: '',
+    maxDuration: ''
+  });
+
   useEffect(() => {
     loadData();
-  }, [currentPage, searchQuery]);
+  }, [currentPage, searchQuery, filters]);
 
   const loadData = async () => {
     try {
       const [callsData, statsData, volumeData, sentimentData] = await Promise.all([
-        api.getCalls(currentPage, perPage, searchQuery),
+        api.getCalls(currentPage, perPage, searchQuery, filters),
         api.getStats(),
         api.getCallVolume(30),
         api.getSentimentTrends()
@@ -62,6 +75,52 @@ export default function Dashboard() {
   const handleSearch = () => {
     setSearchQuery(searchInput);
     setCurrentPage(1);
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      status: '',
+      sentiment: '',
+      dateFrom: '',
+      dateTo: '',
+      minDuration: '',
+      maxDuration: ''
+    });
+    setCurrentPage(1);
+  };
+
+  const getActiveFilterCount = () => {
+    return Object.values(filters).filter(v => v !== '').length;
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const blob = await api.exportCallsCSV(searchQuery, filters);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `calls-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Failed to export CSV:', error);
+      alert('Failed to export CSV');
+    }
+  };
+
+  const handleEmailReport = async () => {
+    const email = prompt('Enter email address to send report to:');
+    if (!email) return;
+
+    try {
+      await api.emailReport(email, searchQuery, filters);
+      alert(`Report sent successfully to ${email}!`);
+    } catch (error) {
+      console.error('Failed to email report:', error);
+      alert('Failed to send report');
+    }
   };
 
   const handleDownloadRecording = async (callId) => {
@@ -128,13 +187,22 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-4">
             {user?.role === 'admin' && (
-              <Button
-                variant="ghost"
-                onClick={() => navigate('/admin/setup-requests')}
-                className="text-sm"
-              >
-                Setup Requests
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate('/admin/setup-requests')}
+                  className="text-sm"
+                >
+                  Setup Requests
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate('/users')}
+                  className="text-sm"
+                >
+                  Users
+                </Button>
+              </>
             )}
             <Button
               variant="outline"
@@ -312,7 +380,7 @@ export default function Dashboard() {
                 </CardDescription>
               </div>
 
-              {/* Search */}
+              {/* Search and Filters */}
               <div className="flex items-center gap-2">
                 <Input
                   placeholder="Search calls..."
@@ -321,11 +389,183 @@ export default function Dashboard() {
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                   className="w-64"
                 />
-                <Button onClick={handleSearch} size="icon">
+                <Button onClick={handleSearch} size="icon" variant="ghost">
                   <Search className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={() => setShowFilters(!showFilters)}
+                  variant={getActiveFilterCount() > 0 ? "default" : "outline"}
+                  className="flex items-center gap-2"
+                >
+                  <Filter className="h-4 w-4" />
+                  Filters
+                  {getActiveFilterCount() > 0 && (
+                    <span className="ml-1 bg-white text-primary rounded-full px-2 py-0.5 text-xs font-bold">
+                      {getActiveFilterCount()}
+                    </span>
+                  )}
+                </Button>
+                <Button
+                  onClick={handleExportCSV}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  title="Export to CSV"
+                >
+                  <FileText className="h-4 w-4" />
+                  Export
+                </Button>
+                <Button
+                  onClick={handleEmailReport}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  title="Email report"
+                >
+                  <Mail className="h-4 w-4" />
+                  Email
                 </Button>
               </div>
             </div>
+
+            {/* Advanced Filters Panel */}
+            {showFilters && (
+              <div className="mt-6 p-6 bg-gray-50 rounded-lg border">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-semibold text-lg">Advanced Filters</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearFilters}
+                    className="text-sm"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear All
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Status Filter */}
+                  <div>
+                    <Label htmlFor="filter-status" className="text-sm font-medium">
+                      Call Status
+                    </Label>
+                    <Select
+                      value={filters.status}
+                      onValueChange={(val) => {
+                        setFilters({ ...filters, status: val });
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <SelectTrigger id="filter-status" className="mt-1">
+                        <SelectValue placeholder="All statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All statuses</SelectItem>
+                        <SelectItem value="ANSWERED">Answered</SelectItem>
+                        <SelectItem value="NO ANSWER">No Answer</SelectItem>
+                        <SelectItem value="BUSY">Busy</SelectItem>
+                        <SelectItem value="FAILED">Failed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Sentiment Filter */}
+                  <div>
+                    <Label htmlFor="filter-sentiment" className="text-sm font-medium">
+                      Sentiment
+                    </Label>
+                    <Select
+                      value={filters.sentiment}
+                      onValueChange={(val) => {
+                        setFilters({ ...filters, sentiment: val });
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <SelectTrigger id="filter-sentiment" className="mt-1">
+                        <SelectValue placeholder="All sentiments" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All sentiments</SelectItem>
+                        <SelectItem value="POSITIVE">Positive</SelectItem>
+                        <SelectItem value="NEUTRAL">Neutral</SelectItem>
+                        <SelectItem value="NEGATIVE">Negative</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Date From */}
+                  <div>
+                    <Label htmlFor="filter-date-from" className="text-sm font-medium">
+                      Date From
+                    </Label>
+                    <Input
+                      id="filter-date-from"
+                      type="date"
+                      value={filters.dateFrom}
+                      onChange={(e) => {
+                        setFilters({ ...filters, dateFrom: e.target.value });
+                        setCurrentPage(1);
+                      }}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {/* Date To */}
+                  <div>
+                    <Label htmlFor="filter-date-to" className="text-sm font-medium">
+                      Date To
+                    </Label>
+                    <Input
+                      id="filter-date-to"
+                      type="date"
+                      value={filters.dateTo}
+                      onChange={(e) => {
+                        setFilters({ ...filters, dateTo: e.target.value });
+                        setCurrentPage(1);
+                      }}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {/* Min Duration */}
+                  <div>
+                    <Label htmlFor="filter-min-duration" className="text-sm font-medium">
+                      Min Duration (seconds)
+                    </Label>
+                    <Input
+                      id="filter-min-duration"
+                      type="number"
+                      min="0"
+                      value={filters.minDuration}
+                      onChange={(e) => {
+                        setFilters({ ...filters, minDuration: e.target.value });
+                        setCurrentPage(1);
+                      }}
+                      placeholder="0"
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {/* Max Duration */}
+                  <div>
+                    <Label htmlFor="filter-max-duration" className="text-sm font-medium">
+                      Max Duration (seconds)
+                    </Label>
+                    <Input
+                      id="filter-max-duration"
+                      type="number"
+                      min="0"
+                      value={filters.maxDuration}
+                      onChange={(e) => {
+                        setFilters({ ...filters, maxDuration: e.target.value });
+                        setCurrentPage(1);
+                      }}
+                      placeholder="3600"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {calls.length === 0 ? (

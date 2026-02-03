@@ -51,8 +51,22 @@ async function fetchWithAuth(url, options = {}) {
 }
 
 export const api = {
-  getCalls: async (page = 1, perPage = 25, search = '') => {
-    const response = await fetchWithAuth(`/calls?page=${page}&per_page=${perPage}&search=${encodeURIComponent(search)}`);
+  getCalls: async (page = 1, perPage = 25, search = '', filters = {}) => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      per_page: perPage.toString(),
+      search: search || ''
+    });
+
+    // Add filters if provided
+    if (filters.status) params.append('status', filters.status);
+    if (filters.sentiment) params.append('sentiment', filters.sentiment);
+    if (filters.dateFrom) params.append('date_from', filters.dateFrom);
+    if (filters.dateTo) params.append('date_to', filters.dateTo);
+    if (filters.minDuration) params.append('min_duration', filters.minDuration);
+    if (filters.maxDuration) params.append('max_duration', filters.maxDuration);
+
+    const response = await fetchWithAuth(`/calls?${params.toString()}`);
     return response.json();
   },
 
@@ -161,6 +175,71 @@ export const api = {
   activateSetupRequest: async (id) => {
     const response = await fetchWithAuth(`/admin/setup-requests/${id}/activate`, {
       method: 'POST'
+    });
+    return response.json();
+  },
+
+  // User Management
+  getUsers: async () => {
+    const response = await fetchWithAuth('/users');
+    return response.json();
+  },
+
+  createUser: async (userData) => {
+    const response = await fetchWithAuth('/users', {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
+    return response.json();
+  },
+
+  updateUser: async (userId, updates) => {
+    const response = await fetchWithAuth(`/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    });
+    return response.json();
+  },
+
+  deleteUser: async (userId) => {
+    const response = await fetchWithAuth(`/users/${userId}`, {
+      method: 'DELETE'
+    });
+    return response.json();
+  },
+
+  resetUserPassword: async (userId, newPassword) => {
+    const response = await fetchWithAuth(`/users/${userId}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({ password: newPassword })
+    });
+    return response.json();
+  },
+
+  // Export and Reporting
+  exportCallsCSV: async (search = '', filters = {}) => {
+    const params = new URLSearchParams({ search: search || '' });
+
+    // Add filters if provided
+    if (filters.status) params.append('status', filters.status);
+    if (filters.sentiment) params.append('sentiment', filters.sentiment);
+    if (filters.dateFrom) params.append('date_from', filters.dateFrom);
+    if (filters.dateTo) params.append('date_to', filters.dateTo);
+    if (filters.minDuration) params.append('min_duration', filters.minDuration);
+    if (filters.maxDuration) params.append('max_duration', filters.maxDuration);
+
+    const response = await fetchWithAuth(`/export/calls/csv?${params.toString()}`);
+    return response.blob();
+  },
+
+  emailReport: async (email, search = '', filters = {}) => {
+    const response = await fetchWithAuth('/export/email-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        email,
+        search,
+        filters
+      })
     });
     return response.json();
   }
