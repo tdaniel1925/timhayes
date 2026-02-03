@@ -1,0 +1,8 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "cd frontend && npm install && npm run build && cd .."
+
+[deploy]
+startCommand = "gunicorn -w 4 -b 0.0.0.0:$PORT app:app"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
