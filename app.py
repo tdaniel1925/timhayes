@@ -47,7 +47,7 @@ from error_handlers import (
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='frontend/dist', static_url_path='')
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "*", "allow_headers": ["Content-Type", "Authorization"]}}, supports_credentials=True)
 
 # Rate Limiting
 from flask_limiter import Limiter
