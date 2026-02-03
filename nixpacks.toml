@@ -1,14 +1,14 @@
+# Backend-only configuration
+# For frontend deployment, use frontend/nixpacks.toml
+
 [phases.setup]
-nixPkgs = ["python312", "python312Packages.pip", "nodejs-18_x"]
+nixPkgs = ["python312", "python312Packages.pip", "postgresql"]
 
 [phases.install]
-cmds = [
-    "pip install --break-system-packages -r requirements.txt",
-    "cd frontend && npm install && cd .."
-]
+cmds = ["pip install --break-system-packages -r requirements.txt"]
 
 [phases.build]
-cmds = ["cd frontend && npm run build && cd .."]
+cmds = ["echo 'Backend build complete'"]
 
 [start]
-cmd = "python3 -m gunicorn -w 4 -b 0.0.0.0:$PORT app:app"
+cmd = "gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile - --error-logfile -"
