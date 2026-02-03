@@ -1,0 +1,11 @@
+{
+  "name": "audiapro-backend",
+  "version": "1.0.0",
+  "description": "AudiaPro - Multi-tenant call analytics platform",
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
