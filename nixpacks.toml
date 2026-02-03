@@ -3,7 +3,7 @@ nixPkgs = ["python312", "python312Packages.pip", "nodejs-18_x"]
 
 [phases.install]
 cmds = [
-    "pip install -r requirements.txt",
+    "pip install --break-system-packages -r requirements.txt",
     "cd frontend && npm install && cd .."
 ]
 
