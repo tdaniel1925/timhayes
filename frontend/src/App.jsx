@@ -5,6 +5,9 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
+import SetupRequest from './pages/SetupRequest';
+import Checkout from './pages/Checkout';
+import CallDetail from './pages/CallDetail';
 
 // Protected Route component
 function ProtectedRoute({ children }) {
@@ -69,6 +72,8 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
+      <Route path="/setup-request" element={<SetupRequest />} />
+      <Route path="/checkout/:requestId" element={<Checkout />} />
 
       {/* Protected routes */}
       <Route
@@ -84,6 +89,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Settings />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/call/:callId"
+        element={
+          <ProtectedRoute>
+            <CallDetail />
           </ProtectedRoute>
         }
       />

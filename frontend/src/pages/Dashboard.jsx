@@ -346,7 +346,11 @@ export default function Dashboard() {
                     </TableHeader>
                     <TableBody>
                       {calls.map((call) => (
-                        <TableRow key={call.id}>
+                        <TableRow
+                          key={call.id}
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => navigate(`/call/${call.id}`)}
+                        >
                           <TableCell className="font-medium">{call.src || '-'}</TableCell>
                           <TableCell>{call.dst || '-'}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">
@@ -367,7 +371,10 @@ export default function Dashboard() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => handleDownloadRecording(call.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownloadRecording(call.id);
+                                }}
                                 className="flex items-center gap-1"
                               >
                                 <Download className="h-3 w-3" />

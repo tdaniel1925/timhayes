@@ -105,5 +105,37 @@ export const api = {
       body: JSON.stringify(config)
     });
     return response.json();
+  },
+
+  // Call Detail
+  getCallDetail: async (callId) => {
+    const response = await fetchWithAuth(`/calls/${callId}`);
+    return response.json();
+  },
+
+  // Notifications
+  getNotifications: async (page = 1, unreadOnly = false) => {
+    const response = await fetchWithAuth(`/notifications?page=${page}&unread=${unreadOnly}`);
+    return response.json();
+  },
+
+  markNotificationRead: async (notificationId) => {
+    const response = await fetchWithAuth(`/notifications/${notificationId}/read`, {
+      method: 'PUT'
+    });
+    return response.json();
+  },
+
+  getNotificationRules: async () => {
+    const response = await fetchWithAuth('/notifications/rules');
+    return response.json();
+  },
+
+  createNotificationRule: async (rule) => {
+    const response = await fetchWithAuth('/notifications/rules', {
+      method: 'POST',
+      body: JSON.stringify(rule)
+    });
+    return response.json();
   }
 };

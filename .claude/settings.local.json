@@ -15,7 +15,9 @@
       "Bash(git branch:*)",
       "Bash(git push:*)",
       "Bash(nslookup:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

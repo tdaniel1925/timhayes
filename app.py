@@ -253,8 +253,116 @@ class SentimentAnalysis(db.Model):
     analyzed_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class SetupRequest(db.Model):
+    """Setup requests from potential customers"""
+    __tablename__ = 'setup_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    request_id = db.Column(db.String(100), unique=True, nullable=False)  # UUID for tracking
+
+    # Company Information
+    company_name = db.Column(db.String(200), nullable=False)
+    industry = db.Column(db.String(100))
+    company_size = db.Column(db.String(50))
+    website = db.Column(db.String(200))
+
+    # Contact Information
+    contact_name = db.Column(db.String(200), nullable=False)
+    contact_email = db.Column(db.String(200), nullable=False)
+    contact_phone = db.Column(db.String(50), nullable=False)
+    contact_title = db.Column(db.String(100))
+
+    # Technical Details (stored as JSON)
+    technical_details = db.Column(db.Text)  # JSON string
+
+    # Plan and Features
+    selected_plan = db.Column(db.String(50))
+    features_requested = db.Column(db.Text)  # JSON string
+
+    # Additional Info
+    specific_requirements = db.Column(db.Text)
+    compliance_requirements = db.Column(db.Text)
+    preferred_setup_date = db.Column(db.String(50))
+
+    # Status tracking
+    status = db.Column(db.String(50), default='pending')  # pending, payment_received, in_progress, completed, cancelled
+    payment_status = db.Column(db.String(50), default='pending')  # pending, completed, failed
+    payment_id = db.Column(db.String(200))  # Stripe payment intent ID
+
+    # Assigned tenant (once created)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=True)
+
+    # Admin notes
+    admin_notes = db.Column(db.Text)
+    assigned_to = db.Column(db.String(200))  # Admin user handling setup
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    completed_at = db.Column(db.DateTime)
+
+
+class AISummary(db.Model):
+    """AI-generated call summaries"""
+    __tablename__ = 'ai_summaries'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cdr_id = db.Column(db.Integer, db.ForeignKey('cdr_records.id'), nullable=False)
+
+    summary_text = db.Column(db.Text)  # 2-3 sentence summary
+    topics = db.Column(db.Text)  # JSON array of topics
+    action_items = db.Column(db.Text)  # JSON array of action items
+    customer_intent = db.Column(db.String(100))  # query, complaint, feedback, sales
+    call_outcome = db.Column(db.String(50))  # resolved, escalated, callback, voicemail
+
+    generated_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class NotificationRule(db.Model):
+    """Notification alert rules"""
+    __tablename__ = 'notification_rules'
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=False)
+
+    name = db.Column(db.String(200), nullable=False)
+    trigger_type = db.Column(db.String(100), nullable=False)  # negative_sentiment, high_volume, low_answer_rate, etc.
+    threshold_value = db.Column(db.Float)
+    threshold_unit = db.Column(db.String(50))  # percentage, count, duration
+
+    enabled = db.Column(db.Boolean, default=True)
+
+    # Notification channels
+    notify_email = db.Column(db.Boolean, default=False)
+    notify_slack = db.Column(db.Boolean, default=False)
+    notify_inapp = db.Column(db.Boolean, default=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Notification(db.Model):
+    """User notifications"""
+    __tablename__ = 'notifications'
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # Null = all users in tenant
+
+    rule_id = db.Column(db.Integer, db.ForeignKey('notification_rules.id'), nullable=True)
+    cdr_id = db.Column(db.Integer, db.ForeignKey('cdr_records.id'), nullable=True)
+
+    notification_type = db.Column(db.String(100))  # alert, info, warning, error
+    title = db.Column(db.String(200))
+    message = db.Column(db.Text)
+
+    read = db.Column(db.Boolean, default=False)
+    read_at = db.Column(db.DateTime)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 # ============================================================================
-# AUTHENTICATION ENDPOINTS (Same as before)
+# AUTHENTICATION ENDPOINTS
 # ============================================================================
 
 @app.route('/api/auth/signup', methods=['POST'])
@@ -711,6 +819,391 @@ def update_settings():
     db.session.commit()
 
     return jsonify({'message': 'Settings updated successfully'}), 200
+
+
+# ============================================================================
+# SETUP REQUEST ENDPOINTS
+# ============================================================================
+
+@app.route('/api/setup-requests', methods=['POST'])
+def create_setup_request():
+    """Create a new setup request from potential customer"""
+    data = request.get_json()
+
+    required_fields = ['company_name', 'contact_email', 'contact_phone', 'phone_system_type', 'selected_plan']
+    if not all(field in data for field in required_fields):
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    try:
+        # Generate unique request ID
+        import uuid
+        request_id = str(uuid.uuid4())[:8].upper()
+
+        setup_request = SetupRequest(
+            request_id=request_id,
+            company_name=data['company_name'],
+            industry=data.get('industry'),
+            company_size=data.get('company_size'),
+            website=data.get('website'),
+            contact_name=data['contact_name'],
+            contact_email=data['contact_email'],
+            contact_phone=data['contact_phone'],
+            contact_title=data.get('contact_title'),
+            technical_details=json.dumps({
+                'phone_system_type': data['phone_system_type'],
+                'phone_system_other': data.get('phone_system_other'),
+                'pbx_ip': data.get('pbx_ip'),
+                'pbx_port': data.get('pbx_port'),
+                'pbx_username': data.get('pbx_username'),
+                'pbx_password': data.get('pbx_password'),
+                'current_call_volume': data.get('current_call_volume'),
+                'timezone': data.get('timezone'),
+                'has_pbx_admin_access': data.get('has_pbx_admin_access'),
+                'can_configure_webhooks': data.get('can_configure_webhooks'),
+                'network_type': data.get('network_type')
+            }),
+            selected_plan=data['selected_plan'],
+            features_requested=json.dumps({
+                'transcription_needed': data.get('transcription_needed', True),
+                'sentiment_analysis_needed': data.get('sentiment_analysis_needed', True),
+                'real_time_alerts': data.get('real_time_alerts', False),
+                'integration_slack': data.get('integration_slack', False),
+                'integration_email': data.get('integration_email', False),
+                'export_reports': data.get('export_reports', False)
+            }),
+            specific_requirements=data.get('specific_requirements'),
+            compliance_requirements=data.get('compliance_requirements'),
+            preferred_setup_date=data.get('preferred_setup_date'),
+            status='pending',
+            payment_status='pending'
+        )
+
+        db.session.add(setup_request)
+        db.session.commit()
+
+        logger.info(f"Setup request created: {request_id} for {data['company_name']}")
+
+        return jsonify({
+            'request_id': request_id,
+            'message': 'Setup request submitted successfully',
+            'next_step': 'payment'
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Setup request error: {e}", exc_info=True)
+        return jsonify({'error': f'Failed to create setup request: {str(e)}'}), 500
+
+
+@app.route('/api/setup-requests/<request_id>', methods=['GET'])
+def get_setup_request(request_id):
+    """Get setup request details (for payment page)"""
+    setup_request = SetupRequest.query.filter_by(request_id=request_id).first()
+
+    if not setup_request:
+        return jsonify({'error': 'Setup request not found'}), 404
+
+    return jsonify({
+        'request_id': setup_request.request_id,
+        'company_name': setup_request.company_name,
+        'contact_email': setup_request.contact_email,
+        'selected_plan': setup_request.selected_plan,
+        'status': setup_request.status,
+        'payment_status': setup_request.payment_status,
+        'created_at': setup_request.created_at.isoformat()
+    }), 200
+
+
+@app.route('/api/setup-requests/<request_id>/payment', methods=['POST'])
+def process_payment(request_id):
+    """Process payment for setup request"""
+    setup_request = SetupRequest.query.filter_by(request_id=request_id).first()
+
+    if not setup_request:
+        return jsonify({'error': 'Setup request not found'}), 404
+
+    data = request.get_json()
+
+    try:
+        # In production, integrate with Stripe here
+        # For now, simulate successful payment
+        import uuid
+        payment_id = f"pi_{uuid.uuid4().hex[:24]}"
+
+        setup_request.payment_status = 'completed'
+        setup_request.payment_id = payment_id
+        setup_request.status = 'payment_received'
+
+        db.session.commit()
+
+        logger.info(f"Payment processed for setup request {request_id}")
+
+        return jsonify({
+            'payment_id': payment_id,
+            'status': 'completed',
+            'message': 'Payment processed successfully'
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Payment error: {e}", exc_info=True)
+        return jsonify({'error': 'Payment processing failed'}), 500
+
+
+# ============================================================================
+# ADMIN ENDPOINTS (for processing setup requests)
+# ============================================================================
+
+@app.route('/api/admin/setup-requests', methods=['GET'])
+@jwt_required()
+def admin_list_setup_requests():
+    """List all setup requests (admin only)"""
+    claims = get_jwt()
+    role = claims.get('role')
+
+    if role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    status_filter = request.args.get('status', 'all')
+    page = int(request.args.get('page', 1))
+    per_page = 25
+
+    query = SetupRequest.query
+    if status_filter != 'all':
+        query = query.filter_by(status=status_filter)
+
+    setup_requests = query.order_by(SetupRequest.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+
+    return jsonify({
+        'requests': [{
+            'id': req.id,
+            'request_id': req.request_id,
+            'company_name': req.company_name,
+            'contact_email': req.contact_email,
+            'contact_phone': req.contact_phone,
+            'selected_plan': req.selected_plan,
+            'status': req.status,
+            'payment_status': req.payment_status,
+            'created_at': req.created_at.isoformat(),
+            'assigned_to': req.assigned_to
+        } for req in setup_requests.items],
+        'total': setup_requests.total,
+        'pages': setup_requests.pages,
+        'current_page': setup_requests.page
+    }), 200
+
+
+@app.route('/api/admin/setup-requests/<int:id>', methods=['PUT'])
+@jwt_required()
+def admin_update_setup_request(id):
+    """Update setup request status (admin only)"""
+    claims = get_jwt()
+    role = claims.get('role')
+
+    if role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    setup_request = SetupRequest.query.get(id)
+    if not setup_request:
+        return jsonify({'error': 'Setup request not found'}), 404
+
+    data = request.get_json()
+
+    if 'status' in data:
+        setup_request.status = data['status']
+    if 'admin_notes' in data:
+        setup_request.admin_notes = data['admin_notes']
+    if 'assigned_to' in data:
+        setup_request.assigned_to = data['assigned_to']
+
+    db.session.commit()
+
+    return jsonify({'message': 'Setup request updated'}), 200
+
+
+# ============================================================================
+# CALL DETAIL ENDPOINTS
+# ============================================================================
+
+@app.route('/api/calls/<int:call_id>', methods=['GET'])
+@jwt_required()
+def get_call_detail(call_id):
+    """Get complete call details with transcription and sentiment"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+
+    cdr = CDRRecord.query.filter_by(id=call_id, tenant_id=tenant_id).first()
+    if not cdr:
+        return jsonify({'error': 'Call not found'}), 404
+
+    call_data = {
+        'id': cdr.id,
+        'uniqueid': cdr.uniqueid,
+        'src': cdr.src,
+        'dst': cdr.dst,
+        'caller_name': cdr.caller_name,
+        'start_time': cdr.start_time,
+        'answer_time': cdr.answer_time,
+        'end_time': cdr.end_time,
+        'duration': cdr.duration,
+        'billsec': cdr.billsec,
+        'disposition': cdr.disposition,
+        'recording_local_path': cdr.recording_local_path,
+        'has_recording': bool(cdr.recording_local_path),
+        'transcription': None,
+        'sentiment': None,
+        'ai_summary': None
+    }
+
+    # Get transcription if exists
+    if cdr.transcription:
+        trans = cdr.transcription
+        call_data['transcription'] = {
+            'text': trans.transcription_text,
+            'language': trans.language,
+            'duration': trans.duration_seconds,
+            'transcribed_at': trans.transcribed_at.isoformat() if trans.transcribed_at else None
+        }
+
+        # Get sentiment if exists
+        if trans.sentiment:
+            sent = trans.sentiment
+            call_data['sentiment'] = {
+                'sentiment': sent.sentiment,
+                'sentiment_score': sent.sentiment_score,
+                'positive_score': sent.positive_score,
+                'negative_score': sent.negative_score,
+                'neutral_score': sent.neutral_score,
+                'key_phrases': sent.key_phrases,
+                'analyzed_at': sent.analyzed_at.isoformat() if sent.analyzed_at else None
+            }
+
+    # Get AI summary if exists
+    ai_summary = AISummary.query.filter_by(cdr_id=call_id).first()
+    if ai_summary:
+        call_data['ai_summary'] = {
+            'summary': ai_summary.summary_text,
+            'topics': json.loads(ai_summary.topics) if ai_summary.topics else [],
+            'action_items': json.loads(ai_summary.action_items) if ai_summary.action_items else [],
+            'customer_intent': ai_summary.customer_intent,
+            'call_outcome': ai_summary.call_outcome
+        }
+
+    return jsonify(call_data), 200
+
+
+# ============================================================================
+# NOTIFICATION ENDPOINTS
+# ============================================================================
+
+@app.route('/api/notifications', methods=['GET'])
+@jwt_required()
+def get_notifications():
+    """Get user notifications"""
+    claims = get_jwt()
+    user_id = get_jwt_identity()
+    tenant_id = claims.get('tenant_id')
+
+    page = int(request.args.get('page', 1))
+    unread_only = request.args.get('unread', 'false').lower() == 'true'
+
+    query = Notification.query.filter(
+        Notification.tenant_id == tenant_id,
+        (Notification.user_id == user_id) | (Notification.user_id == None)
+    )
+
+    if unread_only:
+        query = query.filter_by(read=False)
+
+    notifications = query.order_by(Notification.created_at.desc()).paginate(
+        page=page, per_page=20, error_out=False
+    )
+
+    return jsonify({
+        'notifications': [{
+            'id': notif.id,
+            'type': notif.notification_type,
+            'title': notif.title,
+            'message': notif.message,
+            'read': notif.read,
+            'cdr_id': notif.cdr_id,
+            'created_at': notif.created_at.isoformat()
+        } for notif in notifications.items],
+        'total': notifications.total,
+        'unread_count': Notification.query.filter_by(tenant_id=tenant_id, read=False).count()
+    }), 200
+
+
+@app.route('/api/notifications/<int:notif_id>/read', methods=['PUT'])
+@jwt_required()
+def mark_notification_read(notif_id):
+    """Mark notification as read"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+
+    notification = Notification.query.filter_by(id=notif_id, tenant_id=tenant_id).first()
+    if not notification:
+        return jsonify({'error': 'Notification not found'}), 404
+
+    notification.read = True
+    notification.read_at = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify({'message': 'Notification marked as read'}), 200
+
+
+@app.route('/api/notifications/rules', methods=['GET'])
+@jwt_required()
+def get_notification_rules():
+    """Get notification rules for tenant"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+
+    rules = NotificationRule.query.filter_by(tenant_id=tenant_id).all()
+
+    return jsonify({
+        'rules': [{
+            'id': rule.id,
+            'name': rule.name,
+            'trigger_type': rule.trigger_type,
+            'threshold_value': rule.threshold_value,
+            'enabled': rule.enabled,
+            'notify_email': rule.notify_email,
+            'notify_slack': rule.notify_slack,
+            'notify_inapp': rule.notify_inapp
+        } for rule in rules]
+    }), 200
+
+
+@app.route('/api/notifications/rules', methods=['POST'])
+@jwt_required()
+def create_notification_rule():
+    """Create new notification rule"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+    role = claims.get('role')
+
+    if role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    data = request.get_json()
+
+    rule = NotificationRule(
+        tenant_id=tenant_id,
+        name=data['name'],
+        trigger_type=data['trigger_type'],
+        threshold_value=data.get('threshold_value'),
+        threshold_unit=data.get('threshold_unit'),
+        notify_email=data.get('notify_email', False),
+        notify_slack=data.get('notify_slack', False),
+        notify_inapp=data.get('notify_inapp', True)
+    )
+
+    db.session.add(rule)
+    db.session.commit()
+
+    return jsonify({'id': rule.id, 'message': 'Notification rule created'}), 201
 
 
 # ============================================================================
