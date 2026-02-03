@@ -721,9 +721,22 @@ def update_settings():
 @app.route('/<path:path>')
 def serve_frontend(path):
     """Serve React frontend"""
-    if path and os.path.exists(os.path.join(app.static_folder, path)):
-        return send_from_directory(app.static_folder, path)
-    return send_from_directory(app.static_folder, 'index.html')
+    try:
+        if path and os.path.exists(os.path.join(app.static_folder, path)):
+            return send_from_directory(app.static_folder, path)
+        return send_from_directory(app.static_folder, 'index.html')
+    except Exception as e:
+        logger.error(f"Frontend serving error: {e}")
+        return jsonify({
+            'error': 'Frontend not built',
+            'message': 'Please build the frontend: cd frontend && npm run build',
+            'api_status': 'Backend API is running',
+            'api_docs': {
+                'health': '/api/auth/me',
+                'login': 'POST /api/auth/login',
+                'signup': 'POST /api/auth/signup'
+            }
+        }), 200
 
 
 # ============================================================================
