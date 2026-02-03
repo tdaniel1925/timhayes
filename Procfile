@@ -1,1 +1,1 @@
-web: cd /app && gunicorn -w 4 -b 0.0.0.0:$PORT app:app
+web: cd /app && source .venv/bin/activate && gunicorn -w 4 -b 0.0.0.0:$PORT app:app
