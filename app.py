@@ -22,7 +22,7 @@ import requests
 from typing import Optional, Dict, Any, List
 import threading
 from urllib.parse import quote
-from sqlalchemy import and_, func, extract
+from sqlalchemy import and_, func, extract, text
 from collections import defaultdict
 import csv
 import io
@@ -2903,7 +2903,7 @@ def health_check():
 
     try:
         # Check database connection
-        db.session.execute('SELECT 1')
+        db.session.execute(text('SELECT 1'))
         health_status['database'] = 'connected'
     except Exception as e:
         health_status['status'] = 'unhealthy'
