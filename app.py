@@ -610,6 +610,7 @@ def increment_usage(tenant_id):
 # ============================================================================
 
 @app.route('/api/auth/signup', methods=['POST'])
+@limiter.limit("3 per hour")
 def signup():
     """Register new tenant and admin user"""
     data = request.get_json()
@@ -621,6 +622,9 @@ def signup():
     if User.query.filter_by(email=data['email']).first():
         return jsonify({'error': 'Email already registered'}), 400
 
+    if len(data['password']) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters'}), 400
+
     subdomain = data['company_name'].lower().replace(' ', '-').replace('_', '-')
     base_subdomain = subdomain
     counter = 1
@@ -629,26 +633,51 @@ def signup():
         counter += 1
 
     try:
+        # Set plan limits
+        plan = data.get('plan', 'starter')
+        plan_limits = {
+            'starter': {'calls_per_month': 500, 'recording_storage_gb': 5},
+            'professional': {'calls_per_month': 2000, 'recording_storage_gb': 25},
+            'enterprise': {'calls_per_month': -1, 'recording_storage_gb': 100}
+        }
+
         tenant = Tenant(
             company_name=data['company_name'],
             subdomain=subdomain,
-            plan=data.get('plan', 'starter'),
+            plan=plan,
+            plan_limits=json.dumps(plan_limits.get(plan, plan_limits['starter'])),
+            billing_cycle_start=datetime.utcnow(),
             phone_system_type=data.get('phone_system_type', 'grandstream_ucm')
         )
         db.session.add(tenant)
         db.session.flush()
 
+        # Generate email verification token
+        verification_token = crypto_secrets.token_urlsafe(32)
+
         user = User(
             tenant_id=tenant.id,
             email=data['email'],
             full_name=data['full_name'],
-            role='admin'
+            role='admin',
+            reset_token=verification_token,
+            reset_token_expires=datetime.utcnow() + timedelta(days=7)
         )
         user.set_password(data['password'])
         db.session.add(user)
 
         db.session.commit()
 
+        # Send verification email
+        send_verification_email(user.email, user.full_name, verification_token)
+
+        # Log audit
+        log_audit('user_signup', 'user', user.id, {
+            'email': user.email,
+            'company': tenant.company_name
+        }, user.id, tenant.id)
+
+        # Return tokens
         access_token = create_access_token(
             identity=user.id,
             additional_claims={'tenant_id': tenant.id, 'role': user.role}
@@ -663,13 +692,15 @@ def signup():
                 'email': user.email,
                 'full_name': user.full_name,
                 'role': user.role,
+                'email_verified': user.email_verified,
                 'tenant': {
                     'id': tenant.id,
                     'company_name': tenant.company_name,
                     'subdomain': subdomain,
                     'plan': tenant.plan
                 }
-            }
+            },
+            'message': 'Account created! Please check your email to verify your account.'
         }), 201
     except Exception as e:
         db.session.rollback()
@@ -901,6 +932,41 @@ def reset_password():
     return jsonify({'message': 'Password reset successfully'}), 200
 
 
+@app.route('/api/auth/verify-email', methods=['POST'])
+@limiter.limit("10 per hour")
+def verify_email():
+    """Verify email address with token"""
+    try:
+        data = request.get_json()
+        token = data.get('token')
+
+        if not token:
+            return jsonify({'error': 'Verification token required'}), 400
+
+        # Find user by token
+        user = User.query.filter_by(reset_token=token).first()
+
+        if not user or not user.verify_reset_token(token):
+            return jsonify({'error': 'Invalid or expired verification token'}), 400
+
+        # Mark email as verified
+        user.email_verified = True
+        user.reset_token = None
+        user.reset_token_expires = None
+        db.session.commit()
+
+        # Log audit
+        log_audit('email_verified', 'user', user.id, {'email': user.email}, user.id, user.tenant_id)
+
+        logger.info(f"Email verified for user: {user.email}")
+
+        return jsonify({'message': 'Email verified successfully! You can now log in.'}), 200
+
+    except Exception as e:
+        logger.error(f"Email verification error: {str(e)}")
+        return jsonify({'error': 'Email verification failed'}), 500
+
+
 # ============================================================================
 # CDR WEBHOOK ENDPOINT
 # ============================================================================
@@ -927,6 +993,40 @@ def receive_cdr(subdomain):
         uniqueid = cdr_data.get('uniqueid', 'unknown')
         logger.info(f"[{subdomain}] Received CDR: {uniqueid} | {cdr_data.get('src')} -> {cdr_data.get('dst')}")
 
+        # Check usage limits
+        if not check_usage_limit(tenant.id):
+            logger.warning(f"[{subdomain}] Usage limit exceeded for tenant {tenant.id}")
+            # Still accept the CDR but mark it as over-limit
+            # In production, you might want to reject or queue for later processing
+            cdr = CDRRecord(
+                tenant_id=tenant.id,
+                uniqueid=cdr_data.get('uniqueid'),
+                src=cdr_data.get('src'),
+                dst=cdr_data.get('dst'),
+                caller_name=cdr_data.get('caller_name'),
+                clid=cdr_data.get('clid'),
+                channel=cdr_data.get('channel'),
+                dstchannel=cdr_data.get('dstchannel'),
+                start_time=cdr_data.get('start'),
+                answer_time=cdr_data.get('answer'),
+                end_time=cdr_data.get('end'),
+                duration=cdr_data.get('duration'),
+                billsec=cdr_data.get('billsec'),
+                disposition=cdr_data.get('disposition'),
+                recordfiles=cdr_data.get('recordfiles'),
+                src_trunk_name=cdr_data.get('src_trunk_name'),
+                dst_trunk_name=cdr_data.get('dst_trunk_name')
+            )
+            db.session.add(cdr)
+            db.session.commit()
+
+            return jsonify({
+                'status': 'accepted_over_limit',
+                'message': 'Usage limit exceeded. Please upgrade your plan.',
+                'upgrade_required': True
+            }), 202
+
+        # Process CDR normally
         cdr = CDRRecord(
             tenant_id=tenant.id,
             uniqueid=cdr_data.get('uniqueid'),
@@ -949,6 +1049,9 @@ def receive_cdr(subdomain):
 
         db.session.add(cdr)
         db.session.commit()
+
+        # Increment usage counter
+        increment_usage(tenant.id)
 
         return jsonify({'status': 'success'}), 200
 
@@ -1136,6 +1239,127 @@ def get_sentiment_trends():
         'sentiment': s[0],
         'count': s[1]
     } for s in sentiments]), 200
+
+
+# ============================================================================
+# SUBSCRIPTION & BILLING MANAGEMENT
+# ============================================================================
+
+@app.route('/api/subscription', methods=['GET'])
+@jwt_required()
+def get_subscription():
+    """Get current subscription details"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+
+    tenant = Tenant.query.get(tenant_id)
+    if not tenant:
+        return jsonify({'error': 'Tenant not found'}), 404
+
+    # Calculate next billing date (assuming monthly billing)
+    next_billing_date = None
+    if tenant.billing_cycle_start:
+        next_billing_date = tenant.billing_cycle_start + timedelta(days=30)
+
+    return jsonify({
+        'plan': tenant.plan_type or 'starter',
+        'status': 'active' if tenant.subscription_ends_at and tenant.subscription_ends_at > datetime.utcnow() else 'inactive',
+        'next_billing_date': next_billing_date.isoformat() if next_billing_date else None,
+        'paypal_subscription_id': tenant.paypal_subscription_id
+    }), 200
+
+
+@app.route('/api/billing/history', methods=['GET'])
+@jwt_required()
+def get_billing_history():
+    """Get billing history for current tenant"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+
+    history = BillingHistory.query.filter_by(tenant_id=tenant_id).order_by(
+        BillingHistory.created_at.desc()
+    ).limit(50).all()
+
+    return jsonify({
+        'history': [{
+            'id': h.id,
+            'invoice_number': h.invoice_number,
+            'amount': h.amount,
+            'payment_status': h.payment_status,
+            'invoice_url': h.invoice_url,
+            'receipt_url': h.receipt_url,
+            'created_at': h.created_at.isoformat()
+        } for h in history]
+    }), 200
+
+
+@app.route('/api/usage/stats', methods=['GET'])
+@jwt_required()
+def get_usage_stats():
+    """Get usage statistics for current billing cycle"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+
+    tenant = Tenant.query.get(tenant_id)
+    if not tenant:
+        return jsonify({'error': 'Tenant not found'}), 404
+
+    # Get plan limits
+    plan_limits = json.loads(tenant.plan_limits) if tenant.plan_limits else {}
+
+    # Calculate storage used (simplified - in production, sum actual file sizes)
+    storage_used_gb = 0  # Placeholder - implement actual storage calculation
+
+    return jsonify({
+        'calls_this_month': tenant.usage_this_month or 0,
+        'calls_limit': plan_limits.get('calls_per_month', 500),
+        'storage_used_gb': storage_used_gb,
+        'storage_limit_gb': plan_limits.get('recording_storage_gb', 5),
+        'billing_cycle_start': tenant.billing_cycle_start.isoformat() if tenant.billing_cycle_start else None
+    }), 200
+
+
+@app.route('/api/subscription/cancel', methods=['POST'])
+@jwt_required()
+@limiter.limit("3 per hour")
+def cancel_subscription():
+    """Cancel subscription (will remain active until end of billing period)"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+    user_id = claims.get('user_id')
+
+    tenant = Tenant.query.get(tenant_id)
+    if not tenant:
+        return jsonify({'error': 'Tenant not found'}), 404
+
+    # In production, cancel PayPal subscription via API
+    if tenant.paypal_subscription_id:
+        try:
+            import paypalrestsdk
+            # Cancel PayPal subscription
+            # subscription = paypalrestsdk.Subscription.find(tenant.paypal_subscription_id)
+            # subscription.cancel()
+            logger.info(f"Subscription cancellation requested for tenant {tenant_id}")
+        except Exception as e:
+            logger.error(f"Failed to cancel PayPal subscription: {e}")
+
+    # Set subscription to expire at end of current billing period
+    if tenant.billing_cycle_start:
+        tenant.subscription_ends_at = tenant.billing_cycle_start + timedelta(days=30)
+    else:
+        tenant.subscription_ends_at = datetime.utcnow()
+
+    db.session.commit()
+
+    # Log audit
+    log_audit('subscription_canceled', 'tenant', tenant_id, {
+        'paypal_subscription_id': tenant.paypal_subscription_id
+    }, user_id, tenant_id)
+
+    return jsonify({
+        'message': 'Subscription canceled successfully',
+        'ends_at': tenant.subscription_ends_at.isoformat()
+    }), 200
 
 
 @app.route('/api/recording/<int:call_id>', methods=['GET'])
@@ -1520,6 +1744,114 @@ def verify_payment(request_id):
     except Exception as e:
         logger.error(f"Payment verification error: {e}", exc_info=True)
         return jsonify({'error': 'Payment verification failed'}), 500
+
+
+# ============================================================================
+# PAYPAL WEBHOOK HANDLER
+# ============================================================================
+
+@app.route('/api/webhooks/paypal', methods=['POST'])
+@limiter.limit("100 per hour")
+def paypal_webhook():
+    """Handle PayPal webhook events for subscriptions and payments"""
+    try:
+        # Get webhook data
+        webhook_data = request.get_json()
+        event_type = webhook_data.get('event_type')
+        resource = webhook_data.get('resource', {})
+
+        logger.info(f"PayPal webhook received: {event_type}")
+
+        # Handle different event types
+        if event_type == 'BILLING.SUBSCRIPTION.CREATED':
+            # Subscription created
+            subscription_id = resource.get('id')
+            subscriber_email = resource.get('subscriber', {}).get('email_address')
+
+            # Find tenant by email or subscription_id
+            tenant = Tenant.query.filter_by(paypal_subscription_id=subscription_id).first()
+            if tenant:
+                tenant.billing_cycle_start = datetime.utcnow()
+                tenant.subscription_ends_at = datetime.utcnow() + timedelta(days=30)
+                db.session.commit()
+                logger.info(f"Subscription created for tenant {tenant.id}")
+
+        elif event_type == 'BILLING.SUBSCRIPTION.CANCELLED':
+            # Subscription canceled
+            subscription_id = resource.get('id')
+            tenant = Tenant.query.filter_by(paypal_subscription_id=subscription_id).first()
+
+            if tenant:
+                # Set expiration to end of current billing period
+                if tenant.billing_cycle_start:
+                    tenant.subscription_ends_at = tenant.billing_cycle_start + timedelta(days=30)
+                else:
+                    tenant.subscription_ends_at = datetime.utcnow()
+                db.session.commit()
+                logger.info(f"Subscription canceled for tenant {tenant.id}")
+
+        elif event_type == 'PAYMENT.SALE.COMPLETED':
+            # Payment completed
+            payment_id = resource.get('id')
+            amount = float(resource.get('amount', {}).get('total', 0))
+            subscription_id = resource.get('billing_agreement_id')
+
+            # Find tenant
+            tenant = Tenant.query.filter_by(paypal_subscription_id=subscription_id).first()
+
+            if tenant:
+                # Create billing history record
+                import uuid
+                invoice_number = f"INV-{uuid.uuid4().hex[:12].upper()}"
+
+                billing = BillingHistory(
+                    tenant_id=tenant.id,
+                    invoice_number=invoice_number,
+                    amount=amount,
+                    payment_status='paid',
+                    payment_method='paypal',
+                    created_at=datetime.utcnow()
+                )
+                db.session.add(billing)
+
+                # Extend subscription
+                tenant.billing_cycle_start = datetime.utcnow()
+                tenant.subscription_ends_at = datetime.utcnow() + timedelta(days=30)
+                tenant.usage_this_month = 0  # Reset usage counter
+
+                db.session.commit()
+                logger.info(f"Payment completed for tenant {tenant.id}: ${amount}")
+
+        elif event_type == 'PAYMENT.SALE.DENIED' or event_type == 'PAYMENT.SALE.REFUNDED':
+            # Payment failed or refunded
+            payment_id = resource.get('id')
+            subscription_id = resource.get('billing_agreement_id')
+
+            tenant = Tenant.query.filter_by(paypal_subscription_id=subscription_id).first()
+
+            if tenant:
+                # Create failed billing record
+                import uuid
+                invoice_number = f"INV-{uuid.uuid4().hex[:12].upper()}"
+
+                billing = BillingHistory(
+                    tenant_id=tenant.id,
+                    invoice_number=invoice_number,
+                    amount=0,
+                    payment_status='failed',
+                    payment_method='paypal',
+                    created_at=datetime.utcnow()
+                )
+                db.session.add(billing)
+                db.session.commit()
+
+                logger.warning(f"Payment failed for tenant {tenant.id}")
+
+        return jsonify({'status': 'received'}), 200
+
+    except Exception as e:
+        logger.error(f"PayPal webhook error: {e}", exc_info=True)
+        return jsonify({'error': 'Webhook processing failed'}), 500
 
 
 # ============================================================================
@@ -2404,6 +2736,54 @@ def send_welcome_email(user_email, user_name, temp_password, company_name):
         return False
 
 
+def send_verification_email(user_email, user_name, verification_token):
+    """Send email verification link"""
+    try:
+        import resend
+        resend.api_key = os.getenv('RESEND_API_KEY')
+
+        verification_link = f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/verify-email?token={verification_token}"
+
+        email_html = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Verify Your Email Address</h2>
+            <p>Hi {user_name},</p>
+            <p>Thank you for signing up for AudiaPro! Please verify your email address to complete your registration.</p>
+
+            <div style="margin: 30px 0; text-align: center;">
+              <a href="{verification_link}" style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+                Verify Email Address
+              </a>
+            </div>
+
+            <p>This link will expire in 7 days.</p>
+            <p>If you didn't create an account with AudiaPro, you can safely ignore this email.</p>
+
+            <p style="margin-top: 30px; color: #666; font-size: 12px;">
+              If the button doesn't work, copy and paste this link into your browser:<br>
+              <a href="{verification_link}">{verification_link}</a>
+            </p>
+          </body>
+        </html>
+        """
+
+        params = {
+            "from": os.getenv('RESEND_FROM_EMAIL', 'verify@audiapro.com'),
+            "to": [user_email],
+            "subject": "Verify Your Email - AudiaPro",
+            "html": email_html
+        }
+
+        resend.Emails.send(params)
+        logger.info(f"Verification email sent to {user_email}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send verification email: {e}")
+        return False
+
+
 def send_sms_alert(phone_number, message):
     """Send SMS alert via Twilio"""
     try:
@@ -2474,6 +2854,44 @@ def send_urgent_notification(user_email, user_phone, subject, message_text):
     if user_phone:
         sms_text = f"URGENT: {subject}\n{message_text}"
         send_sms_alert(user_phone, sms_text)
+
+
+# ============================================================================
+# HEALTH CHECK ENDPOINT
+# ============================================================================
+
+@app.route('/health', methods=['GET'])
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for monitoring and load balancers"""
+    health_status = {
+        'status': 'healthy',
+        'timestamp': datetime.utcnow().isoformat(),
+        'service': 'AudiaPro',
+        'version': '1.0.0'
+    }
+
+    try:
+        # Check database connection
+        db.session.execute('SELECT 1')
+        health_status['database'] = 'connected'
+    except Exception as e:
+        health_status['status'] = 'unhealthy'
+        health_status['database'] = 'disconnected'
+        health_status['error'] = str(e)
+        return jsonify(health_status), 503
+
+    # Check encryption key
+    if not ENCRYPTION_KEY:
+        health_status['status'] = 'degraded'
+        health_status['encryption'] = 'warning: using temporary key'
+    else:
+        health_status['encryption'] = 'configured'
+
+    # Return 200 if healthy, 503 if unhealthy
+    status_code = 200 if health_status['status'] == 'healthy' else 503
+
+    return jsonify(health_status), status_code
 
 
 # ============================================================================

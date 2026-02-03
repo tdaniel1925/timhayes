@@ -12,6 +12,8 @@ import AdminSetupRequests from './pages/AdminSetupRequests';
 import Notifications from './pages/Notifications';
 import UserManagement from './pages/UserManagement';
 import IntegrationsPanel from './pages/IntegrationsPanel';
+import VerifyEmail from './pages/VerifyEmail';
+import SubscriptionManagement from './pages/SubscriptionManagement';
 
 // Protected Route component
 function ProtectedRoute({ children }) {
@@ -78,6 +80,7 @@ function AppRoutes() {
       />
       <Route path="/setup-request" element={<SetupRequest />} />
       <Route path="/checkout/:requestId" element={<Checkout />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
 
       {/* Protected routes */}
       <Route
@@ -133,6 +136,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <IntegrationsPanel />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/subscription"
+        element={
+          <ProtectedRoute>
+            <SubscriptionManagement />
           </ProtectedRoute>
         }
       />

@@ -242,5 +242,60 @@ export const api = {
       })
     });
     return response.json();
+  },
+
+  // Password Reset
+  requestPasswordReset: async (email) => {
+    const response = await fetch(`${API_BASE}/auth/request-password-reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    return response.json();
+  },
+
+  resetPassword: async (token, newPassword) => {
+    const response = await fetch(`${API_BASE}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, new_password: newPassword })
+    });
+    return response.json();
+  },
+
+  // Email Verification
+  verifyEmail: async (token) => {
+    const response = await fetch(`${API_BASE}/auth/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+    if (!response.ok) {
+      throw await response.json();
+    }
+    return response.json();
+  },
+
+  // Subscription Management
+  getSubscription: async () => {
+    const response = await fetchWithAuth('/subscription');
+    return response.json();
+  },
+
+  getBillingHistory: async () => {
+    const response = await fetchWithAuth('/billing/history');
+    return response.json();
+  },
+
+  getUsageStats: async () => {
+    const response = await fetchWithAuth('/usage/stats');
+    return response.json();
+  },
+
+  cancelSubscription: async () => {
+    const response = await fetchWithAuth('/subscription/cancel', {
+      method: 'POST'
+    });
+    return response.json();
   }
 };
