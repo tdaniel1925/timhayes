@@ -1,5 +1,9 @@
-[phases.setup]
-nixPkgs = ["nodejs-18_x", "python311"]
+# Nixpacks configuration for AudiaPro
+# Python + Node.js hybrid app
+
+[providers]
+python = "3.12"
+nodejs = "18"
 
 [phases.install]
 cmds = [
