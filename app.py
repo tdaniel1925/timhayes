@@ -1022,6 +1022,137 @@ def admin_update_setup_request(id):
     return jsonify({'message': 'Setup request updated'}), 200
 
 
+@app.route('/api/admin/setup-requests/<int:id>/detail', methods=['GET'])
+@jwt_required()
+def admin_get_setup_request_detail(id):
+    """Get full setup request details (admin only)"""
+    claims = get_jwt()
+    role = claims.get('role')
+
+    if role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    setup_request = SetupRequest.query.get(id)
+    if not setup_request:
+        return jsonify({'error': 'Setup request not found'}), 404
+
+    return jsonify({
+        'id': setup_request.id,
+        'request_id': setup_request.request_id,
+        'company_name': setup_request.company_name,
+        'industry': setup_request.industry,
+        'company_size': setup_request.company_size,
+        'website': setup_request.website,
+        'contact_name': setup_request.contact_name,
+        'contact_email': setup_request.contact_email,
+        'contact_phone': setup_request.contact_phone,
+        'contact_title': setup_request.contact_title,
+        'technical_details': json.loads(setup_request.technical_details) if setup_request.technical_details else {},
+        'selected_plan': setup_request.selected_plan,
+        'features_requested': json.loads(setup_request.features_requested) if setup_request.features_requested else {},
+        'specific_requirements': setup_request.specific_requirements,
+        'compliance_requirements': setup_request.compliance_requirements,
+        'preferred_setup_date': setup_request.preferred_setup_date,
+        'status': setup_request.status,
+        'payment_status': setup_request.payment_status,
+        'payment_id': setup_request.payment_id,
+        'tenant_id': setup_request.tenant_id,
+        'admin_notes': setup_request.admin_notes,
+        'assigned_to': setup_request.assigned_to,
+        'created_at': setup_request.created_at.isoformat(),
+        'updated_at': setup_request.updated_at.isoformat() if setup_request.updated_at else None
+    }), 200
+
+
+@app.route('/api/admin/setup-requests/<int:id>/activate', methods=['POST'])
+@jwt_required()
+def admin_activate_setup_request(id):
+    """Activate account - create tenant and admin user (admin only)"""
+    claims = get_jwt()
+    role = claims.get('role')
+
+    if role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    setup_request = SetupRequest.query.get(id)
+    if not setup_request:
+        return jsonify({'error': 'Setup request not found'}), 404
+
+    if setup_request.tenant_id:
+        return jsonify({'error': 'Account already activated'}), 400
+
+    if setup_request.payment_status != 'completed':
+        return jsonify({'error': 'Payment not completed'}), 400
+
+    try:
+        # Parse technical details
+        technical = json.loads(setup_request.technical_details) if setup_request.technical_details else {}
+
+        # Create subdomain from company name
+        subdomain = setup_request.company_name.lower().replace(' ', '-').replace('_', '-')
+        base_subdomain = subdomain
+        counter = 1
+        while Tenant.query.filter_by(subdomain=subdomain).first():
+            subdomain = f"{base_subdomain}-{counter}"
+            counter += 1
+
+        # Create tenant
+        tenant = Tenant(
+            company_name=setup_request.company_name,
+            subdomain=subdomain,
+            plan=setup_request.selected_plan,
+            phone_system_type=technical.get('phone_system_type', 'grandstream_ucm'),
+            pbx_ip=technical.get('pbx_ip'),
+            pbx_username=technical.get('pbx_username'),
+            pbx_password=technical.get('pbx_password'),
+            pbx_port=int(technical.get('pbx_port', 8443)) if technical.get('pbx_port') else 8443,
+            transcription_enabled=True,
+            sentiment_enabled=True,
+            is_active=True
+        )
+        db.session.add(tenant)
+        db.session.flush()
+
+        # Generate temporary password
+        import secrets
+        import string
+        temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits + '!@#$') for _ in range(12))
+
+        # Create admin user
+        user = User(
+            tenant_id=tenant.id,
+            email=setup_request.contact_email,
+            full_name=setup_request.contact_name,
+            role='admin',
+            is_active=True
+        )
+        user.set_password(temp_password)
+        db.session.add(user)
+
+        # Update setup request
+        setup_request.tenant_id = tenant.id
+        setup_request.status = 'completed'
+        setup_request.completed_at = datetime.utcnow()
+
+        db.session.commit()
+
+        logger.info(f"Account activated: {setup_request.company_name} (tenant_id: {tenant.id})")
+
+        return jsonify({
+            'message': 'Account activated successfully',
+            'tenant_id': tenant.id,
+            'subdomain': subdomain,
+            'email': setup_request.contact_email,
+            'temp_password': temp_password,
+            'login_url': f'/login'
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Account activation error: {e}", exc_info=True)
+        return jsonify({'error': f'Activation failed: {str(e)}'}), 500
+
+
 # ============================================================================
 # CALL DETAIL ENDPOINTS
 # ============================================================================

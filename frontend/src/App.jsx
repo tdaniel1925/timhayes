@@ -8,6 +8,8 @@ import Settings from './pages/Settings';
 import SetupRequest from './pages/SetupRequest';
 import Checkout from './pages/Checkout';
 import CallDetail from './pages/CallDetail';
+import AdminSetupRequests from './pages/AdminSetupRequests';
+import Notifications from './pages/Notifications';
 
 // Protected Route component
 function ProtectedRoute({ children }) {
@@ -97,6 +99,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <CallDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/setup-requests"
+        element={
+          <ProtectedRoute>
+            <AdminSetupRequests />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <Notifications />
           </ProtectedRoute>
         }
       />

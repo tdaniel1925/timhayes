@@ -14,6 +14,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
+import NotificationBell from '@/components/NotificationBell';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -126,6 +127,15 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground">{user?.tenant?.company_name}</p>
           </div>
           <div className="flex items-center gap-4">
+            {user?.role === 'admin' && (
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/admin/setup-requests')}
+                className="text-sm"
+              >
+                Setup Requests
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => navigate('/settings')}
@@ -134,6 +144,7 @@ export default function Dashboard() {
               <Settings className="h-4 w-4" />
               Settings
             </Button>
+            <NotificationBell />
             <span className="text-sm text-muted-foreground">{user?.email}</span>
             <Button variant="outline" onClick={logout}>Logout</Button>
           </div>

@@ -137,5 +137,31 @@ export const api = {
       body: JSON.stringify(rule)
     });
     return response.json();
+  },
+
+  // Admin - Setup Requests
+  getSetupRequests: async (status = 'all', page = 1) => {
+    const response = await fetchWithAuth(`/admin/setup-requests?status=${status}&page=${page}`);
+    return response.json();
+  },
+
+  getSetupRequestDetail: async (id) => {
+    const response = await fetchWithAuth(`/admin/setup-requests/${id}/detail`);
+    return response.json();
+  },
+
+  updateSetupRequest: async (id, data) => {
+    const response = await fetchWithAuth(`/admin/setup-requests/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+    return response.json();
+  },
+
+  activateSetupRequest: async (id) => {
+    const response = await fetchWithAuth(`/admin/setup-requests/${id}/activate`, {
+      method: 'POST'
+    });
+    return response.json();
   }
 };
