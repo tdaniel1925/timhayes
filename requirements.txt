@@ -1,0 +1,16 @@
+# Core dependencies
+Flask==3.0.0
+requests==2.31.0
+
+# Optional: OpenAI for transcription (recommended)
+openai==1.12.0
+
+# Optional: Local AI models for sentiment analysis
+transformers==4.36.0
+torch==2.1.2
+
+# Optional: For better audio file handling
+pydub==0.25.1
+
+# Utility
+python-dotenv==1.0.0

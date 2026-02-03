@@ -1,0 +1,47 @@
+{
+  "identity": {
+    "name": "",
+    "description": "",
+    "stack": []
+  },
+  "decisions": [],
+  "customRules": [],
+  "activeTask": {
+    "description": "cb",
+    "filesModified": [],
+    "lastUpdated": 1769957790057
+  },
+  "conversation": [
+    {
+      "role": "user",
+      "content": "cb",
+      "timestamp": 1769957223103
+    },
+    {
+      "role": "user",
+      "content": "cb",
+      "timestamp": 1769957223107
+    },
+    {
+      "role": "assistant",
+      "content": "I see you've entered just \"cb\" which appears to be a command. Since this project isn't initialized yet, let me help you get started.\n\nIt looks like you need to initialize your project first. Here are the available commands:\n\n## Available CB Commands:\n\n### Project Setup\n- `cb init` - Initialize project with framework detection and setup\n- `cb config` - View/edit project configuration\n\n### Development\n- `cb feature <name>` - Start working on a new feature\n- `cb task <description>` - Create and work on a specific task\n- `cb review` - Review current code against patterns\n- `cb fix` - Auto-fix common pattern violations\n\n### Architecture\n- `cb arch <decision>` - Record an architectural decision\n- `cb rules add <rule>` - Add a custom project rule\n\n### Information\n- `cb status` - Show current project status\n- `cb help` - Show detailed help\n\n## Next Steps:\n1. Run `cb init` to set up your project\n2. Or specify what you'd like me to help you with\n\nWhat would you like to do? Please provide a specific command or describe what you're trying to accomplish.",
+      "timestamp": 1769957229806
+    },
+    {
+      "role": "user",
+      "content": "cb",
+      "timestamp": 1769957790018
+    },
+    {
+      "role": "user",
+      "content": "cb",
+      "timestamp": 1769957790057
+    },
+    {
+      "role": "assistant",
+      "content": "I see you're trying to use the `cb` command. Based on your project structure, you have a project named \"1 - Tim Hayes\" but it's not fully initialized yet.\n\nSince you just entered \"cb\" without any arguments, let me show you the current status and available options:\n\n## Current Project Status\n- **Name**: 1 - Tim Hayes\n- **Framework**: Unknown (needs detection)\n- **Features**: Not tracked yet\n- **Architecture**: No decisions recorded\n\n## Available Commands\n\n### Essential Setup (Start Here)\n```bash\ncb init          # Initialize and detect your project framework\ncb config        # Configure project settings\n```\n\n### Development Commands\n```bash\ncb feature <name>        # Start a new feature\ncb task <description>    # Work on a specific task\ncb review               # Check code against patterns\ncb fix                  # Auto-fix pattern violations\n```\n\n### Architecture Commands\n```bash\ncb arch <decision>      # Record architectural decision\ncb rules add <rule>     # Add custom project rule\n```\n\n### Information Commands\n```bash\ncb status              # Show detailed project status\ncb help                # Show comprehensive help\n```\n\n## Recommended Next Steps:\n1. **Run `cb init`** to properly initialize your project\n2. This will detect your framework and set up proper configuration\n3. Then you can start using development commands\n\nWhat would you like to do? Please specify a command or let me know what you're trying to accomplish!",
+      "timestamp": 1769957796637
+    }
+  ],
+  "features": []
+}
