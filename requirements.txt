@@ -22,7 +22,15 @@ openai==1.12.0
 
 # Email and SMS
 resend==0.8.0
-twilio==8.10.0
+
+# PayPal SDK
+paypalrestsdk==1.13.1
+
+# Encryption
+cryptography==42.0.0
+
+# Rate Limiting
+Flask-Limiter==3.5.0
 
 # Production server
 gunicorn==21.2.0

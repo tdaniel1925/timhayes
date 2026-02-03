@@ -26,6 +26,8 @@ from sqlalchemy import and_, func, extract
 from collections import defaultdict
 import csv
 import io
+from cryptography.fernet import Fernet
+import secrets as crypto_secrets
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -34,6 +36,17 @@ load_dotenv()
 # Initialize Flask app
 app = Flask(__name__, static_folder='frontend/dist', static_url_path='')
 CORS(app)
+
+# Rate Limiting
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"  # Use Redis in production: redis://localhost:6379
+)
 
 # Configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///callinsight.db')
@@ -56,6 +69,15 @@ logger = logging.getLogger(__name__)
 # Ensure recording directory exists
 RECORDING_DIR = os.getenv('RECORDING_DIR', './recordings')
 Path(RECORDING_DIR).mkdir(parents=True, exist_ok=True)
+
+# Encryption key for sensitive data (must be set in production!)
+ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY')
+if not ENCRYPTION_KEY:
+    # Generate a key for development (DO NOT use in production)
+    logger.warning("⚠️  ENCRYPTION_KEY not set! Generating temporary key. SET THIS IN PRODUCTION!")
+    ENCRYPTION_KEY = Fernet.generate_key().decode()
+
+cipher_suite = Fernet(ENCRYPTION_KEY.encode())
 
 # ============================================================================
 # PHONE SYSTEM PRESETS
@@ -125,6 +147,63 @@ PHONE_SYSTEM_PRESETS = {
         'supports_recording': True,
         'cdr_format': 'json',
         'documentation': 'https://www.twilio.com/docs'
+    },
+    'goto_connect': {
+        'name': 'GoTo Connect',
+        'default_port': 443,
+        'webhook_path': '/api/webhook/cdr/{subdomain}',
+        'supports_recording': True,
+        'cdr_format': 'json',
+        'documentation': 'https://support.goto.com/connect',
+        'setup_guide': 'Configure webhooks in GoTo Admin > Integrations > Webhooks'
+    },
+    'cisco_ucm': {
+        'name': 'Cisco Unified Communications Manager',
+        'default_port': 8443,
+        'webhook_path': '/api/webhook/cdr/{subdomain}',
+        'supports_recording': True,
+        'cdr_format': 'json',
+        'documentation': 'https://www.cisco.com/c/en/us/support/unified-communications/unified-communications-manager-callmanager/tsd-products-support-series-home.html'
+    },
+    'avaya_ip_office': {
+        'name': 'Avaya IP Office',
+        'default_port': 443,
+        'webhook_path': '/api/webhook/cdr/{subdomain}',
+        'supports_recording': True,
+        'cdr_format': 'json',
+        'documentation': 'https://support.avaya.com/products/P0997/ip-office'
+    },
+    'mitel': {
+        'name': 'Mitel MiVoice',
+        'default_port': 443,
+        'webhook_path': '/api/webhook/cdr/{subdomain}',
+        'supports_recording': True,
+        'cdr_format': 'json',
+        'documentation': 'https://www.mitel.com/support'
+    },
+    'nextiva': {
+        'name': 'Nextiva',
+        'default_port': 443,
+        'webhook_path': '/api/webhook/cdr/{subdomain}',
+        'supports_recording': True,
+        'cdr_format': 'json',
+        'documentation': 'https://www.nextiva.com/support'
+    },
+    '8x8': {
+        'name': '8x8 X Series',
+        'default_port': 443,
+        'webhook_path': '/api/webhook/cdr/{subdomain}',
+        'supports_recording': True,
+        'cdr_format': 'json',
+        'documentation': 'https://support.8x8.com/'
+    },
+    'vonage': {
+        'name': 'Vonage Business Communications',
+        'default_port': 443,
+        'webhook_path': '/api/webhook/cdr/{subdomain}',
+        'supports_recording': True,
+        'cdr_format': 'json',
+        'documentation': 'https://www.vonage.com/support/'
     }
 }
 
@@ -141,15 +220,15 @@ class Tenant(db.Model):
     subdomain = db.Column(db.String(100), unique=True, nullable=False)
 
     # Phone System Configuration
-    phone_system_type = db.Column(db.String(50), default='grandstream_ucm')  # New field
+    phone_system_type = db.Column(db.String(50), default='grandstream_ucm')
     pbx_ip = db.Column(db.String(200))
     pbx_username = db.Column(db.String(100))
-    pbx_password = db.Column(db.String(200))
+    _pbx_password = db.Column('pbx_password', db.Text)  # Encrypted
     pbx_port = db.Column(db.Integer, default=8443)
 
     # Webhook credentials
     webhook_username = db.Column(db.String(100))
-    webhook_password = db.Column(db.String(200))
+    _webhook_password = db.Column('webhook_password', db.Text)  # Encrypted
 
     # Features
     transcription_enabled = db.Column(db.Boolean, default=True)
@@ -157,14 +236,56 @@ class Tenant(db.Model):
 
     # Subscription
     plan = db.Column(db.String(50), default='starter')
+    plan_limits = db.Column(db.Text)  # JSON: {calls_per_month: 500, recording_storage_gb: 10}
+    usage_this_month = db.Column(db.Integer, default=0)  # Call count this month
+    billing_cycle_start = db.Column(db.DateTime)
+
+    # PayPal subscription
+    paypal_subscription_id = db.Column(db.String(200))
+    paypal_customer_id = db.Column(db.String(200))
+
     is_active = db.Column(db.Boolean, default=True)
 
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    subscription_ends_at = db.Column(db.DateTime)
 
     # Relationships
     users = db.relationship('User', backref='tenant', lazy=True, cascade='all, delete-orphan')
     cdr_records = db.relationship('CDRRecord', backref='tenant', lazy=True, cascade='all, delete-orphan')
+
+    # Encrypted password properties
+    @property
+    def pbx_password(self):
+        if not self._pbx_password:
+            return None
+        try:
+            return cipher_suite.decrypt(self._pbx_password.encode()).decode()
+        except:
+            return None
+
+    @pbx_password.setter
+    def pbx_password(self, value):
+        if value:
+            self._pbx_password = cipher_suite.encrypt(value.encode()).decode()
+        else:
+            self._pbx_password = None
+
+    @property
+    def webhook_password(self):
+        if not self._webhook_password:
+            return None
+        try:
+            return cipher_suite.decrypt(self._webhook_password.encode()).decode()
+        except:
+            return None
+
+    @webhook_password.setter
+    def webhook_password(self, value):
+        if value:
+            self._webhook_password = cipher_suite.encrypt(value.encode()).decode()
+        else:
+            self._webhook_password = None
 
 
 class User(db.Model):
@@ -177,9 +298,15 @@ class User(db.Model):
     email = db.Column(db.String(200), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
     full_name = db.Column(db.String(200))
+    phone = db.Column(db.String(50))  # For SMS notifications
 
     role = db.Column(db.String(50), default='user')
     is_active = db.Column(db.Boolean, default=True)
+    email_verified = db.Column(db.Boolean, default=False)
+
+    # Password reset
+    reset_token = db.Column(db.String(200))
+    reset_token_expires = db.Column(db.DateTime)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
@@ -189,6 +316,22 @@ class User(db.Model):
 
     def check_password(self, password):
         return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
+
+    def generate_reset_token(self):
+        """Generate password reset token valid for 1 hour"""
+        self.reset_token = crypto_secrets.token_urlsafe(32)
+        self.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+        return self.reset_token
+
+    def verify_reset_token(self, token):
+        """Verify reset token is valid and not expired"""
+        if not self.reset_token or not self.reset_token_expires:
+            return False
+        if self.reset_token != token:
+            return False
+        if datetime.utcnow() > self.reset_token_expires:
+            return False
+        return True
 
 
 class CDRRecord(db.Model):
@@ -289,7 +432,8 @@ class SetupRequest(db.Model):
     # Status tracking
     status = db.Column(db.String(50), default='pending')  # pending, payment_received, in_progress, completed, cancelled
     payment_status = db.Column(db.String(50), default='pending')  # pending, completed, failed
-    payment_id = db.Column(db.String(200))  # Stripe payment intent ID
+    payment_id = db.Column(db.String(200))  # PayPal order ID
+    paypal_subscription_id = db.Column(db.String(200))  # PayPal subscription ID
 
     # Assigned tenant (once created)
     tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=True)
@@ -361,6 +505,104 @@ class Notification(db.Model):
     read_at = db.Column(db.DateTime)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class BillingHistory(db.Model):
+    """Billing and payment history"""
+    __tablename__ = 'billing_history'
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=False)
+
+    invoice_number = db.Column(db.String(100), unique=True)
+    amount = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(10), default='USD')
+
+    description = db.Column(db.Text)
+    billing_period_start = db.Column(db.DateTime)
+    billing_period_end = db.Column(db.DateTime)
+
+    payment_method = db.Column(db.String(50))  # paypal, credit_card, etc
+    payment_id = db.Column(db.String(200))  # PayPal transaction ID
+    payment_status = db.Column(db.String(50), default='pending')  # pending, paid, failed, refunded
+
+    invoice_url = db.Column(db.Text)  # Link to invoice PDF
+    receipt_url = db.Column(db.Text)  # Link to receipt
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    paid_at = db.Column(db.DateTime)
+
+
+class AuditLog(db.Model):
+    """Audit trail for important actions"""
+    __tablename__ = 'audit_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    action = db.Column(db.String(100), nullable=False)  # user_created, password_reset, plan_changed, etc
+    resource_type = db.Column(db.String(50))  # user, tenant, setup_request, etc
+    resource_id = db.Column(db.Integer)
+
+    details = db.Column(db.Text)  # JSON with additional details
+    ip_address = db.Column(db.String(50))
+    user_agent = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def log_audit(action, resource_type=None, resource_id=None, details=None, user_id=None, tenant_id=None):
+    """Log audit trail for important actions"""
+    try:
+        audit = AuditLog(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            details=json.dumps(details) if details else None,
+            ip_address=request.remote_addr if request else None,
+            user_agent=request.headers.get('User-Agent') if request else None
+        )
+        db.session.add(audit)
+        db.session.commit()
+        logger.info(f"Audit: {action} by user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to log audit: {e}")
+
+
+def check_usage_limit(tenant_id):
+    """Check if tenant has exceeded usage limits"""
+    tenant = Tenant.query.get(tenant_id)
+    if not tenant:
+        return False
+
+    # Parse plan limits
+    limits = json.loads(tenant.plan_limits) if tenant.plan_limits else {}
+    calls_limit = limits.get('calls_per_month', 500)
+
+    # Check if exceeded
+    if tenant.usage_this_month >= calls_limit:
+        logger.warning(f"Tenant {tenant_id} exceeded usage limit: {tenant.usage_this_month}/{calls_limit}")
+        return False
+
+    return True
+
+
+def increment_usage(tenant_id):
+    """Increment usage counter for tenant"""
+    try:
+        tenant = Tenant.query.get(tenant_id)
+        if tenant:
+            tenant.usage_this_month = (tenant.usage_this_month or 0) + 1
+            db.session.commit()
+    except Exception as e:
+        logger.error(f"Failed to increment usage: {e}")
 
 
 # ============================================================================
@@ -436,6 +678,7 @@ def signup():
 
 
 @app.route('/api/auth/login', methods=['POST'])
+@limiter.limit("5 per minute")
 def login():
     """Login user"""
     data = request.get_json()
@@ -521,6 +764,141 @@ def get_current_user():
             'sentiment_enabled': user.tenant.sentiment_enabled
         }
     }), 200
+
+
+@app.route('/api/auth/request-password-reset', methods=['POST'])
+@limiter.limit("3 per hour")
+def request_password_reset():
+    """Request password reset email"""
+    data = request.get_json()
+    email = data.get('email')
+
+    if not email:
+        return jsonify({'error': 'Email required'}), 400
+
+    user = User.query.filter_by(email=email).first()
+
+    # Always return success to prevent email enumeration
+    if user:
+        token = user.generate_reset_token()
+        db.session.commit()
+
+        # Send reset email
+        try:
+            import resend
+            resend.api_key = os.getenv('RESEND_API_KEY')
+
+            reset_link = f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/reset-password?token={token}"
+
+            email_html = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Password Reset Request</h2>
+                <p>Hi {user.full_name},</p>
+                <p>We received a request to reset your password for your AudiaPro account.</p>
+
+                <div style="margin: 30px 0;">
+                  <a href="{reset_link}" style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                    Reset Password
+                  </a>
+                </div>
+
+                <p>This link will expire in 1 hour.</p>
+                <p>If you didn't request this, you can safely ignore this email.</p>
+
+                <p style="margin-top: 30px; color: #666; font-size: 12px;">
+                  For security, please do not share this link with anyone.
+                </p>
+              </body>
+            </html>
+            """
+
+            params = {
+                "from": os.getenv('RESEND_FROM_EMAIL', 'noreply@audiapro.com'),
+                "to": [user.email],
+                "subject": "Password Reset Request - AudiaPro",
+                "html": email_html
+            }
+
+            resend.Emails.send(params)
+            logger.info(f"Password reset email sent to {user.email}")
+
+            # Log audit
+            log_audit('password_reset_requested', 'user', user.id, {'email': user.email}, user.id, user.tenant_id)
+
+        except Exception as e:
+            logger.error(f"Failed to send reset email: {e}")
+
+    return jsonify({'message': 'If an account with that email exists, a reset link has been sent'}), 200
+
+
+@app.route('/api/auth/reset-password', methods=['POST'])
+@limiter.limit("5 per hour")
+def reset_password():
+    """Reset password with token"""
+    data = request.get_json()
+    token = data.get('token')
+    new_password = data.get('password')
+
+    if not token or not new_password:
+        return jsonify({'error': 'Token and new password required'}), 400
+
+    if len(new_password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters'}), 400
+
+    # Find user with this token
+    user = User.query.filter_by(reset_token=token).first()
+
+    if not user or not user.verify_reset_token(token):
+        return jsonify({'error': 'Invalid or expired reset token'}), 400
+
+    # Reset password
+    user.set_password(new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.session.commit()
+
+    logger.info(f"Password reset successfully for {user.email}")
+
+    # Log audit
+    log_audit('password_reset_completed', 'user', user.id, {'email': user.email}, user.id, user.tenant_id)
+
+    # Send confirmation email
+    try:
+        import resend
+        resend.api_key = os.getenv('RESEND_API_KEY')
+
+        email_html = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Password Changed Successfully</h2>
+            <p>Hi {user.full_name},</p>
+            <p>Your AudiaPro password has been changed successfully.</p>
+
+            <p>If you didn't make this change, please contact support immediately.</p>
+
+            <div style="margin-top: 30px;">
+              <a href="{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/login" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                Log In Now
+              </a>
+            </div>
+          </body>
+        </html>
+        """
+
+        params = {
+            "from": os.getenv('RESEND_FROM_EMAIL', 'noreply@audiapro.com'),
+            "to": [user.email],
+            "subject": "Password Changed - AudiaPro",
+            "html": email_html
+        }
+
+        resend.Emails.send(params)
+
+    except Exception as e:
+        logger.error(f"Failed to send confirmation email: {e}")
+
+    return jsonify({'message': 'Password reset successfully'}), 200
 
 
 # ============================================================================
