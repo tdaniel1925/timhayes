@@ -11,4 +11,4 @@ cmds = ["pip install --break-system-packages -r requirements.txt"]
 cmds = ["echo 'Backend build complete'"]
 
 [start]
-cmd = "gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile - --error-logfile -"
+cmd = "python -m gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile - --error-logfile -"
