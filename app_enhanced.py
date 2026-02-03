@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AudiaPro - Enhanced Multi-Tenant SaaS Platform
+CallInsight AI - Enhanced Multi-Tenant SaaS Platform
 Backend API with JWT Authentication, Analytics, and Multi-Platform Support
 """
 
@@ -742,7 +742,7 @@ if __name__ == '__main__':
 
     port = int(os.getenv('PORT', 5000))
     logger.info("=" * 60)
-    logger.info("AudiaPro - Enhanced Multi-Platform SaaS")
+    logger.info("CallInsight AI - Enhanced Multi-Platform SaaS")
     logger.info("=" * 60)
     logger.info(f"Starting on port {port}")
     logger.info(f"Supported Phone Systems: {len(PHONE_SYSTEM_PRESETS)}")

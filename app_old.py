@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-AudiaPro - Enhanced Multi-Tenant SaaS Platform
-Backend API with JWT Authentication, Analytics, and Multi-Platform Support
+CallInsight AI - Multi-Tenant SaaS Platform
+Backend API with JWT Authentication
 """
 
 import os
@@ -10,7 +10,7 @@ import logging
 import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
-from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import (
@@ -19,11 +19,10 @@ from flask_jwt_extended import (
 )
 import bcrypt
 import requests
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 import threading
 from urllib.parse import quote
-from sqlalchemy import and_, func, extract
-from collections import defaultdict
+from sqlalchemy import and_
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -56,77 +55,6 @@ RECORDING_DIR = os.getenv('RECORDING_DIR', './recordings')
 Path(RECORDING_DIR).mkdir(parents=True, exist_ok=True)
 
 # ============================================================================
-# PHONE SYSTEM PRESETS
-# ============================================================================
-
-PHONE_SYSTEM_PRESETS = {
-    'grandstream_ucm': {
-        'name': 'Grandstream UCM',
-        'default_port': 8443,
-        'webhook_path': '/api/webhook/cdr/{subdomain}',
-        'supports_recording': True,
-        'cdr_format': 'json',
-        'documentation': 'https://documentation.grandstream.com'
-    },
-    'ringcentral': {
-        'name': 'RingCentral',
-        'default_port': 443,
-        'webhook_path': '/api/webhook/cdr/{subdomain}',
-        'supports_recording': True,
-        'cdr_format': 'json',
-        'documentation': 'https://developers.ringcentral.com'
-    },
-    '3cx': {
-        'name': '3CX Phone System',
-        'default_port': 5001,
-        'webhook_path': '/api/webhook/cdr/{subdomain}',
-        'supports_recording': True,
-        'cdr_format': 'json',
-        'documentation': 'https://www.3cx.com/docs/manual/cdr-reports/'
-    },
-    'freepbx': {
-        'name': 'FreePBX / Asterisk',
-        'default_port': 80,
-        'webhook_path': '/api/webhook/cdr/{subdomain}',
-        'supports_recording': True,
-        'cdr_format': 'json',
-        'documentation': 'https://wiki.freepbx.org/display/FPG/CDR+Reports'
-    },
-    'yeastar': {
-        'name': 'Yeastar PBX',
-        'default_port': 8088,
-        'webhook_path': '/api/webhook/cdr/{subdomain}',
-        'supports_recording': True,
-        'cdr_format': 'json',
-        'documentation': 'https://help.yeastar.com'
-    },
-    'vitalpbx': {
-        'name': 'VitalPBX',
-        'default_port': 443,
-        'webhook_path': '/api/webhook/cdr/{subdomain}',
-        'supports_recording': True,
-        'cdr_format': 'json',
-        'documentation': 'https://vitalpbx.com/documentation'
-    },
-    'fusionpbx': {
-        'name': 'FusionPBX',
-        'default_port': 443,
-        'webhook_path': '/api/webhook/cdr/{subdomain}',
-        'supports_recording': True,
-        'cdr_format': 'json',
-        'documentation': 'https://docs.fusionpbx.com'
-    },
-    'twilio': {
-        'name': 'Twilio',
-        'default_port': 443,
-        'webhook_path': '/api/webhook/cdr/{subdomain}',
-        'supports_recording': True,
-        'cdr_format': 'json',
-        'documentation': 'https://www.twilio.com/docs'
-    }
-}
-
-# ============================================================================
 # DATABASE MODELS
 # ============================================================================
 
@@ -138,12 +66,11 @@ class Tenant(db.Model):
     company_name = db.Column(db.String(200), nullable=False)
     subdomain = db.Column(db.String(100), unique=True, nullable=False)
 
-    # Phone System Configuration
-    phone_system_type = db.Column(db.String(50), default='grandstream_ucm')  # New field
-    pbx_ip = db.Column(db.String(200))
-    pbx_username = db.Column(db.String(100))
-    pbx_password = db.Column(db.String(200))
-    pbx_port = db.Column(db.Integer, default=8443)
+    # UCM Configuration (per tenant)
+    ucm_ip = db.Column(db.String(200))
+    ucm_username = db.Column(db.String(100))
+    ucm_password = db.Column(db.String(200))
+    ucm_https_port = db.Column(db.Integer, default=8443)
 
     # Webhook credentials
     webhook_username = db.Column(db.String(100))
@@ -154,7 +81,7 @@ class Tenant(db.Model):
     sentiment_enabled = db.Column(db.Boolean, default=True)
 
     # Subscription
-    plan = db.Column(db.String(50), default='starter')
+    plan = db.Column(db.String(50), default='starter')  # starter, professional, enterprise
     is_active = db.Column(db.Boolean, default=True)
 
     # Timestamps
@@ -176,7 +103,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(200), nullable=False)
     full_name = db.Column(db.String(200))
 
-    role = db.Column(db.String(50), default='user')
+    role = db.Column(db.String(50), default='user')  # admin, user
     is_active = db.Column(db.Boolean, default=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -219,6 +146,7 @@ class CDRRecord(db.Model):
     # Relationships
     transcription = db.relationship('Transcription', backref='cdr', uselist=False, cascade='all, delete-orphan')
 
+    # Composite unique constraint per tenant
     __table_args__ = (db.UniqueConstraint('tenant_id', 'uniqueid', name='_tenant_uniqueid_uc'),)
 
 
@@ -234,6 +162,7 @@ class Transcription(db.Model):
     duration_seconds = db.Column(db.Float)
     transcribed_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Relationship
     sentiment = db.relationship('SentimentAnalysis', backref='transcription', uselist=False, cascade='all, delete-orphan')
 
 
@@ -254,7 +183,7 @@ class SentimentAnalysis(db.Model):
 
 
 # ============================================================================
-# AUTHENTICATION ENDPOINTS (Same as before)
+# AUTHENTICATION ENDPOINTS
 # ============================================================================
 
 @app.route('/api/auth/signup', methods=['POST'])
@@ -266,9 +195,11 @@ def signup():
     if not all(field in data for field in required_fields):
         return jsonify({'error': 'Missing required fields'}), 400
 
+    # Check if email already exists
     if User.query.filter_by(email=data['email']).first():
         return jsonify({'error': 'Email already registered'}), 400
 
+    # Create subdomain from company name
     subdomain = data['company_name'].lower().replace(' ', '-').replace('_', '-')
     base_subdomain = subdomain
     counter = 1
@@ -277,15 +208,16 @@ def signup():
         counter += 1
 
     try:
+        # Create tenant
         tenant = Tenant(
             company_name=data['company_name'],
             subdomain=subdomain,
-            plan=data.get('plan', 'starter'),
-            phone_system_type=data.get('phone_system_type', 'grandstream_ucm')
+            plan=data.get('plan', 'starter')
         )
         db.session.add(tenant)
         db.session.flush()
 
+        # Create admin user
         user = User(
             tenant_id=tenant.id,
             email=data['email'],
@@ -297,6 +229,7 @@ def signup():
 
         db.session.commit()
 
+        # Create tokens
         access_token = create_access_token(
             identity=user.id,
             additional_claims={'tenant_id': tenant.id, 'role': user.role}
@@ -341,9 +274,11 @@ def login():
     if not user.is_active or not user.tenant.is_active:
         return jsonify({'error': 'Account is inactive'}), 403
 
+    # Update last login
     user.last_login = datetime.utcnow()
     db.session.commit()
 
+    # Create tokens
     access_token = create_access_token(
         identity=user.id,
         additional_claims={'tenant_id': user.tenant_id, 'role': user.role}
@@ -406,7 +341,6 @@ def get_current_user():
             'company_name': user.tenant.company_name,
             'subdomain': user.tenant.subdomain,
             'plan': user.tenant.plan,
-            'phone_system_type': user.tenant.phone_system_type,
             'transcription_enabled': user.tenant.transcription_enabled,
             'sentiment_enabled': user.tenant.sentiment_enabled
         }
@@ -419,18 +353,21 @@ def get_current_user():
 
 @app.route('/api/webhook/cdr/<subdomain>', methods=['POST'])
 def receive_cdr(subdomain):
-    """Receive CDR webhook - tenant-specific endpoint"""
+    """Receive CDR webhook from CloudUCM - tenant-specific endpoint"""
     try:
+        # Find tenant by subdomain
         tenant = Tenant.query.filter_by(subdomain=subdomain).first()
         if not tenant:
             logger.warning(f"Unknown tenant subdomain: {subdomain}")
             return jsonify({'error': 'Unknown tenant'}), 404
 
+        # Verify webhook credentials
         auth = request.authorization
         if not auth or auth.username != tenant.webhook_username or auth.password != tenant.webhook_password:
             logger.warning(f"Invalid credentials for tenant: {subdomain}")
             return jsonify({'error': 'Unauthorized'}), 401
 
+        # Parse CDR data
         if request.is_json:
             cdr_data = request.get_json()
         else:
@@ -439,6 +376,7 @@ def receive_cdr(subdomain):
         uniqueid = cdr_data.get('uniqueid', 'unknown')
         logger.info(f"[{subdomain}] Received CDR: {uniqueid} | {cdr_data.get('src')} -> {cdr_data.get('dst')}")
 
+        # Save CDR to database
         cdr = CDRRecord(
             tenant_id=tenant.id,
             uniqueid=cdr_data.get('uniqueid'),
@@ -462,6 +400,10 @@ def receive_cdr(subdomain):
         db.session.add(cdr)
         db.session.commit()
 
+        # TODO: Process recording in background (transcription + sentiment)
+        # if cdr_data.get('disposition') == 'ANSWERED' and cdr_data.get('recordfiles'):
+        #     process_call_recording_async(tenant, cdr, cdr_data)
+
         return jsonify({'status': 'success'}), 200
 
     except Exception as e:
@@ -470,38 +412,26 @@ def receive_cdr(subdomain):
 
 
 # ============================================================================
-# ENHANCED DASHBOARD API ENDPOINTS
+# DASHBOARD API ENDPOINTS
 # ============================================================================
 
 @app.route('/api/calls', methods=['GET'])
 @jwt_required()
 def get_calls():
-    """Get paginated calls for current tenant"""
+    """Get all calls for current tenant"""
     claims = get_jwt()
     tenant_id = claims.get('tenant_id')
 
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 25, type=int)
-    search = request.args.get('search', '')
+    limit = request.args.get('limit', 50, type=int)
+    offset = request.args.get('offset', 0, type=int)
 
-    query = CDRRecord.query.filter_by(tenant_id=tenant_id)
+    calls = CDRRecord.query.filter_by(tenant_id=tenant_id)\
+        .order_by(CDRRecord.received_at.desc())\
+        .limit(limit)\
+        .offset(offset)\
+        .all()
 
-    # Search filter
-    if search:
-        query = query.filter(
-            db.or_(
-                CDRRecord.src.like(f'%{search}%'),
-                CDRRecord.dst.like(f'%{search}%'),
-                CDRRecord.caller_name.like(f'%{search}%')
-            )
-        )
-
-    # Pagination
-    pagination = query.order_by(CDRRecord.received_at.desc()).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
-
-    calls = [{
+    return jsonify([{
         'id': call.id,
         'uniqueid': call.uniqueid,
         'src': call.src,
@@ -511,176 +441,69 @@ def get_calls():
         'duration': call.duration,
         'billsec': call.billsec,
         'disposition': call.disposition,
-        'recording_path': call.recordfiles,
-        'has_recording': bool(call.recordfiles),
         'transcription': call.transcription.transcription_text if call.transcription else None,
         'sentiment': call.transcription.sentiment.sentiment if call.transcription and call.transcription.sentiment else None,
         'sentiment_score': call.transcription.sentiment.sentiment_score if call.transcription and call.transcription.sentiment else None
-    } for call in pagination.items]
-
-    return jsonify({
-        'calls': calls,
-        'pagination': {
-            'page': pagination.page,
-            'per_page': pagination.per_page,
-            'total': pagination.total,
-            'pages': pagination.pages,
-            'has_next': pagination.has_next,
-            'has_prev': pagination.has_prev
-        }
-    }), 200
+    } for call in calls]), 200
 
 
 @app.route('/api/stats', methods=['GET'])
 @jwt_required()
 def get_stats():
-    """Get comprehensive statistics"""
+    """Get statistics for current tenant"""
     claims = get_jwt()
     tenant_id = claims.get('tenant_id')
 
     total_calls = CDRRecord.query.filter_by(tenant_id=tenant_id).count()
     answered_calls = CDRRecord.query.filter_by(tenant_id=tenant_id, disposition='ANSWERED').count()
-    missed_calls = CDRRecord.query.filter_by(tenant_id=tenant_id, disposition='NO ANSWER').count()
-
-    # Average duration
-    avg_duration = db.session.query(func.avg(CDRRecord.duration)).filter_by(tenant_id=tenant_id).scalar() or 0
-
-    # Transcribed calls
     transcribed_calls = db.session.query(CDRRecord).join(Transcription).filter(CDRRecord.tenant_id == tenant_id).count()
 
     return jsonify({
         'total_calls': total_calls,
         'answered_calls': answered_calls,
-        'missed_calls': missed_calls,
-        'avg_duration': round(avg_duration, 2),
-        'transcribed_calls': transcribed_calls,
-        'answer_rate': round((answered_calls / total_calls * 100) if total_calls > 0 else 0, 1)
+        'transcribed_calls': transcribed_calls
     }), 200
 
 
-@app.route('/api/analytics/call-volume', methods=['GET'])
+# ============================================================================
+# ADMIN ENDPOINTS
+# ============================================================================
+
+@app.route('/api/admin/tenants', methods=['GET'])
 @jwt_required()
-def get_call_volume():
-    """Get call volume over time"""
+def get_all_tenants():
+    """Get all tenants (super admin only)"""
     claims = get_jwt()
-    tenant_id = claims.get('tenant_id')
+    role = claims.get('role')
 
-    days = request.args.get('days', 30, type=int)
-    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    if role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
 
-    calls = CDRRecord.query.filter(
-        CDRRecord.tenant_id == tenant_id,
-        CDRRecord.received_at >= cutoff_date
-    ).all()
-
-    # Group by date
-    call_volume = defaultdict(int)
-    for call in calls:
-        date_str = call.received_at.strftime('%Y-%m-%d')
-        call_volume[date_str] += 1
-
-    # Fill in missing dates
-    result = []
-    for i in range(days):
-        date = datetime.utcnow() - timedelta(days=i)
-        date_str = date.strftime('%Y-%m-%d')
-        result.append({
-            'date': date_str,
-            'calls': call_volume.get(date_str, 0)
-        })
-
-    return jsonify(sorted(result, key=lambda x: x['date'])), 200
-
-
-@app.route('/api/analytics/sentiment-trends', methods=['GET'])
-@jwt_required()
-def get_sentiment_trends():
-    """Get sentiment trends"""
-    claims = get_jwt()
-    tenant_id = claims.get('tenant_id')
-
-    sentiments = db.session.query(
-        SentimentAnalysis.sentiment,
-        func.count(SentimentAnalysis.id).label('count')
-    ).join(Transcription).join(CDRRecord).filter(
-        CDRRecord.tenant_id == tenant_id
-    ).group_by(SentimentAnalysis.sentiment).all()
+    tenants = Tenant.query.all()
 
     return jsonify([{
-        'sentiment': s[0],
-        'count': s[1]
-    } for s in sentiments]), 200
+        'id': t.id,
+        'company_name': t.company_name,
+        'subdomain': t.subdomain,
+        'plan': t.plan,
+        'is_active': t.is_active,
+        'created_at': t.created_at.isoformat(),
+        'user_count': len(t.users),
+        'call_count': len(t.cdr_records)
+    } for t in tenants]), 200
 
 
-@app.route('/api/recording/<int:call_id>', methods=['GET'])
+@app.route('/api/admin/tenant/<int:tenant_id>/config', methods=['PUT'])
 @jwt_required()
-def get_recording(call_id):
-    """Download/stream recording file"""
+def update_tenant_config(tenant_id):
+    """Update tenant UCM configuration"""
     claims = get_jwt()
-    tenant_id = claims.get('tenant_id')
+    user_tenant_id = claims.get('tenant_id')
+    role = claims.get('role')
 
-    call = CDRRecord.query.filter_by(id=call_id, tenant_id=tenant_id).first()
-    if not call:
-        return jsonify({'error': 'Call not found'}), 404
-
-    if not call.recording_local_path or not os.path.exists(call.recording_local_path):
-        return jsonify({'error': 'Recording not available'}), 404
-
-    return send_file(call.recording_local_path, as_attachment=True)
-
-
-# ============================================================================
-# PHONE SYSTEMS ENDPOINTS
-# ============================================================================
-
-@app.route('/api/phone-systems', methods=['GET'])
-def get_phone_systems():
-    """Get list of supported phone systems"""
-    return jsonify({
-        'systems': [
-            {
-                'id': key,
-                **value
-            } for key, value in PHONE_SYSTEM_PRESETS.items()
-        ]
-    }), 200
-
-
-# ============================================================================
-# SETTINGS ENDPOINTS
-# ============================================================================
-
-@app.route('/api/settings', methods=['GET'])
-@jwt_required()
-def get_settings():
-    """Get tenant settings"""
-    claims = get_jwt()
-    tenant_id = claims.get('tenant_id')
-
-    tenant = Tenant.query.get(tenant_id)
-    if not tenant:
-        return jsonify({'error': 'Tenant not found'}), 404
-
-    return jsonify({
-        'company_name': tenant.company_name,
-        'subdomain': tenant.subdomain,
-        'phone_system_type': tenant.phone_system_type,
-        'pbx_ip': tenant.pbx_ip,
-        'pbx_username': tenant.pbx_username,
-        'pbx_port': tenant.pbx_port,
-        'webhook_username': tenant.webhook_username,
-        'transcription_enabled': tenant.transcription_enabled,
-        'sentiment_enabled': tenant.sentiment_enabled,
-        'plan': tenant.plan
-    }), 200
-
-
-@app.route('/api/settings', methods=['PUT'])
-@jwt_required()
-def update_settings():
-    """Update tenant settings"""
-    claims = get_jwt()
-    tenant_id = claims.get('tenant_id')
+    # Only allow updating own tenant or if super admin
+    if role != 'admin' and user_tenant_id != tenant_id:
+        return jsonify({'error': 'Unauthorized'}), 403
 
     tenant = Tenant.query.get(tenant_id)
     if not tenant:
@@ -688,17 +511,15 @@ def update_settings():
 
     data = request.get_json()
 
-    # Update fields
-    if 'phone_system_type' in data:
-        tenant.phone_system_type = data['phone_system_type']
-    if 'pbx_ip' in data:
-        tenant.pbx_ip = data['pbx_ip']
-    if 'pbx_username' in data:
-        tenant.pbx_username = data['pbx_username']
-    if 'pbx_password' in data:
-        tenant.pbx_password = data['pbx_password']
-    if 'pbx_port' in data:
-        tenant.pbx_port = data['pbx_port']
+    # Update UCM config
+    if 'ucm_ip' in data:
+        tenant.ucm_ip = data['ucm_ip']
+    if 'ucm_username' in data:
+        tenant.ucm_username = data['ucm_username']
+    if 'ucm_password' in data:
+        tenant.ucm_password = data['ucm_password']
+    if 'ucm_https_port' in data:
+        tenant.ucm_https_port = data['ucm_https_port']
     if 'webhook_username' in data:
         tenant.webhook_username = data['webhook_username']
     if 'webhook_password' in data:
@@ -710,7 +531,7 @@ def update_settings():
 
     db.session.commit()
 
-    return jsonify({'message': 'Settings updated successfully'}), 200
+    return jsonify({'message': 'Configuration updated'}), 200
 
 
 # ============================================================================
@@ -742,10 +563,9 @@ if __name__ == '__main__':
 
     port = int(os.getenv('PORT', 5000))
     logger.info("=" * 60)
-    logger.info("AudiaPro - Enhanced Multi-Platform SaaS")
+    logger.info("CallInsight AI - Multi-Tenant SaaS Platform")
     logger.info("=" * 60)
     logger.info(f"Starting on port {port}")
-    logger.info(f"Supported Phone Systems: {len(PHONE_SYSTEM_PRESETS)}")
     logger.info("=" * 60)
 
     app.run(host='0.0.0.0', port=port, debug=os.getenv('DEBUG', 'false').lower() == 'true')

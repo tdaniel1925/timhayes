@@ -35,7 +35,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-3xl font-bold text-center">CallInsight AI</CardTitle>
+          <CardTitle className="text-3xl font-bold text-center">AudiaPro</CardTitle>
           <CardDescription className="text-center">
             Sign in to your account to continue
           </CardDescription>

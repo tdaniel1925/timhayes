@@ -51,13 +51,46 @@ async function fetchWithAuth(url, options = {}) {
 }
 
 export const api = {
-  getCalls: async (limit = 50, offset = 0) => {
-    const response = await fetchWithAuth(`/calls?limit=${limit}&offset=${offset}`);
+  getCalls: async (page = 1, perPage = 25, search = '') => {
+    const response = await fetchWithAuth(`/calls?page=${page}&per_page=${perPage}&search=${encodeURIComponent(search)}`);
     return response.json();
   },
 
   getStats: async () => {
     const response = await fetchWithAuth('/stats');
+    return response.json();
+  },
+
+  getCallVolume: async (days = 30) => {
+    const response = await fetchWithAuth(`/analytics/call-volume?days=${days}`);
+    return response.json();
+  },
+
+  getSentimentTrends: async () => {
+    const response = await fetchWithAuth('/analytics/sentiment-trends');
+    return response.json();
+  },
+
+  getRecording: async (callId) => {
+    const response = await fetchWithAuth(`/recording/${callId}`);
+    return response.blob();
+  },
+
+  getPhoneSystems: async () => {
+    const response = await fetch(`${API_BASE}/phone-systems`);
+    return response.json();
+  },
+
+  getSettings: async () => {
+    const response = await fetchWithAuth('/settings');
+    return response.json();
+  },
+
+  updateSettings: async (settings) => {
+    const response = await fetchWithAuth('/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings)
+    });
     return response.json();
   },
 

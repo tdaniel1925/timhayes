@@ -49,7 +49,7 @@ export default function Signup() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-3xl font-bold text-center">Get Started</CardTitle>
           <CardDescription className="text-center">
-            Create your CallInsight AI account
+            Create your AudiaPro account
           </CardDescription>
         </CardHeader>
         <CardContent>
