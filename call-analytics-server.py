@@ -17,6 +17,10 @@ from typing import Optional, Dict, Any
 import threading
 from urllib.parse import quote
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 # Optional AI imports
 try:
     import openai
@@ -37,7 +41,7 @@ CONFIG = {
     'UCM_PASSWORD': os.getenv('UCM_PASSWORD', 'password'),
     'UCM_HTTPS_PORT': int(os.getenv('UCM_HTTPS_PORT', '8089')),
     'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY', ''),
-    'WEBHOOK_PORT': int(os.getenv('WEBHOOK_PORT', '5000')),
+    'WEBHOOK_PORT': int(os.getenv('PORT', os.getenv('WEBHOOK_PORT', '5000'))),
     'WEBHOOK_USERNAME': os.getenv('WEBHOOK_USERNAME', 'admin'),  # Match CloudUCM config
     'WEBHOOK_PASSWORD': os.getenv('WEBHOOK_PASSWORD', 'password'),  # Match CloudUCM config
     'RECORDING_DIR': os.getenv('RECORDING_DIR', './recordings'),
