@@ -10,7 +10,7 @@ import logging
 import hashlib
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, render_template
 import sqlite3
 import requests
 from typing import Optional, Dict, Any
@@ -624,8 +624,14 @@ def get_stats():
 
 
 @app.route('/', methods=['GET'])
+def landing():
+    """Landing page"""
+    return render_template('landing.html')
+
+
+@app.route('/dashboard', methods=['GET'])
 def dashboard():
-    """Simple web dashboard"""
+    """Analytics dashboard"""
     calls = db_manager.get_recent_calls(50)
 
     html = """
