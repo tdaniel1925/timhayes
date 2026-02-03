@@ -11,6 +11,7 @@ import CallDetail from './pages/CallDetail';
 import AdminSetupRequests from './pages/AdminSetupRequests';
 import Notifications from './pages/Notifications';
 import UserManagement from './pages/UserManagement';
+import IntegrationsPanel from './pages/IntegrationsPanel';
 
 // Protected Route component
 function ProtectedRoute({ children }) {
@@ -124,6 +125,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <UserManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/integrations"
+        element={
+          <ProtectedRoute>
+            <IntegrationsPanel />
           </ProtectedRoute>
         }
       />

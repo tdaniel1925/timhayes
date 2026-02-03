@@ -202,6 +202,13 @@ export default function Dashboard() {
                 >
                   Users
                 </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate('/integrations')}
+                  className="text-sm"
+                >
+                  Integrations
+                </Button>
               </>
             )}
             <Button

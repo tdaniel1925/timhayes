@@ -170,7 +170,7 @@ export default function Checkout() {
               <CardHeader>
                 <CardTitle>Payment Information</CardTitle>
                 <CardDescription>
-                  Secure payment processing powered by Stripe
+                  Secure payment processing powered by PayPal
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -179,6 +179,19 @@ export default function Checkout() {
                   <div>
                     <Label>Payment Method</Label>
                     <div className="grid grid-cols-2 gap-4 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('paypal')}
+                        className={`p-4 border-2 rounded-lg flex items-center justify-center transition-all ${
+                          paymentMethod === 'paypal' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'
+                        }`}
+                      >
+                        <svg className="w-8 h-8 mr-2" fill="#0070BA" viewBox="0 0 24 24">
+                          <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.76-4.852.073-.455.463-.788.922-.788h.581c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.833-4.46z" />
+                        </svg>
+                        PayPal
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => setPaymentMethod('card')}
@@ -190,20 +203,7 @@ export default function Checkout() {
                           <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
                           <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
                         </svg>
-                        Credit Card
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod('ach')}
-                        className={`p-4 border-2 rounded-lg flex items-center justify-center transition-all ${
-                          paymentMethod === 'ach' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'
-                        }`}
-                      >
-                        <svg className="w-8 h-8 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                        </svg>
-                        Bank Account
+                        Debit / Credit
                       </button>
                     </div>
                   </div>
@@ -277,12 +277,20 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  {paymentMethod === 'ach' && (
+                  {paymentMethod === 'paypal' && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <p className="text-sm text-blue-800">
-                        ACH bank transfer setup will be completed during your setup call with our team.
-                        Click "Complete Order" to proceed with your request.
-                      </p>
+                      <div className="flex items-start gap-3">
+                        <svg className="w-12 h-12 flex-shrink-0" fill="#0070BA" viewBox="0 0 24 24">
+                          <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.76-4.852.073-.455.463-.788.922-.788h.581c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.833-4.46z" />
+                        </svg>
+                        <div>
+                          <p className="font-semibold text-blue-900 mb-2">Pay with PayPal</p>
+                          <p className="text-sm text-blue-800">
+                            You'll be redirected to PayPal to securely complete your subscription.
+                            You can use your PayPal balance, bank account, or credit/debit card.
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -294,7 +302,7 @@ export default function Checkout() {
 
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                     <p className="text-sm text-gray-700">
-                      🔒 Your payment information is encrypted and secure. We use Stripe for payment processing and never store your full card details on our servers.
+                      🔒 Your payment information is encrypted and secure. We use PayPal for payment processing - your financial details are never shared with us or stored on our servers.
                     </p>
                   </div>
 
@@ -329,7 +337,9 @@ export default function Checkout() {
                 <span className="text-sm">PCI Compliant</span>
               </div>
               <div className="flex items-center">
-                <span className="text-sm font-semibold">Powered by Stripe</span>
+                <svg className="w-16 h-6 mr-1" fill="#0070BA" viewBox="0 0 100 32">
+                  <path d="M12 4.917v18.42c0 1.5-.75 2.145-2.149 2.145-.586 0-1.27-.088-1.73-.279l-.279 2.55c.642.252 1.559.374 2.609.374 2.806 0 4.329-1.32 4.329-4.26V4.917h-2.78zm9.885 22.172c-4.092 0-6.71-2.933-6.71-7.298 0-4.67 2.856-7.62 6.938-7.62.718 0 1.425.093 1.973.28v2.43c-.483-.217-1.035-.327-1.717-.327-2.343 0-4.083 1.737-4.083 4.98 0 3.056 1.605 4.847 4.19 4.847.642 0 1.176-.112 1.61-.3v2.46c-.562.28-1.314.547-2.201.547zm23.59-.164h-2.828l.005-10.914-4.611 10.914h-2.274l-4.607-10.914v10.914h-2.777V4.917h3.392l5.292 12.465 5.14-12.465h3.39l-.123 22.008zm-37.277 0h2.78v-9.364h6.61V15.11h-6.61V7.465h7.32V4.917h-10.1v22.008z" />
+                </svg>
               </div>
             </div>
           </div>
