@@ -25,38 +25,62 @@ def test_webhook(backend_url, tenant_subdomain="demo", webhook_user="admin", web
     # Webhook endpoint
     webhook_url = f"{backend_url}/api/webhook/cdr/{tenant_subdomain}"
 
-    # Generate test call data
+    # Generate test call data (Grandstream CDR format)
     now = datetime.now(timezone.utc).isoformat()
     test_calls = [
         {
-            "call_id": f"TEST-CALL-{random.randint(1000, 9999)}",
-            "caller_number": "+15551234567",
-            "called_number": "+15559876543",
-            "call_type": "inbound",
-            "call_outcome": "answered",
-            "call_duration": 245,
-            "start_time": now,
-            "end_time": now
+            "uniqueid": f"TEST-CALL-{random.randint(1000, 9999)}",
+            "src": "+15551234567",
+            "dst": "+15559876543",
+            "caller_name": "Test Caller 1",
+            "clid": "Test Caller 1 <+15551234567>",
+            "channel": "SIP/trunk-001",
+            "dstchannel": "SIP/extension-001",
+            "start": now,
+            "answer": now,
+            "end": now,
+            "duration": 245,
+            "billsec": 245,
+            "disposition": "ANSWERED",
+            "recordfiles": "",
+            "src_trunk_name": "Main Trunk",
+            "dst_trunk_name": "Extension 100"
         },
         {
-            "call_id": f"TEST-CALL-{random.randint(1000, 9999)}",
-            "caller_number": "+15559876543",
-            "called_number": "+15551112222",
-            "call_type": "outbound",
-            "call_outcome": "no-answer",
-            "call_duration": 0,
-            "start_time": now,
-            "end_time": now
+            "uniqueid": f"TEST-CALL-{random.randint(1000, 9999)}",
+            "src": "+15559876543",
+            "dst": "+15551112222",
+            "caller_name": "Test Caller 2",
+            "clid": "Test Caller 2 <+15559876543>",
+            "channel": "SIP/extension-002",
+            "dstchannel": "SIP/trunk-002",
+            "start": now,
+            "answer": "",
+            "end": now,
+            "duration": 15,
+            "billsec": 0,
+            "disposition": "NO ANSWER",
+            "recordfiles": "",
+            "src_trunk_name": "Extension 200",
+            "dst_trunk_name": "Main Trunk"
         },
         {
-            "call_id": f"TEST-CALL-{random.randint(1000, 9999)}",
-            "caller_number": "+15553334444",
-            "called_number": "+15555556666",
-            "call_type": "inbound",
-            "call_outcome": "answered",
-            "call_duration": 480,
-            "start_time": now,
-            "end_time": now
+            "uniqueid": f"TEST-CALL-{random.randint(1000, 9999)}",
+            "src": "+15553334444",
+            "dst": "+15555556666",
+            "caller_name": "Test Caller 3",
+            "clid": "Test Caller 3 <+15553334444>",
+            "channel": "SIP/trunk-003",
+            "dstchannel": "SIP/extension-003",
+            "start": now,
+            "answer": now,
+            "end": now,
+            "duration": 480,
+            "billsec": 480,
+            "disposition": "ANSWERED",
+            "recordfiles": "/var/recordings/test-call-3.wav",
+            "src_trunk_name": "Main Trunk",
+            "dst_trunk_name": "Extension 300"
         }
     ]
 
@@ -68,11 +92,10 @@ def test_webhook(backend_url, tenant_subdomain="demo", webhook_user="admin", web
 
     for i, call_data in enumerate(test_calls, 1):
         print(f"[CALL {i}/{len(test_calls)}]")
-        print(f"   From: {call_data['caller_number']}")
-        print(f"   To: {call_data['called_number']}")
-        print(f"   Type: {call_data['call_type']}")
-        print(f"   Outcome: {call_data['call_outcome']}")
-        print(f"   Duration: {call_data['call_duration']}s")
+        print(f"   From: {call_data['src']}")
+        print(f"   To: {call_data['dst']}")
+        print(f"   Disposition: {call_data['disposition']}")
+        print(f"   Duration: {call_data['duration']}s / Billable: {call_data['billsec']}s")
 
         try:
             # Send webhook with basic auth
