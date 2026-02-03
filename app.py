@@ -26,12 +26,24 @@ from sqlalchemy import and_, func, extract
 from collections import defaultdict
 import csv
 import io
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 import secrets as crypto_secrets
 
 # Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
+
+# Import error handling system
+from error_handlers import (
+    register_error_handlers,
+    safe_json_parse,
+    safe_int,
+    safe_float,
+    safe_division,
+    validate_required_fields,
+    validate_pagination,
+    DatabaseTransaction
+)
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='frontend/dist', static_url_path='')
@@ -58,6 +70,9 @@ app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
 # Initialize extensions
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
+
+# Register error handlers for crash prevention
+register_error_handlers(app, db)
 
 # Configure logging
 logging.basicConfig(
@@ -261,7 +276,8 @@ class Tenant(db.Model):
             return None
         try:
             return cipher_suite.decrypt(self._pbx_password.encode()).decode()
-        except:
+        except (InvalidToken, UnicodeDecodeError) as e:
+            logger.error(f"Failed to decrypt pbx_password for tenant {self.id}: {e}")
             return None
 
     @pbx_password.setter
@@ -277,7 +293,8 @@ class Tenant(db.Model):
             return None
         try:
             return cipher_suite.decrypt(self._webhook_password.encode()).decode()
-        except:
+        except (InvalidToken, UnicodeDecodeError) as e:
+            logger.error(f"Failed to decrypt webhook_password for tenant {self.id}: {e}")
             return None
 
     @webhook_password.setter
@@ -582,8 +599,8 @@ def check_usage_limit(tenant_id):
     if not tenant:
         return False
 
-    # Parse plan limits
-    limits = json.loads(tenant.plan_limits) if tenant.plan_limits else {}
+    # Parse plan limits safely
+    limits = safe_json_parse(tenant.plan_limits, default={})
     calls_limit = limits.get('calls_per_month', 500)
 
     # Check if exceeded
@@ -598,11 +615,14 @@ def increment_usage(tenant_id):
     """Increment usage counter for tenant"""
     try:
         tenant = Tenant.query.get(tenant_id)
-        if tenant:
-            tenant.usage_this_month = (tenant.usage_this_month or 0) + 1
-            db.session.commit()
+        if not tenant:
+            logger.error(f"Tenant {tenant_id} not found for usage increment")
+            return
+        tenant.usage_this_month = (tenant.usage_this_month or 0) + 1
+        db.session.commit()
     except Exception as e:
-        logger.error(f"Failed to increment usage: {e}")
+        db.session.rollback()
+        logger.error(f"Failed to increment usage for tenant {tenant_id}: {e}", exc_info=True)
 
 
 # ============================================================================
@@ -980,15 +1000,24 @@ def receive_cdr(subdomain):
             logger.warning(f"Unknown tenant subdomain: {subdomain}")
             return jsonify({'error': 'Unknown tenant'}), 404
 
+        # Safely get webhook credentials (handle None from decryption failure)
+        webhook_user = tenant.webhook_username or ""
+        webhook_pass = tenant.webhook_password or ""
+
         auth = request.authorization
-        if not auth or auth.username != tenant.webhook_username or auth.password != tenant.webhook_password:
+        if not auth or auth.username != webhook_user or auth.password != webhook_pass:
             logger.warning(f"Invalid credentials for tenant: {subdomain}")
             return jsonify({'error': 'Unauthorized'}), 401
 
-        if request.is_json:
-            cdr_data = request.get_json()
-        else:
-            cdr_data = json.loads(request.data.decode('utf-8'))
+        # Safely parse CDR data (handle JSON errors)
+        try:
+            if request.is_json:
+                cdr_data = request.get_json()
+            else:
+                cdr_data = json.loads(request.data.decode('utf-8'))
+        except (UnicodeDecodeError, json.JSONDecodeError) as e:
+            logger.error(f"Invalid CDR data format: {e}")
+            return jsonify({'error': 'Invalid JSON format'}), 400
 
         uniqueid = cdr_data.get('uniqueid', 'unknown')
         logger.info(f"[{subdomain}] Received CDR: {uniqueid} | {cdr_data.get('src')} -> {cdr_data.get('dst')}")
@@ -1056,8 +1085,9 @@ def receive_cdr(subdomain):
         return jsonify({'status': 'success'}), 200
 
     except Exception as e:
-        logger.error(f"Error processing CDR: {e}")
-        return jsonify({'error': str(e)}), 500
+        db.session.rollback()  # Critical: Prevent cascading failures
+        logger.error(f"Error processing CDR: {e}", exc_info=True)
+        return jsonify({'error': 'CDR processing failed'}), 500
 
 
 # ============================================================================
@@ -1122,7 +1152,7 @@ def get_calls():
     # Sentiment filter (requires join with transcription and sentiment tables)
     if sentiment:
         query = query.join(CDRRecord.transcription).join(Transcription.sentiment).filter(
-            Sentiment.sentiment == sentiment
+            SentimentAnalysis.sentiment == sentiment
         )
 
     # Pagination
@@ -2512,7 +2542,7 @@ def export_calls_csv():
 
     if sentiment:
         query = query.join(CDRRecord.transcription).join(Transcription.sentiment).filter(
-            Sentiment.sentiment == sentiment
+            SentimentAnalysis.sentiment == sentiment
         )
 
     # Get all matching calls
@@ -2601,7 +2631,7 @@ def email_report():
 
         if filters.get('sentiment'):
             query = query.join(CDRRecord.transcription).join(Transcription.sentiment).filter(
-                Sentiment.sentiment == filters['sentiment']
+                SentimentAnalysis.sentiment == filters['sentiment']
             )
 
         # Get stats
