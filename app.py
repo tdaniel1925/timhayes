@@ -321,8 +321,8 @@ def signup():
         }), 201
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Signup error: {e}")
-        return jsonify({'error': 'Registration failed'}), 500
+        logger.error(f"Signup error: {e}", exc_info=True)
+        return jsonify({'error': f'Registration failed: {str(e)}'}), 500
 
 
 @app.route('/api/auth/login', methods=['POST'])
@@ -748,6 +748,15 @@ def init_db():
     with app.app_context():
         db.create_all()
         logger.info("Database initialized")
+
+
+# Initialize database on app startup (before first request)
+@app.before_request
+def initialize_database():
+    """Ensure database is initialized before processing requests"""
+    if not hasattr(app, '_database_initialized'):
+        init_db()
+        app._database_initialized = True
 
 
 if __name__ == '__main__':
