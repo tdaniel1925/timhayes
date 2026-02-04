@@ -1,6 +1,6 @@
-// API helper functions
+// API helper functions with comprehensive error handling
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 async function fetchWithAuth(url, options = {}) {
   const token = localStorage.getItem('access_token');
@@ -23,27 +23,33 @@ async function fetchWithAuth(url, options = {}) {
     // Token expired, try to refresh
     const refreshToken = localStorage.getItem('refresh_token');
     if (refreshToken) {
-      const refreshResponse = await fetch(`${API_BASE}/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${refreshToken}`,
-          'Content-Type': 'application/json'
+      try {
+        const refreshResponse = await fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${refreshToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (refreshResponse.ok) {
+          const data = await refreshResponse.json();
+          if (data?.access_token) {
+            localStorage.setItem('access_token', data.access_token);
+            // Retry original request
+            headers['Authorization'] = `Bearer ${data.access_token}`;
+            return fetch(`${API_BASE}${url}`, { ...options, headers });
+          }
         }
-      });
-
-      if (refreshResponse.ok) {
-        const { access_token } = await refreshResponse.json();
-        localStorage.setItem('access_token', access_token);
-
-        // Retry original request
-        headers['Authorization'] = `Bearer ${access_token}`;
-        return fetch(`${API_BASE}${url}`, { ...options, headers });
-      } else {
-        // Refresh failed, logout
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
+      } catch (error) {
+        console.error('Token refresh failed:', error);
       }
+
+      // Refresh failed, logout
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      window.location.href = '/login';
+      throw new Error('Session expired');
     }
   }
 
@@ -67,36 +73,57 @@ export const api = {
     if (filters.maxDuration) params.append('max_duration', filters.maxDuration);
 
     const response = await fetchWithAuth(`/calls?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch calls');
+    }
     return response.json();
   },
 
   getStats: async () => {
     const response = await fetchWithAuth('/stats');
+    if (!response.ok) {
+      throw new Error('Failed to fetch stats');
+    }
     return response.json();
   },
 
   getCallVolume: async (days = 30) => {
     const response = await fetchWithAuth(`/analytics/call-volume?days=${days}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch call volume');
+    }
     return response.json();
   },
 
   getSentimentTrends: async () => {
     const response = await fetchWithAuth('/analytics/sentiment-trends');
+    if (!response.ok) {
+      throw new Error('Failed to fetch sentiment trends');
+    }
     return response.json();
   },
 
   getRecording: async (callId) => {
     const response = await fetchWithAuth(`/recording/${callId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch recording');
+    }
     return response.blob();
   },
 
   getPhoneSystems: async () => {
     const response = await fetch(`${API_BASE}/phone-systems`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch phone systems');
+    }
     return response.json();
   },
 
   getSettings: async () => {
     const response = await fetchWithAuth('/settings');
+    if (!response.ok) {
+      throw new Error('Failed to fetch settings');
+    }
     return response.json();
   },
 
@@ -105,11 +132,18 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(settings)
     });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update settings');
+    }
     return response.json();
   },
 
   getTenants: async () => {
     const response = await fetchWithAuth('/admin/tenants');
+    if (!response.ok) {
+      throw new Error('Failed to fetch tenants');
+    }
     return response.json();
   },
 
@@ -118,18 +152,27 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(config)
     });
+    if (!response.ok) {
+      throw new Error('Failed to update tenant config');
+    }
     return response.json();
   },
 
   // Call Detail
   getCallDetail: async (callId) => {
     const response = await fetchWithAuth(`/calls/${callId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch call details');
+    }
     return response.json();
   },
 
   // Notifications
   getNotifications: async (page = 1, unreadOnly = false) => {
     const response = await fetchWithAuth(`/notifications?page=${page}&unread=${unreadOnly}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch notifications');
+    }
     return response.json();
   },
 
@@ -137,11 +180,17 @@ export const api = {
     const response = await fetchWithAuth(`/notifications/${notificationId}/read`, {
       method: 'PUT'
     });
+    if (!response.ok) {
+      throw new Error('Failed to mark notification as read');
+    }
     return response.json();
   },
 
   getNotificationRules: async () => {
     const response = await fetchWithAuth('/notifications/rules');
+    if (!response.ok) {
+      throw new Error('Failed to fetch notification rules');
+    }
     return response.json();
   },
 
@@ -150,17 +199,26 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(rule)
     });
+    if (!response.ok) {
+      throw new Error('Failed to create notification rule');
+    }
     return response.json();
   },
 
   // Admin - Setup Requests
   getSetupRequests: async (status = 'all', page = 1) => {
     const response = await fetchWithAuth(`/admin/setup-requests?status=${status}&page=${page}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch setup requests');
+    }
     return response.json();
   },
 
   getSetupRequestDetail: async (id) => {
     const response = await fetchWithAuth(`/admin/setup-requests/${id}/detail`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch setup request details');
+    }
     return response.json();
   },
 
@@ -169,6 +227,9 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data)
     });
+    if (!response.ok) {
+      throw new Error('Failed to update setup request');
+    }
     return response.json();
   },
 
@@ -176,12 +237,19 @@ export const api = {
     const response = await fetchWithAuth(`/admin/setup-requests/${id}/activate`, {
       method: 'POST'
     });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to activate setup request');
+    }
     return response.json();
   },
 
   // User Management
   getUsers: async () => {
     const response = await fetchWithAuth('/users');
+    if (!response.ok) {
+      throw new Error('Failed to fetch users');
+    }
     return response.json();
   },
 
@@ -190,6 +258,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(userData)
     });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create user');
+    }
     return response.json();
   },
 
@@ -198,6 +270,9 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(updates)
     });
+    if (!response.ok) {
+      throw new Error('Failed to update user');
+    }
     return response.json();
   },
 
@@ -205,6 +280,9 @@ export const api = {
     const response = await fetchWithAuth(`/users/${userId}`, {
       method: 'DELETE'
     });
+    if (!response.ok) {
+      throw new Error('Failed to delete user');
+    }
     return response.json();
   },
 
@@ -213,6 +291,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ password: newPassword })
     });
+    if (!response.ok) {
+      throw new Error('Failed to reset user password');
+    }
     return response.json();
   },
 
@@ -229,6 +310,9 @@ export const api = {
     if (filters.maxDuration) params.append('max_duration', filters.maxDuration);
 
     const response = await fetchWithAuth(`/export/calls/csv?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error('Failed to export calls');
+    }
     return response.blob();
   },
 
@@ -241,6 +325,9 @@ export const api = {
         filters
       })
     });
+    if (!response.ok) {
+      throw new Error('Failed to send email report');
+    }
     return response.json();
   },
 
@@ -251,6 +338,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
     });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to request password reset');
+    }
     return response.json();
   },
 
@@ -260,6 +351,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, new_password: newPassword })
     });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to reset password');
+    }
     return response.json();
   },
 
@@ -271,7 +366,8 @@ export const api = {
       body: JSON.stringify({ token })
     });
     if (!response.ok) {
-      throw await response.json();
+      const error = await response.json();
+      throw error;
     }
     return response.json();
   },
@@ -279,16 +375,25 @@ export const api = {
   // Subscription Management
   getSubscription: async () => {
     const response = await fetchWithAuth('/subscription');
+    if (!response.ok) {
+      throw new Error('Failed to fetch subscription');
+    }
     return response.json();
   },
 
   getBillingHistory: async () => {
     const response = await fetchWithAuth('/billing/history');
+    if (!response.ok) {
+      throw new Error('Failed to fetch billing history');
+    }
     return response.json();
   },
 
   getUsageStats: async () => {
     const response = await fetchWithAuth('/usage/stats');
+    if (!response.ok) {
+      throw new Error('Failed to fetch usage stats');
+    }
     return response.json();
   },
 
@@ -296,6 +401,10 @@ export const api = {
     const response = await fetchWithAuth('/subscription/cancel', {
       method: 'POST'
     });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to cancel subscription');
+    }
     return response.json();
   }
 };
