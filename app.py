@@ -3324,7 +3324,7 @@ def superadmin_platform_stats():
 
         # Total tenants
         total_tenants = Tenant.query.count()
-        active_tenants = Tenant.query.filter_by(status='active').count()
+        active_tenants = Tenant.query.filter_by(is_active=True).count()
 
         # Total users
         total_users = User.query.count()
@@ -3394,7 +3394,7 @@ def superadmin_revenue_dashboard():
         tenants_by_plan = db.session.query(
             Tenant.plan,
             db.func.count(Tenant.id).label('count')
-        ).filter(Tenant.status == 'active').group_by(Tenant.plan).all()
+        ).filter(Tenant.is_active == True).group_by(Tenant.plan).all()
 
         plan_breakdown = []
         mrr = 0  # Monthly Recurring Revenue
@@ -3434,12 +3434,12 @@ def superadmin_revenue_dashboard():
 
         # Calculate churn (tenants that became inactive this month)
         churned_this_month = Tenant.query.filter(
-            Tenant.status != 'active',
+            Tenant.is_active == False,
             Tenant.subscription_ends_at >= datetime.utcnow().replace(day=1)
         ).count()
 
         # Calculate growth rate
-        total_active = Tenant.query.filter_by(status='active').count()
+        total_active = Tenant.query.filter_by(is_active=True).count()
         growth_rate = ((new_tenants_this_month - churned_this_month) / total_active * 100) if total_active > 0 else 0
 
         # Calculate average revenue per customer (ARPU)
@@ -3473,7 +3473,7 @@ def superadmin_revenue_dashboard():
             tenants_that_month = Tenant.query.filter(
                 Tenant.created_at <= month_date,
                 db.or_(
-                    Tenant.status == 'active',
+                    Tenant.is_active == True,
                     Tenant.subscription_ends_at >= month_date
                 )
             ).count()
