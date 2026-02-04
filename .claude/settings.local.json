@@ -33,7 +33,20 @@
       "Bash(del nul)",
       "Bash(del package-lock.json)",
       "Bash(/tmp/login_response.json)",
-      "Bash(/tmp/manager_login.json)"
+      "Bash(/tmp/manager_login.json)",
+      "Bash(TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc3MDE4NjA3MSwianRpIjoiOGE4ZWJhZTItM2Y2Ni00MmFmLWFjNDAtZTFjOGQ5NDkyMjYwIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6MSwibmJmIjoxNzcwMTg2MDcxLCJjc3JmIjoiOWFhYTRmZmItYmU5OS00Mzc2LWIzZDYtODRiMDUyZjdmNTkxIiwiZXhwIjoxNzcwMTg5NjcxLCJ0ZW5hbnRfaWQiOjEsInJvbGUiOiJhZG1pbiJ9.zgZeLZ_gmYkvAgmOVl2pRZn9JOzJaCMdKaefqAxL4SI)",
+      "Bash(__NEW_LINE__ curl -X PUT https://timhayes-bo-production-58c5.up.railway.app/api/settings -H \"Authorization: Bearer $TOKEN\" -H \"Content-Type: application/json\" -d '{\"\"webhook_username\"\": \"\"testco_webhook\"\", \"\"webhook_password\"\": \"\"TestWebhook123!\"\"}')",
+      "Bash(__NEW_LINE__ curl -X GET \"https://timhayes-bo-production-58c5.up.railway.app/api/calls?limit=10\" -H \"Authorization: Bearer $TOKEN\")",
+      "Bash(set DATABASE_URL=postgresql://postgres:jbleFfJMAiljcizINgmQtYOSaUTuuKSK@yamabiko.proxy.rlwy.net:26726/railway)",
+      "Bash($env:PYTHONIOENCODING=\"utf-8\")",
+      "Bash($env:DATABASE_URL=\"postgresql://postgres:jbleFfJMAiljcizINgmQtYOSaUTuuKSK@yamabiko.proxy.rlwy.net:26726/railway\")",
+      "Bash(cmd /c run_setup.bat)",
+      "Bash(powershell -Command \"$env:DATABASE_URL=''postgresql://postgres:jbleFfJMAiljcizINgmQtYOSaUTuuKSK@yamabiko.proxy.rlwy.net:26726/railway''; python ''C:\\dev\\1 - Tim Hayes\\setup_features_simple.py''\")",
+      "Bash(railway service:*)",
+      "Bash(npm run build:*)",
+      "Bash(echo \"After making a test call, run this command to check if it was received:\ncurl -H ''Authorization: Bearer YOUR_TOKEN'' https://audiapro-backend.onrender.com/api/calls\")",
+      "Bash(arp:*)",
+      "Bash($env:DATABASE_URL=\"postgresql://postgres.fcubjohwzfhjcwcnwost:ttandSellaBella1234@aws-0-us-west-2.pooler.supabase.com:6543/postgres\")"
     ],
     "deny": [],
     "ask": []
