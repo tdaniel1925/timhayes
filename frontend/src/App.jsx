@@ -28,6 +28,13 @@ import UserManagement from './pages/UserManagement';
 import IntegrationsPanel from './pages/IntegrationsPanel';
 import SubscriptionManagement from './pages/SubscriptionManagement';
 
+// Super Admin Pages
+import SuperAdminLogin from './pages/SuperAdminLogin';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import TenantList from './pages/TenantList';
+import TenantCreate from './pages/TenantCreate';
+import TenantDetail from './pages/TenantDetail';
+
 // Protected Route component
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -168,6 +175,13 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      {/* Super Admin Routes (manage their own auth) */}
+      <Route path="/superadmin/login" element={<SuperAdminLogin />} />
+      <Route path="/superadmin/dashboard" element={<SuperAdminDashboard />} />
+      <Route path="/superadmin/tenants" element={<TenantList />} />
+      <Route path="/superadmin/tenants/create" element={<TenantCreate />} />
+      <Route path="/superadmin/tenants/:tenantId" element={<TenantDetail />} />
 
       {/* 404 - Redirect to home */}
       <Route path="*" element={<Navigate to="/" replace />} />

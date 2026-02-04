@@ -588,6 +588,33 @@ class AuditLog(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class SuperAdmin(db.Model):
+    """Platform super administrators - not tied to any tenant"""
+    __tablename__ = 'super_admins'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    email = db.Column(db.String(200), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+    full_name = db.Column(db.String(200))
+
+    role = db.Column(db.String(50), default='super_admin')  # super_admin, admin, support
+    is_active = db.Column(db.Boolean, default=True)
+
+    # 2FA fields (for future)
+    totp_secret = db.Column(db.String(200))
+    totp_enabled = db.Column(db.Boolean, default=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime)
+
+    def set_password(self, password):
+        self.password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+    def check_password(self, password):
+        return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
+
+
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
@@ -794,6 +821,160 @@ def process_call_ai_async(call_id, audio_file_path):
     thread = threading.Thread(target=ai_worker, daemon=True)
     thread.start()
     logger.info(f"Started AI processing thread for call {call_id}")
+
+
+# ============================================================================
+# SUPER ADMIN ENDPOINTS
+# ============================================================================
+
+@app.route('/api/superadmin/register', methods=['POST'])
+@limiter.limit("5 per hour")
+def superadmin_register():
+    """Register first super admin (only if none exist)"""
+    try:
+        # Check if any super admin exists
+        existing = SuperAdmin.query.first()
+        if existing:
+            return jsonify({'error': 'Super admin already exists'}), 403
+
+        data = request.get_json()
+
+        # Validate required fields
+        required_fields = ['email', 'password', 'full_name']
+        if not all(field in data for field in required_fields):
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # Create super admin
+        super_admin = SuperAdmin(
+            email=data['email'].lower().strip(),
+            full_name=data['full_name'].strip(),
+            role='super_admin',
+            is_active=True
+        )
+        super_admin.set_password(data['password'])
+
+        db.session.add(super_admin)
+        db.session.commit()
+
+        logger.info(f"Super admin created: {super_admin.email}")
+
+        # Generate JWT token
+        access_token = create_access_token(
+            identity=super_admin.id,
+            additional_claims={
+                'role': 'super_admin',
+                'is_super_admin': True
+            }
+        )
+        refresh_token = create_refresh_token(identity=super_admin.id)
+
+        return jsonify({
+            'access_token': access_token,
+            'refresh_token': refresh_token,
+            'super_admin': {
+                'id': super_admin.id,
+                'email': super_admin.email,
+                'full_name': super_admin.full_name,
+                'role': super_admin.role
+            }
+        }), 201
+
+    except Exception as e:
+        logger.error(f"Super admin registration error: {e}", exc_info=True)
+        db.session.rollback()
+        return jsonify({'error': 'Registration failed'}), 500
+
+
+@app.route('/api/superadmin/login', methods=['POST'])
+@limiter.limit("10 per hour")
+def superadmin_login():
+    """Super admin login"""
+    try:
+        data = request.get_json()
+
+        if not data or not data.get('email') or not data.get('password'):
+            return jsonify({'error': 'Email and password required'}), 400
+
+        # Find super admin
+        super_admin = SuperAdmin.query.filter_by(
+            email=data['email'].lower().strip()
+        ).first()
+
+        if not super_admin or not super_admin.check_password(data['password']):
+            return jsonify({'error': 'Invalid credentials'}), 401
+
+        if not super_admin.is_active:
+            return jsonify({'error': 'Account is disabled'}), 403
+
+        # Update last login
+        super_admin.last_login = datetime.utcnow()
+        db.session.commit()
+
+        # Generate JWT tokens
+        access_token = create_access_token(
+            identity=super_admin.id,
+            additional_claims={
+                'role': 'super_admin',
+                'is_super_admin': True
+            }
+        )
+        refresh_token = create_refresh_token(identity=super_admin.id)
+
+        logger.info(f"Super admin logged in: {super_admin.email}")
+
+        return jsonify({
+            'access_token': access_token,
+            'refresh_token': refresh_token,
+            'super_admin': {
+                'id': super_admin.id,
+                'email': super_admin.email,
+                'full_name': super_admin.full_name,
+                'role': super_admin.role
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Super admin login error: {e}", exc_info=True)
+        return jsonify({'error': 'Login failed'}), 500
+
+
+@app.route('/api/superadmin/me', methods=['GET'])
+@jwt_required()
+def get_superadmin_me():
+    """Get current super admin info"""
+    try:
+        claims = get_jwt()
+        if not claims.get('is_super_admin'):
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        super_admin_id = get_jwt_identity()
+        super_admin = SuperAdmin.query.get(super_admin_id)
+
+        if not super_admin:
+            return jsonify({'error': 'Super admin not found'}), 404
+
+        return jsonify({
+            'id': super_admin.id,
+            'email': super_admin.email,
+            'full_name': super_admin.full_name,
+            'role': super_admin.role,
+            'is_active': super_admin.is_active,
+            'created_at': super_admin.created_at.isoformat(),
+            'last_login': super_admin.last_login.isoformat() if super_admin.last_login else None
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get super admin error: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to get super admin info'}), 500
+
+
+# Helper function to check super admin access
+def require_super_admin():
+    """Decorator to require super admin access"""
+    claims = get_jwt()
+    if not claims.get('is_super_admin'):
+        raise Exception('Super admin access required')
+    return True
 
 
 # ============================================================================
@@ -2640,6 +2821,387 @@ def reset_user_password(user_id):
         db.session.rollback()
         logger.error(f"Password reset error: {e}", exc_info=True)
         return jsonify({'error': 'Failed to reset password'}), 500
+
+
+# ============================================================================
+# SUPER ADMIN - TENANT MANAGEMENT
+# ============================================================================
+
+@app.route('/api/superadmin/tenants', methods=['GET'])
+@jwt_required()
+def superadmin_list_tenants():
+    """List all tenants (super admin only)"""
+    try:
+        require_super_admin()
+
+        # Get query parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        search = request.args.get('search', '')
+        status_filter = request.args.get('status', '')
+
+        # Build query
+        query = Tenant.query
+
+        if search:
+            query = query.filter(
+                db.or_(
+                    Tenant.company_name.ilike(f'%{search}%'),
+                    Tenant.subdomain.ilike(f'%{search}%')
+                )
+            )
+
+        if status_filter:
+            query = query.filter_by(status=status_filter)
+
+        # Paginate
+        pagination = query.order_by(Tenant.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+
+        tenants_data = []
+        for tenant in pagination.items:
+            # Get user count
+            user_count = User.query.filter_by(tenant_id=tenant.id).count()
+
+            # Get calls this month
+            start_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            calls_this_month = CDRRecord.query.filter(
+                CDRRecord.tenant_id == tenant.id,
+                CDRRecord.call_date >= start_of_month
+            ).count()
+
+            tenants_data.append({
+                'id': tenant.id,
+                'company_name': tenant.company_name,
+                'subdomain': tenant.subdomain,
+                'plan': tenant.plan,
+                'status': tenant.status,
+                'max_users': tenant.max_users,
+                'max_calls_per_month': tenant.max_calls_per_month,
+                'user_count': user_count,
+                'calls_this_month': calls_this_month,
+                'created_at': tenant.created_at.isoformat(),
+                'subscription_status': tenant.subscription_status,
+                'subscription_ends_at': tenant.subscription_ends_at.isoformat() if tenant.subscription_ends_at else None
+            })
+
+        return jsonify({
+            'tenants': tenants_data,
+            'total': pagination.total,
+            'pages': pagination.pages,
+            'current_page': page,
+            'per_page': per_page
+        }), 200
+
+    except Exception as e:
+        logger.error(f"List tenants error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/tenants', methods=['POST'])
+@jwt_required()
+def superadmin_create_tenant():
+    """Create new tenant (super admin only)"""
+    try:
+        require_super_admin()
+
+        data = request.get_json()
+
+        # Validate required fields
+        required_fields = ['company_name', 'subdomain', 'admin_email', 'admin_password', 'admin_name']
+        if not all(field in data for field in required_fields):
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # Check if subdomain already exists
+        existing_tenant = Tenant.query.filter_by(subdomain=data['subdomain']).first()
+        if existing_tenant:
+            return jsonify({'error': 'Subdomain already exists'}), 400
+
+        # Check if email already exists
+        existing_user = User.query.filter_by(email=data['admin_email']).first()
+        if existing_user:
+            return jsonify({'error': 'Email already exists'}), 400
+
+        # Create tenant
+        tenant = Tenant(
+            subdomain=data['subdomain'].lower().strip(),
+            company_name=data['company_name'].strip(),
+            plan=data.get('plan', 'starter'),
+            status=data.get('status', 'active'),
+            max_users=data.get('max_users', 5),
+            max_calls_per_month=data.get('max_calls_per_month', 500),
+            subscription_status='active'
+        )
+
+        db.session.add(tenant)
+        db.session.flush()  # Get tenant.id
+
+        # Create admin user for tenant
+        admin_user = User(
+            tenant_id=tenant.id,
+            email=data['admin_email'].lower().strip(),
+            full_name=data['admin_name'].strip(),
+            role='admin',
+            is_active=True,
+            email_verified=True
+        )
+        admin_user.set_password(data['admin_password'])
+
+        db.session.add(admin_user)
+        db.session.commit()
+
+        logger.info(f"Tenant created by super admin: {tenant.company_name} ({tenant.subdomain})")
+
+        return jsonify({
+            'message': 'Tenant created successfully',
+            'tenant': {
+                'id': tenant.id,
+                'company_name': tenant.company_name,
+                'subdomain': tenant.subdomain,
+                'plan': tenant.plan,
+                'status': tenant.status
+            },
+            'admin_user': {
+                'email': admin_user.email,
+                'full_name': admin_user.full_name
+            }
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Create tenant error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/tenants/<int:tenant_id>', methods=['GET'])
+@jwt_required()
+def superadmin_get_tenant(tenant_id):
+    """Get tenant details (super admin only)"""
+    try:
+        require_super_admin()
+
+        tenant = Tenant.query.get_or_404(tenant_id)
+
+        # Get users
+        users = User.query.filter_by(tenant_id=tenant.id).all()
+        users_data = [{
+            'id': u.id,
+            'email': u.email,
+            'full_name': u.full_name,
+            'role': u.role,
+            'is_active': u.is_active,
+            'last_login': u.last_login.isoformat() if u.last_login else None
+        } for u in users]
+
+        # Get call stats
+        total_calls = CDRRecord.query.filter_by(tenant_id=tenant.id).count()
+        start_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        calls_this_month = CDRRecord.query.filter(
+            CDRRecord.tenant_id == tenant.id,
+            CDRRecord.call_date >= start_of_month
+        ).count()
+
+        return jsonify({
+            'id': tenant.id,
+            'company_name': tenant.company_name,
+            'subdomain': tenant.subdomain,
+            'plan': tenant.plan,
+            'status': tenant.status,
+            'max_users': tenant.max_users,
+            'max_calls_per_month': tenant.max_calls_per_month,
+            'subscription_status': tenant.subscription_status,
+            'subscription_ends_at': tenant.subscription_ends_at.isoformat() if tenant.subscription_ends_at else None,
+            'created_at': tenant.created_at.isoformat(),
+            'users': users_data,
+            'total_calls': total_calls,
+            'calls_this_month': calls_this_month
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get tenant error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/tenants/<int:tenant_id>', methods=['PUT'])
+@jwt_required()
+def superadmin_update_tenant(tenant_id):
+    """Update tenant (super admin only)"""
+    try:
+        require_super_admin()
+
+        tenant = Tenant.query.get_or_404(tenant_id)
+        data = request.get_json()
+
+        # Update fields
+        if 'company_name' in data:
+            tenant.company_name = data['company_name'].strip()
+        if 'plan' in data:
+            tenant.plan = data['plan']
+        if 'status' in data:
+            tenant.status = data['status']
+        if 'max_users' in data:
+            tenant.max_users = data['max_users']
+        if 'max_calls_per_month' in data:
+            tenant.max_calls_per_month = data['max_calls_per_month']
+        if 'subscription_status' in data:
+            tenant.subscription_status = data['subscription_status']
+
+        db.session.commit()
+
+        logger.info(f"Tenant updated by super admin: {tenant.company_name}")
+
+        return jsonify({
+            'message': 'Tenant updated successfully',
+            'tenant': {
+                'id': tenant.id,
+                'company_name': tenant.company_name,
+                'plan': tenant.plan,
+                'status': tenant.status
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Update tenant error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/tenants/<int:tenant_id>', methods=['DELETE'])
+@jwt_required()
+def superadmin_delete_tenant(tenant_id):
+    """Delete tenant and all related data (super admin only)"""
+    try:
+        require_super_admin()
+
+        tenant = Tenant.query.get_or_404(tenant_id)
+
+        # Delete all related data (CASCADE should handle this, but being explicit)
+        CDRRecord.query.filter_by(tenant_id=tenant.id).delete()
+        User.query.filter_by(tenant_id=tenant.id).delete()
+        Notification.query.filter_by(tenant_id=tenant.id).delete()
+        AuditLog.query.filter_by(tenant_id=tenant.id).delete()
+
+        # Delete tenant
+        db.session.delete(tenant)
+        db.session.commit()
+
+        logger.warning(f"Tenant deleted by super admin: {tenant.company_name}")
+
+        return jsonify({'message': 'Tenant deleted successfully'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Delete tenant error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/tenants/<int:tenant_id>/impersonate', methods=['POST'])
+@jwt_required()
+def superadmin_impersonate_tenant(tenant_id):
+    """Impersonate tenant admin (super admin only)"""
+    try:
+        require_super_admin()
+
+        tenant = Tenant.query.get_or_404(tenant_id)
+
+        # Get tenant's admin user
+        admin_user = User.query.filter_by(tenant_id=tenant.id, role='admin').first()
+        if not admin_user:
+            return jsonify({'error': 'No admin user found for tenant'}), 404
+
+        # Generate JWT token for the tenant admin
+        access_token = create_access_token(
+            identity=admin_user.id,
+            additional_claims={
+                'tenant_id': tenant.id,
+                'role': admin_user.role,
+                'impersonated_by': get_jwt_identity()  # Track who is impersonating
+            }
+        )
+
+        logger.info(f"Super admin impersonating tenant: {tenant.company_name}")
+
+        return jsonify({
+            'access_token': access_token,
+            'user': {
+                'id': admin_user.id,
+                'email': admin_user.email,
+                'full_name': admin_user.full_name,
+                'role': admin_user.role,
+                'tenant': {
+                    'id': tenant.id,
+                    'company_name': tenant.company_name,
+                    'subdomain': tenant.subdomain,
+                    'plan': tenant.plan
+                }
+            },
+            'impersonated': True
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Impersonate error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/stats', methods=['GET'])
+@jwt_required()
+def superadmin_platform_stats():
+    """Get platform-wide statistics (super admin only)"""
+    try:
+        require_super_admin()
+
+        # Total tenants
+        total_tenants = Tenant.query.count()
+        active_tenants = Tenant.query.filter_by(status='active').count()
+
+        # Total users
+        total_users = User.query.count()
+
+        # Total calls
+        total_calls = CDRRecord.query.count()
+
+        # Calls today
+        today = datetime.utcnow().date()
+        calls_today = CDRRecord.query.filter(
+            db.func.date(CDRRecord.call_date) == today
+        ).count()
+
+        # Calls this month
+        start_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        calls_this_month = CDRRecord.query.filter(
+            CDRRecord.call_date >= start_of_month
+        ).count()
+
+        # Revenue (if billing data available)
+        total_revenue = db.session.query(db.func.sum(BillingHistory.amount)).filter(
+            BillingHistory.status == 'completed'
+        ).scalar() or 0
+
+        # Recent tenants
+        recent_tenants = Tenant.query.order_by(Tenant.created_at.desc()).limit(5).all()
+        recent_tenants_data = [{
+            'id': t.id,
+            'company_name': t.company_name,
+            'subdomain': t.subdomain,
+            'plan': t.plan,
+            'created_at': t.created_at.isoformat()
+        } for t in recent_tenants]
+
+        return jsonify({
+            'total_tenants': total_tenants,
+            'active_tenants': active_tenants,
+            'total_users': total_users,
+            'total_calls': total_calls,
+            'calls_today': calls_today,
+            'calls_this_month': calls_this_month,
+            'total_revenue': float(total_revenue),
+            'recent_tenants': recent_tenants_data
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Platform stats error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 
 # ============================================================================

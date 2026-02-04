@@ -17,7 +17,20 @@
       "Bash(nslookup:*)",
       "Bash(python:*)",
       "Bash(find:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(.env.example)",
+      "Bash(railway variables --help:*)",
+      "Bash(railway variables:*)",
+      "Bash(railway status:*)",
+      "Bash(railway login:*)",
+      "Bash(timeout /t 3)",
+      "Bash(nul)",
+      "Bash(curl:*)",
+      "Bash(railway logs:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(timeout /t 60)",
+      "Bash(del nul)"
     ],
     "deny": [],
     "ask": []
