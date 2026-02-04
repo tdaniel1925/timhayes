@@ -46,7 +46,13 @@
       "Bash(npm run build:*)",
       "Bash(echo \"After making a test call, run this command to check if it was received:\ncurl -H ''Authorization: Bearer YOUR_TOKEN'' https://audiapro-backend.onrender.com/api/calls\")",
       "Bash(arp:*)",
-      "Bash($env:DATABASE_URL=\"postgresql://postgres.fcubjohwzfhjcwcnwost:ttandSellaBella1234@aws-0-us-west-2.pooler.supabase.com:6543/postgres\")"
+      "Bash($env:DATABASE_URL=\"postgresql://postgres.fcubjohwzfhjcwcnwost:ttandSellaBella1234@aws-0-us-west-2.pooler.supabase.com:6543/postgres\")",
+      "Bash(render:*)",
+      "Bash(for i in {1..6})",
+      "Bash(do echo \"Attempt $i/6...\")",
+      "Bash(done)",
+      "Bash(for i in {1..3})",
+      "Bash(do echo \"Check $i/3:\")"
     ],
     "deny": [],
     "ask": []
