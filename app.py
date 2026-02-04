@@ -65,7 +65,11 @@ limiter = Limiter(
 )
 
 # Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///callinsight.db')
+# Fix Railway's postgres:// URL to postgresql:// for SQLAlchemy compatibility
+database_url = os.getenv('DATABASE_URL', 'sqlite:///callinsight.db')
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-this')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
@@ -5776,8 +5780,20 @@ def debug_database():
             debug_info['managers'] = {'error': str(e)}
 
         # Environment check
+        # Show raw DATABASE_URL from environment (masked)
+        raw_db_url = os.getenv('DATABASE_URL', 'NOT SET')
+        if raw_db_url != 'NOT SET' and '@' in raw_db_url:
+            parts = raw_db_url.split('@')
+            user_part = parts[0].split('://')[1].split(':')[0] if '://' in parts[0] else 'unknown'
+            host_part = '@'.join(parts[1:])
+            masked_raw = f"{parts[0].split('://')[0]}://{user_part}:****@{host_part}"
+        else:
+            masked_raw = raw_db_url
+
         debug_info['environment'] = {
             'DATABASE_URL_set': bool(os.getenv('DATABASE_URL')),
+            'DATABASE_URL_raw': masked_raw,
+            'DATABASE_URL_starts_with_postgres': raw_db_url.startswith('postgres://') if raw_db_url != 'NOT SET' else False,
             'OPENAI_API_KEY_set': bool(os.getenv('OPENAI_API_KEY')),
             'JWT_SECRET_KEY_set': bool(os.getenv('JWT_SECRET_KEY')),
             'ENCRYPTION_KEY_set': bool(os.getenv('ENCRYPTION_KEY'))
