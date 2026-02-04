@@ -2,8 +2,21 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
+
+// Marketing Pages
+import Home from './pages/Home';
+import Features from './pages/Features';
+import Pricing from './pages/Pricing';
+import HowItWorks from './pages/HowItWorks';
+import Integrations from './pages/Integrations';
+import Contact from './pages/Contact';
+
+// Auth Pages
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import VerifyEmail from './pages/VerifyEmail';
+
+// App Pages
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import SetupRequest from './pages/SetupRequest';
@@ -13,7 +26,6 @@ import AdminSetupRequests from './pages/AdminSetupRequests';
 import Notifications from './pages/Notifications';
 import UserManagement from './pages/UserManagement';
 import IntegrationsPanel from './pages/IntegrationsPanel';
-import VerifyEmail from './pages/VerifyEmail';
 import SubscriptionManagement from './pages/SubscriptionManagement';
 
 // Protected Route component
@@ -62,7 +74,15 @@ function PublicRoute({ children }) {
 function AppRoutes() {
   return (
     <Routes>
-      {/* Public routes */}
+      {/* Marketing Pages (Public - No Auth Required) */}
+      <Route path="/" element={<Home />} />
+      <Route path="/features" element={<Features />} />
+      <Route path="/pricing" element={<Pricing />} />
+      <Route path="/how-it-works" element={<HowItWorks />} />
+      <Route path="/integrations" element={<Integrations />} />
+      <Route path="/contact" element={<Contact />} />
+
+      {/* Auth Routes (Public - Redirect if Logged In) */}
       <Route
         path="/login"
         element={
@@ -149,11 +169,8 @@ function AppRoutes() {
         }
       />
 
-      {/* Default redirect */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
-      {/* 404 */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* 404 - Redirect to home */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
