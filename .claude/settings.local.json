@@ -31,7 +31,9 @@
       "Bash(npm run dev:*)",
       "Bash(timeout /t 60)",
       "Bash(del nul)",
-      "Bash(del package-lock.json)"
+      "Bash(del package-lock.json)",
+      "Bash(/tmp/login_response.json)",
+      "Bash(/tmp/manager_login.json)"
     ],
     "deny": [],
     "ask": []
