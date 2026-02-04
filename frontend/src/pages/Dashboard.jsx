@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import {
   Phone, TrendingUp, MessageSquare, BarChart3, Download,
-  ChevronLeft, ChevronRight, Search, Settings, Filter, X, FileText, Mail
+  ChevronLeft, ChevronRight, Search, Settings, Filter, X, FileText, Mail, Play, Pause
 } from 'lucide-react';
 import {
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area,
@@ -45,6 +45,11 @@ export default function Dashboard() {
     minDuration: '',
     maxDuration: ''
   });
+
+  // Audio player state
+  const [playingCallId, setPlayingCallId] = useState(null);
+  const [audioUrl, setAudioUrl] = useState(null);
+  const audioRef = React.useRef(null);
 
   useEffect(() => {
     loadData();
@@ -147,6 +152,81 @@ export default function Dashboard() {
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   };
 
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const isToday = date.toDateString() === today.toDateString();
+    const isYesterday = date.toDateString() === yesterday.toDateString();
+
+    const timeStr = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    if (isToday) {
+      return `Today ${timeStr}`;
+    } else if (isYesterday) {
+      return `Yesterday ${timeStr}`;
+    } else {
+      const dateStr = date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+      });
+      return `${dateStr} ${timeStr}`;
+    }
+  };
+
+  const handlePlayRecording = async (callId) => {
+    try {
+      // If already playing this call, pause it
+      if (playingCallId === callId && audioRef.current && !audioRef.current.paused) {
+        audioRef.current.pause();
+        setPlayingCallId(null);
+        return;
+      }
+
+      // Clean up previous audio
+      if (audioUrl) {
+        window.URL.revokeObjectURL(audioUrl);
+      }
+
+      // Load and play new recording
+      const blob = await api.getRecording(callId);
+      const url = window.URL.createObjectURL(blob);
+      setAudioUrl(url);
+      setPlayingCallId(callId);
+
+      // Wait for audio element to be ready
+      setTimeout(() => {
+        if (audioRef.current) {
+          audioRef.current.src = url;
+          audioRef.current.play().catch(error => {
+            console.error('Failed to play recording:', error);
+            alert('Failed to play recording');
+          });
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Failed to load recording:', error);
+      alert('Recording not available');
+    }
+  };
+
+  // Clean up audio URL when component unmounts
+  React.useEffect(() => {
+    return () => {
+      if (audioUrl) {
+        window.URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [audioUrl]);
+
   const getSentimentColor = (sentiment) => {
     if (!sentiment) return 'text-gray-500';
     const s = sentiment.toUpperCase();
@@ -178,6 +258,14 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Hidden audio player for streaming recordings */}
+      <audio
+        ref={audioRef}
+        onEnded={() => setPlayingCallId(null)}
+        onPause={() => setPlayingCallId(null)}
+        style={{ display: 'none' }}
+      />
+
       {/* Header */}
       <header className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
@@ -593,9 +681,10 @@ export default function Dashboard() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Date & Time</TableHead>
                         <TableHead>From</TableHead>
                         <TableHead>To</TableHead>
-                        <TableHead>Caller</TableHead>
+                        <TableHead>Caller Info</TableHead>
                         <TableHead>Duration</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Recording</TableHead>
@@ -609,10 +698,22 @@ export default function Dashboard() {
                           className="cursor-pointer hover:bg-gray-50"
                           onClick={() => navigate(`/call/${call.id}`)}
                         >
+                          <TableCell className="font-medium text-sm">
+                            {formatDateTime(call.call_date || call.start_time)}
+                          </TableCell>
                           <TableCell className="font-medium">{call.src || '-'}</TableCell>
                           <TableCell>{call.dst || '-'}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {call.caller_name || '-'}
+                          <TableCell className="text-sm">
+                            <div className="flex flex-col">
+                              <span className="font-medium">
+                                {call.caller_name || 'Unknown'}
+                              </span>
+                              {call.clid && call.clid !== call.caller_name && (
+                                <span className="text-xs text-muted-foreground">
+                                  {call.clid}
+                                </span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>{formatDuration(call.duration)}</TableCell>
                           <TableCell>
@@ -626,18 +727,36 @@ export default function Dashboard() {
                           </TableCell>
                           <TableCell>
                             {call.has_recording ? (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDownloadRecording(call.id);
-                                }}
-                                className="flex items-center gap-1"
-                              >
-                                <Download className="h-3 w-3" />
-                                Download
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePlayRecording(call.id);
+                                  }}
+                                  className="flex items-center gap-1"
+                                  title={playingCallId === call.id ? "Pause" : "Play"}
+                                >
+                                  {playingCallId === call.id ? (
+                                    <Pause className="h-3 w-3" />
+                                  ) : (
+                                    <Play className="h-3 w-3" />
+                                  )}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadRecording(call.id);
+                                  }}
+                                  className="flex items-center gap-1"
+                                  title="Download"
+                                >
+                                  <Download className="h-3 w-3" />
+                                </Button>
+                              </div>
                             ) : (
                               <span className="text-xs text-muted-foreground">N/A</span>
                             )}
