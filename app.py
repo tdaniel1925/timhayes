@@ -664,8 +664,26 @@ def increment_usage(tenant_id):
         if not tenant:
             logger.error(f"Tenant {tenant_id} not found for usage increment")
             return
-        tenant.usage_this_month = (tenant.usage_this_month or 0) + 1
+
+        old_usage = tenant.usage_this_month or 0
+        tenant.usage_this_month = old_usage + 1
         db.session.commit()
+
+        # Check if we crossed warning thresholds
+        calls_limit = tenant.max_calls_per_month or 500
+        new_percentage = (tenant.usage_this_month / calls_limit * 100) if calls_limit > 0 else 0
+        old_percentage = (old_usage / calls_limit * 100) if calls_limit > 0 else 0
+
+        # Send warning at 80% threshold
+        if old_percentage < 80 and new_percentage >= 80:
+            logger.info(f"Tenant {tenant_id} reached 80% usage threshold")
+            send_usage_limit_warning(tenant, 'calls')
+
+        # Send warning at 90% threshold
+        elif old_percentage < 90 and new_percentage >= 90:
+            logger.info(f"Tenant {tenant_id} reached 90% usage threshold")
+            send_usage_limit_warning(tenant, 'calls')
+
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to increment usage for tenant {tenant_id}: {e}", exc_info=True)
@@ -1131,6 +1149,9 @@ def signup():
 
         # Send verification email
         send_verification_email(user.email, user.full_name, verification_token)
+
+        # Notify super admins about new tenant
+        send_new_tenant_notification_to_superadmins(tenant)
 
         # Log audit
         log_audit('user_signup', 'user', user.id, {
@@ -3095,6 +3116,12 @@ def superadmin_create_tenant():
         db.session.add(admin_user)
         db.session.commit()
 
+        # Send welcome email to admin user
+        send_welcome_email(admin_user.email, admin_user.full_name, data['admin_password'], tenant.company_name)
+
+        # Notify other super admins about new tenant
+        send_new_tenant_notification_to_superadmins(tenant)
+
         logger.info(f"Tenant created by super admin: {tenant.company_name} ({tenant.subdomain})")
 
         return jsonify({
@@ -3900,6 +3927,397 @@ def send_urgent_notification(user_email, user_phone, subject, message_text):
     if user_phone:
         sms_text = f"URGENT: {subject}\n{message_text}"
         send_sms_alert(user_phone, sms_text)
+
+
+def send_usage_limit_warning(tenant, usage_type='calls'):
+    """Send warning email when approaching usage limits"""
+    try:
+        import resend
+        resend.api_key = os.getenv('RESEND_API_KEY')
+
+        # Get tenant admin users
+        admins = User.query.filter_by(tenant_id=tenant.id, role='admin', is_active=True).all()
+
+        if not admins:
+            logger.warning(f"No admins found for tenant {tenant.id}")
+            return False
+
+        # Calculate current usage percentage
+        if usage_type == 'calls':
+            current = tenant.usage_this_month or 0
+            limit = tenant.max_calls_per_month
+            percentage = (current / limit * 100) if limit > 0 else 0
+            limit_type = "call"
+        else:  # users
+            current = User.query.filter_by(tenant_id=tenant.id).count()
+            limit = tenant.max_users
+            percentage = (current / limit * 100) if limit > 0 else 0
+            limit_type = "user"
+
+        email_html = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #ffc107; padding: 15px; border-radius: 5px 5px 0 0;">
+              <h2 style="margin: 0; color: #000;">Usage Limit Warning</h2>
+            </div>
+            <div style="padding: 20px; border: 1px solid #ffc107; border-top: none; border-radius: 0 0 5px 5px;">
+              <p>Hi Team,</p>
+              <p>Your <strong>{tenant.company_name}</strong> account is approaching its {limit_type} limit.</p>
+
+              <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h3 style="margin-top: 0;">Current Usage</h3>
+                <p style="font-size: 24px; font-weight: bold; color: #{"dc3545" if percentage >= 90 else "ffc107"}; margin: 10px 0;">
+                  {int(percentage)}% Used
+                </p>
+                <p><strong>{int(current)}</strong> of <strong>{int(limit)}</strong> {limit_type}s</p>
+              </div>
+
+              <p>To avoid service interruption, please consider upgrading your plan.</p>
+
+              <p><a href="{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/subscription"
+                 style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+                View Plans & Upgrade
+              </a></p>
+
+              <p style="margin-top: 30px; color: #666; font-size: 12px;">
+                This is an automated notification from AudiaPro.
+              </p>
+            </div>
+          </body>
+        </html>
+        """
+
+        for admin in admins:
+            params = {
+                "from": os.getenv('RESEND_FROM_EMAIL', 'alerts@audiapro.com'),
+                "to": [admin.email],
+                "subject": f"Action Required: {limit_type.capitalize()} Limit Warning - {tenant.company_name}",
+                "html": email_html
+            }
+
+            resend.Emails.send(params)
+            logger.info(f"Usage limit warning sent to {admin.email} for tenant {tenant.id}")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send usage limit warning: {e}")
+        return False
+
+
+def send_plan_upgrade_email(tenant, recommended_plan):
+    """Send plan upgrade recommendation email"""
+    try:
+        import resend
+        resend.api_key = os.getenv('RESEND_API_KEY')
+
+        admins = User.query.filter_by(tenant_id=tenant.id, role='admin', is_active=True).all()
+
+        if not admins:
+            return False
+
+        plan_features = {
+            'starter': {
+                'price': '$29/month',
+                'users': '5 users',
+                'calls': '1,000 calls/month',
+                'features': ['Basic analytics', 'Email support', 'Call recordings']
+            },
+            'professional': {
+                'price': '$99/month',
+                'users': '20 users',
+                'calls': '10,000 calls/month',
+                'features': ['Advanced analytics', 'Priority support', 'AI transcription', 'Sentiment analysis', 'Custom reports']
+            },
+            'enterprise': {
+                'price': '$299/month',
+                'users': 'Unlimited users',
+                'calls': 'Unlimited calls',
+                'features': ['Everything in Professional', 'Dedicated account manager', 'Custom integrations', 'SLA guarantee', '24/7 phone support']
+            }
+        }
+
+        plan_info = plan_features.get(recommended_plan, {})
+
+        email_html = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Upgrade to {recommended_plan.capitalize()} Plan</h2>
+            <p>Hi Team at {tenant.company_name},</p>
+            <p>Based on your usage patterns, we recommend upgrading to our <strong>{recommended_plan.capitalize()} Plan</strong> for better value and features.</p>
+
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; margin: 30px 0;">
+              <h3 style="margin-top: 0; font-size: 28px;">{recommended_plan.capitalize()} Plan</h3>
+              <p style="font-size: 24px; font-weight: bold; margin: 10px 0;">{plan_info.get('price', '')}</p>
+              <p style="font-size: 18px;">{plan_info.get('users', '')} | {plan_info.get('calls', '')}</p>
+            </div>
+
+            <div style="background: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
+              <h4>What's Included:</h4>
+              <ul style="line-height: 2;">
+                {"".join([f"<li>{feature}</li>" for feature in plan_info.get('features', [])])}
+              </ul>
+            </div>
+
+            <p><a href="{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/subscription"
+               style="background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; font-size: 16px;">
+              Upgrade Now
+            </a></p>
+
+            <p style="margin-top: 30px; color: #666; font-size: 12px;">
+              Questions? Reply to this email or contact support@audiapro.com
+            </p>
+          </body>
+        </html>
+        """
+
+        for admin in admins:
+            params = {
+                "from": os.getenv('RESEND_FROM_EMAIL', 'sales@audiapro.com'),
+                "to": [admin.email],
+                "subject": f"Recommended: Upgrade to {recommended_plan.capitalize()} Plan",
+                "html": email_html
+            }
+
+            resend.Emails.send(params)
+            logger.info(f"Plan upgrade email sent to {admin.email}")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send plan upgrade email: {e}")
+        return False
+
+
+def send_new_tenant_notification_to_superadmins(tenant):
+    """Notify super admins about new tenant signup"""
+    try:
+        import resend
+        resend.api_key = os.getenv('RESEND_API_KEY')
+
+        super_admins = SuperAdmin.query.filter_by(is_active=True).all()
+
+        if not super_admins:
+            logger.warning("No active super admins found")
+            return False
+
+        email_html = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #28a745; color: white; padding: 15px; border-radius: 5px 5px 0 0;">
+              <h2 style="margin: 0;">New Tenant Signup!</h2>
+            </div>
+            <div style="padding: 20px; border: 1px solid #28a745; border-top: none; border-radius: 0 0 5px 5px;">
+              <p>A new tenant has signed up for AudiaPro!</p>
+
+              <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h3 style="margin-top: 0;">Tenant Details</h3>
+                <p><strong>Company:</strong> {tenant.company_name}</p>
+                <p><strong>Subdomain:</strong> {tenant.subdomain}</p>
+                <p><strong>Plan:</strong> {tenant.plan}</p>
+                <p><strong>Created:</strong> {tenant.created_at.strftime('%Y-%m-%d %H:%M:%S')}</p>
+              </div>
+
+              <p><a href="{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/superadmin/tenants/{tenant.id}"
+                 style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+                View Tenant Details
+              </a></p>
+
+              <p style="margin-top: 30px; color: #666; font-size: 12px;">
+                Automated notification from AudiaPro Platform
+              </p>
+            </div>
+          </body>
+        </html>
+        """
+
+        for super_admin in super_admins:
+            params = {
+                "from": os.getenv('RESEND_FROM_EMAIL', 'platform@audiapro.com'),
+                "to": [super_admin.email],
+                "subject": f"New Tenant Signup: {tenant.company_name}",
+                "html": email_html
+            }
+
+            resend.Emails.send(params)
+            logger.info(f"New tenant notification sent to super admin {super_admin.email}")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send new tenant notification: {e}")
+        return False
+
+
+def send_payment_confirmation_email(tenant, amount, invoice_number, billing_period):
+    """Send payment confirmation email"""
+    try:
+        import resend
+        resend.api_key = os.getenv('RESEND_API_KEY')
+
+        admins = User.query.filter_by(tenant_id=tenant.id, role='admin', is_active=True).all()
+
+        if not admins:
+            return False
+
+        email_html = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #28a745; color: white; padding: 15px; border-radius: 5px 5px 0 0;">
+              <h2 style="margin: 0;">Payment Received</h2>
+            </div>
+            <div style="padding: 20px; border: 1px solid #28a745; border-top: none; border-radius: 0 0 5px 5px;">
+              <p>Thank you for your payment!</p>
+
+              <div style="background: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
+                <h3 style="margin-top: 0;">Payment Details</h3>
+                <table style="width: 100%;">
+                  <tr>
+                    <td style="padding: 5px 0;"><strong>Invoice Number:</strong></td>
+                    <td style="padding: 5px 0; text-align: right;">{invoice_number}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0;"><strong>Amount Paid:</strong></td>
+                    <td style="padding: 5px 0; text-align: right; font-size: 20px; color: #28a745;">${amount:.2f}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0;"><strong>Billing Period:</strong></td>
+                    <td style="padding: 5px 0; text-align: right;">{billing_period}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0;"><strong>Company:</strong></td>
+                    <td style="padding: 5px 0; text-align: right;">{tenant.company_name}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <p>Your subscription is now active and will renew automatically.</p>
+
+              <p><a href="{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/subscription"
+                 style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                View Billing History
+              </a></p>
+
+              <p style="margin-top: 30px; color: #666; font-size: 12px;">
+                Questions about this payment? Contact billing@audiapro.com
+              </p>
+            </div>
+          </body>
+        </html>
+        """
+
+        for admin in admins:
+            params = {
+                "from": os.getenv('RESEND_FROM_EMAIL', 'billing@audiapro.com'),
+                "to": [admin.email],
+                "subject": f"Payment Confirmation - Invoice {invoice_number}",
+                "html": email_html
+            }
+
+            resend.Emails.send(params)
+            logger.info(f"Payment confirmation sent to {admin.email}")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send payment confirmation: {e}")
+        return False
+
+
+def send_monthly_usage_report(tenant):
+    """Send monthly usage summary email"""
+    try:
+        import resend
+        resend.api_key = os.getenv('RESEND_API_KEY')
+
+        admins = User.query.filter_by(tenant_id=tenant.id, role='admin', is_active=True).all()
+
+        if not admins:
+            return False
+
+        # Calculate stats
+        current_users = User.query.filter_by(tenant_id=tenant.id).count()
+        calls_this_month = tenant.usage_this_month or 0
+        calls_percentage = (calls_this_month / tenant.max_calls_per_month * 100) if tenant.max_calls_per_month > 0 else 0
+
+        # Get top caller (most calls)
+        from sqlalchemy import func
+        top_caller = db.session.query(
+            CDRRecord.src,
+            func.count(CDRRecord.id).label('call_count')
+        ).filter_by(tenant_id=tenant.id).filter(
+            CDRRecord.call_date >= datetime.utcnow().replace(day=1)
+        ).group_by(CDRRecord.src).order_by(func.count(CDRRecord.id).desc()).first()
+
+        email_html = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Monthly Usage Report - {tenant.company_name}</h2>
+            <p>Hi Team,</p>
+            <p>Here's your usage summary for {datetime.utcnow().strftime('%B %Y')}:</p>
+
+            <div style="background: #f5f5f5; padding: 20px; border-radius: 10px; margin: 20px 0;">
+              <div style="margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #666;">Call Usage</h3>
+                <p style="font-size: 32px; font-weight: bold; margin: 10px 0; color: #007bff;">
+                  {int(calls_this_month)} calls
+                </p>
+                <div style="background: #ddd; border-radius: 10px; height: 10px; margin: 10px 0;">
+                  <div style="background: #007bff; border-radius: 10px; height: 10px; width: {min(calls_percentage, 100)}%;"></div>
+                </div>
+                <p style="margin: 5px 0; color: #666; font-size: 14px;">
+                  {int(calls_percentage)}% of {tenant.max_calls_per_month} calls
+                </p>
+              </div>
+
+              <div style="margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #666;">Active Users</h3>
+                <p style="font-size: 32px; font-weight: bold; margin: 10px 0; color: #28a745;">
+                  {current_users} users
+                </p>
+                <p style="margin: 5px 0; color: #666; font-size: 14px;">
+                  Limit: {tenant.max_users} users
+                </p>
+              </div>
+
+              {f'''
+              <div>
+                <h3 style="margin: 0; color: #666;">Top Caller</h3>
+                <p style="font-size: 20px; font-weight: bold; margin: 10px 0;">
+                  {top_caller[0]} - {top_caller[1]} calls
+                </p>
+              </div>
+              ''' if top_caller else ''}
+            </div>
+
+            <p><a href="{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/dashboard"
+               style="background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
+              View Full Dashboard
+            </a></p>
+
+            <p style="margin-top: 30px; color: #666; font-size: 12px;">
+              This is your monthly automated usage report from AudiaPro.
+            </p>
+          </body>
+        </html>
+        """
+
+        for admin in admins:
+            params = {
+                "from": os.getenv('RESEND_FROM_EMAIL', 'reports@audiapro.com'),
+                "to": [admin.email],
+                "subject": f"Monthly Usage Report - {datetime.utcnow().strftime('%B %Y')} - {tenant.company_name}",
+                "html": email_html
+            }
+
+            resend.Emails.send(params)
+            logger.info(f"Monthly usage report sent to {admin.email}")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send monthly usage report: {e}")
+        return False
 
 
 # ============================================================================
