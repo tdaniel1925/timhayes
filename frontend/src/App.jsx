@@ -6,7 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 // Marketing Pages
 import Home from './pages/Home';
 import Features from './pages/Features';
-import Pricing from './pages/Pricing';
+import BookDemo from './pages/BookDemo';
 import HowItWorks from './pages/HowItWorks';
 import Integrations from './pages/Integrations';
 import Contact from './pages/Contact';
@@ -83,7 +83,7 @@ function AppRoutes() {
       {/* Marketing Pages (Public - No Auth Required) */}
       <Route path="/" element={<Home />} />
       <Route path="/features" element={<Features />} />
-      <Route path="/pricing" element={<Pricing />} />
+      <Route path="/book-demo" element={<BookDemo />} />
       <Route path="/how-it-works" element={<HowItWorks />} />
       <Route path="/platform-integrations" element={<Integrations />} />
       <Route path="/contact" element={<Contact />} />

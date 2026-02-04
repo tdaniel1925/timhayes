@@ -106,22 +106,22 @@ export default function Home() {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
               <Link
-                to="/signup"
+                to="/book-demo"
                 className="w-full sm:w-auto px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all shadow-xl shadow-blue-500/30"
               >
-                Start Free Trial
+                Book a Demo
               </Link>
               <Link
                 to="/contact"
                 className="w-full sm:w-auto px-8 py-4 text-lg font-semibold text-gray-700 bg-white rounded-xl border-2 border-gray-300 hover:border-gray-400 transform hover:scale-105 transition-all shadow-lg"
               >
-                Book a Demo
+                Contact Sales
               </Link>
             </div>
 
             {/* Trust Indicators */}
             <p className="text-sm text-gray-500">
-              No credit card required • Free 14-day trial • Cancel anytime
+              Enterprise-grade security • 24/7 support • Custom integrations
             </p>
           </div>
 
@@ -263,58 +263,40 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Pricing Preview */}
+      {/* Enterprise CTA */}
       <section className="py-20 bg-gradient-to-br from-blue-600 to-indigo-700 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl sm:text-4xl font-extrabold mb-4">
-            Simple, transparent pricing
+            Enterprise Call Analytics Tailored to Your Business
           </h2>
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-            Start with our free trial, then choose the plan that fits your business
+            Custom solutions designed for your call volume, team size, and industry requirements
           </p>
 
-          <div className="grid md:grid-cols-3 gap-8 mt-12 max-w-5xl mx-auto">
-            {[
-              { name: 'Starter', price: '$49', calls: '500 calls/mo' },
-              { name: 'Professional', price: '$149', calls: '2,000 calls/mo', featured: true },
-              { name: 'Enterprise', price: '$399', calls: 'Unlimited calls' }
-            ].map((plan, index) => (
-              <div
-                key={index}
-                className={`p-6 rounded-2xl ${
-                  plan.featured
-                    ? 'bg-white text-gray-900 shadow-2xl scale-105'
-                    : 'bg-white/10 backdrop-blur-lg border border-white/20'
-                }`}
-              >
-                {plan.featured && (
-                  <div className="text-xs font-semibold text-blue-600 bg-blue-100 px-3 py-1 rounded-full inline-block mb-4">
-                    MOST POPULAR
-                  </div>
-                )}
-                <div className="text-xl font-semibold mb-2">{plan.name}</div>
-                <div className="text-4xl font-bold mb-2">{plan.price}<span className="text-lg font-normal">/mo</span></div>
-                <div className={`text-sm mb-6 ${plan.featured ? 'text-gray-600' : 'text-blue-100'}`}>{plan.calls}</div>
-                <Link
-                  to="/pricing"
-                  className={`block w-full py-3 px-6 rounded-lg font-semibold transition-all ${
-                    plan.featured
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
-                      : 'bg-white text-blue-600 hover:bg-gray-100'
-                  }`}
-                >
-                  View Details
-                </Link>
-              </div>
-            ))}
+          <div className="grid md:grid-cols-3 gap-8 mt-12 max-w-5xl mx-auto mb-12">
+            <div className="p-6 rounded-2xl bg-white/10 backdrop-blur-lg border border-white/20">
+              <div className="text-4xl mb-4">🎯</div>
+              <h3 className="text-xl font-semibold mb-2">Customized Setup</h3>
+              <p className="text-blue-100">Tailored configuration for your specific PBX system and workflow</p>
+            </div>
+            <div className="p-6 rounded-2xl bg-white text-gray-900 shadow-2xl scale-105">
+              <div className="text-4xl mb-4">📊</div>
+              <h3 className="text-xl font-semibold mb-2">Flexible Pricing</h3>
+              <p className="text-gray-600">Enterprise pricing based on your actual usage and requirements</p>
+            </div>
+            <div className="p-6 rounded-2xl bg-white/10 backdrop-blur-lg border border-white/20">
+              <div className="text-4xl mb-4">🤝</div>
+              <h3 className="text-xl font-semibold mb-2">Dedicated Support</h3>
+              <p className="text-blue-100">24/7 enterprise support with dedicated account manager</p>
+            </div>
           </div>
 
           <div className="mt-12">
             <Link
-              to="/signup"
+              to="/book-demo"
               className="inline-flex items-center px-8 py-4 text-lg font-semibold bg-white text-blue-600 rounded-xl hover:bg-gray-100 transform hover:scale-105 transition-all shadow-xl"
             >
-              Start your free trial
+              Schedule Your Demo
               <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
@@ -334,16 +316,16 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/signup"
+              to="/book-demo"
               className="px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all shadow-xl"
             >
-              Get Started Free
+              Schedule a Demo
             </Link>
             <Link
               to="/contact"
               className="px-8 py-4 text-lg font-semibold text-gray-700 bg-white rounded-xl border-2 border-gray-300 hover:border-gray-400 transition-all"
             >
-              Talk to Sales
+              Contact Sales
             </Link>
           </div>
         </div>

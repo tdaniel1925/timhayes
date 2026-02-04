@@ -7,7 +7,7 @@ export default function MarketingLayout({ children }) {
 
   const navigation = [
     { name: 'Features', href: '/features' },
-    { name: 'Pricing', href: '/pricing' },
+    { name: 'Book Demo', href: '/book-demo' },
     { name: 'How It Works', href: '/how-it-works' },
     { name: 'Integrations', href: '/platform-integrations' },
     { name: 'Contact', href: '/contact' },
@@ -59,10 +59,10 @@ export default function MarketingLayout({ children }) {
                 Sign In
               </Link>
               <Link
-                to="/signup"
+                to="/book-demo"
                 className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all shadow-lg shadow-blue-500/30"
               >
-                Start Free Trial
+                Book a Demo
               </Link>
             </div>
 
@@ -109,11 +109,11 @@ export default function MarketingLayout({ children }) {
                   Sign In
                 </Link>
                 <Link
-                  to="/signup"
+                  to="/book-demo"
                   onClick={() => setMobileMenuOpen(false)}
                   className="block w-full px-4 py-2 text-center text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg"
                 >
-                  Start Free Trial
+                  Book a Demo
                 </Link>
               </div>
             </div>
@@ -150,7 +150,7 @@ export default function MarketingLayout({ children }) {
               <h3 className="font-semibold text-white mb-3">Product</h3>
               <ul className="space-y-2 text-sm">
                 <li><Link to="/features" className="hover:text-white transition-colors">Features</Link></li>
-                <li><Link to="/pricing" className="hover:text-white transition-colors">Pricing</Link></li>
+                <li><Link to="/book-demo" className="hover:text-white transition-colors">Book Demo</Link></li>
                 <li><Link to="/integrations" className="hover:text-white transition-colors">Integrations</Link></li>
                 <li><Link to="/how-it-works" className="hover:text-white transition-colors">How It Works</Link></li>
               </ul>
