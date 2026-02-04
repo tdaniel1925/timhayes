@@ -645,9 +645,8 @@ def check_usage_limit(tenant_id):
     if not tenant:
         return False
 
-    # Parse plan limits safely
-    limits = safe_json_parse(tenant.plan_limits, default={})
-    calls_limit = limits.get('calls_per_month', 500)
+    # Use max_calls_per_month from tenant model
+    calls_limit = tenant.max_calls_per_month or 500
 
     # Check if exceeded
     if tenant.usage_this_month >= calls_limit:
@@ -1692,18 +1691,36 @@ def get_usage_stats():
     if not tenant:
         return jsonify({'error': 'Tenant not found'}), 404
 
-    # Get plan limits
-    plan_limits = json.loads(tenant.plan_limits) if tenant.plan_limits else {}
+    # Count current users
+    current_users = User.query.filter_by(tenant_id=tenant_id).count()
 
-    # Calculate storage used (simplified - in production, sum actual file sizes)
-    storage_used_gb = 0  # Placeholder - implement actual storage calculation
+    # Calculate percentage used
+    calls_percentage = (tenant.usage_this_month / tenant.max_calls_per_month * 100) if tenant.max_calls_per_month > 0 else 0
+    users_percentage = (current_users / tenant.max_users * 100) if tenant.max_users > 0 else 0
+
+    # Determine if limits are approaching
+    calls_warning = calls_percentage >= 80
+    users_warning = users_percentage >= 80
 
     return jsonify({
-        'calls_this_month': tenant.usage_this_month or 0,
-        'calls_limit': plan_limits.get('calls_per_month', 500),
-        'storage_used_gb': storage_used_gb,
-        'storage_limit_gb': plan_limits.get('recording_storage_gb', 5),
-        'billing_cycle_start': tenant.billing_cycle_start.isoformat() if tenant.billing_cycle_start else None
+        'plan': tenant.plan,
+        'status': tenant.status,
+        'users': {
+            'current': current_users,
+            'limit': tenant.max_users,
+            'percentage': round(users_percentage, 1),
+            'warning': users_warning,
+            'limit_reached': current_users >= tenant.max_users
+        },
+        'calls': {
+            'current': tenant.usage_this_month or 0,
+            'limit': tenant.max_calls_per_month,
+            'percentage': round(calls_percentage, 1),
+            'warning': calls_warning,
+            'limit_reached': tenant.usage_this_month >= tenant.max_calls_per_month
+        },
+        'billing_cycle_start': tenant.billing_cycle_start.isoformat() if tenant.billing_cycle_start else None,
+        'created_at': tenant.created_at.isoformat() if tenant.created_at else None
     }), 200
 
 
@@ -2687,6 +2704,21 @@ def create_user():
 
     if User.query.filter_by(email=data['email']).first():
         return jsonify({'error': 'Email already exists'}), 400
+
+    # Check max_users limit
+    tenant = Tenant.query.get(tenant_id)
+    if not tenant:
+        return jsonify({'error': 'Tenant not found'}), 404
+
+    current_user_count = User.query.filter_by(tenant_id=tenant_id).count()
+    if current_user_count >= tenant.max_users:
+        return jsonify({
+            'error': 'User limit reached',
+            'message': f'Your plan allows maximum {tenant.max_users} users. Please upgrade your plan to add more users.',
+            'current_users': current_user_count,
+            'max_users': tenant.max_users,
+            'upgrade_required': True
+        }), 403
 
     try:
         user = User(
