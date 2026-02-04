@@ -49,6 +49,12 @@ from error_handlers import (
     DatabaseTransaction
 )
 
+# Import Supabase Storage Manager
+from supabase_storage import init_storage_manager, get_storage_manager
+
+# Import UCM Recording Downloader
+from ucm_downloader import download_and_upload_recording, get_recording_for_transcription
+
 # Initialize Flask app
 app = Flask(__name__, static_folder='frontend/dist', static_url_path='')
 CORS(app, resources={r"/api/*": {"origins": "*", "allow_headers": ["Content-Type", "Authorization"]}}, supports_credentials=True)
@@ -122,6 +128,26 @@ if OPENAI_API_KEY:
         logger.info("✅ OpenAI client initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize OpenAI client: {e}")
+
+# Initialize Supabase Storage for call recordings
+SUPABASE_URL = os.getenv('SUPABASE_URL')
+SUPABASE_KEY = os.getenv('SUPABASE_KEY')
+SUPABASE_BUCKET = os.getenv('SUPABASE_BUCKET', 'call-recordings')
+
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        init_storage_manager(SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET)
+        logger.info("✅ Supabase Storage initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize Supabase Storage: {e}")
+else:
+    logger.warning("⚠️  Supabase Storage not configured - recordings will be stored locally")
+
+# UCM Configuration (for downloading recordings)
+UCM_IP = os.getenv('UCM_IP', '192.168.1.100')
+UCM_USERNAME = os.getenv('UCM_USERNAME', 'admin')
+UCM_PASSWORD = os.getenv('UCM_PASSWORD', 'password')
+UCM_PORT = int(os.getenv('UCM_PORT', '8089'))
 else:
     logger.warning("⚠️  OPENAI_API_KEY not set - AI features will be disabled")
 
@@ -1010,13 +1036,15 @@ def require_role(allowed_roles):
 # AI PROCESSING FUNCTIONS (OpenAI Integration)
 # ============================================================================
 
-def transcribe_audio(audio_file_path, call_id=None):
+def transcribe_audio(storage_path, call_id=None, tenant_id=None):
     """
     Transcribe audio file using OpenAI Whisper
+    Downloads from Supabase if needed, transcribes, then cleans up
 
     Args:
-        audio_file_path: Path to audio file (WAV, MP3, etc.)
+        storage_path: Path to audio file (local or Supabase Storage path)
         call_id: Optional call ID for logging
+        tenant_id: Optional tenant ID for Supabase downloads
 
     Returns:
         str: Transcribed text or None if transcription fails
@@ -1025,15 +1053,24 @@ def transcribe_audio(audio_file_path, call_id=None):
         logger.debug(f"Transcription skipped for call {call_id}: OpenAI not configured or transcription disabled")
         return None
 
+    local_file_path = None
+    temp_file = False
+
     try:
-        # Check if file exists
-        if not os.path.exists(audio_file_path):
-            logger.warning(f"Audio file not found: {audio_file_path}")
+        # Get local file for transcription (downloads from Supabase if needed)
+        storage_manager = get_storage_manager()
+        local_file_path = get_recording_for_transcription(storage_path, storage_manager, tenant_id)
+
+        if not local_file_path or not os.path.exists(local_file_path):
+            logger.warning(f"Audio file not available for call {call_id}")
             return None
 
+        # Mark as temp if it was downloaded from Supabase
+        temp_file = storage_path.startswith('tenant_') if storage_path else False
+
         # Open and transcribe audio file
-        with open(audio_file_path, 'rb') as audio_file:
-            logger.info(f"Transcribing audio for call {call_id}: {audio_file_path}")
+        with open(local_file_path, 'rb') as audio_file:
+            logger.info(f"Transcribing audio for call {call_id}: {local_file_path}")
 
             # Use Whisper API
             transcript = openai_client.audio.transcriptions.create(
@@ -1048,6 +1085,15 @@ def transcribe_audio(audio_file_path, call_id=None):
     except Exception as e:
         logger.error(f"Transcription failed for call {call_id}: {e}", exc_info=True)
         return None
+
+    finally:
+        # Clean up temp file if it was downloaded from Supabase
+        if temp_file and local_file_path and os.path.exists(local_file_path):
+            try:
+                os.remove(local_file_path)
+                logger.debug(f"Cleaned up temp transcription file: {local_file_path}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to clean up temp file: {cleanup_error}")
 
 
 def analyze_sentiment(transcription_text, call_id=None):
@@ -1709,14 +1755,14 @@ def monitor_compliance(transcription_text, tenant_id, cdr_id):
         return None
 
 
-def process_call_ai_async(call_id, audio_file_path):
+def process_call_ai_async(call_id, ucm_recording_path):
     """
     Process call with AI features in background thread
-    Now checks which features are enabled for the tenant
+    Downloads recording from UCM, uploads to Supabase, then processes with AI
 
     Args:
         call_id: Database ID of the call
-        audio_file_path: Path to recording file
+        ucm_recording_path: Path to recording file on UCM server
     """
     def ai_worker():
         try:
@@ -1728,6 +1774,34 @@ def process_call_ai_async(call_id, audio_file_path):
 
             tenant_id = call.tenant_id
 
+            # Step 0: Download recording from UCM and upload to Supabase
+            storage_manager = get_storage_manager()
+            storage_path = None
+
+            if ucm_recording_path:
+                logger.info(f"Downloading recording from UCM for call {call_id}")
+                storage_path = download_and_upload_recording(
+                    UCM_IP,
+                    UCM_USERNAME,
+                    UCM_PASSWORD,
+                    ucm_recording_path,
+                    tenant_id,
+                    call.uniqueid,
+                    storage_manager
+                )
+
+                if storage_path:
+                    # Update CDR with Supabase storage path
+                    call.recordfiles = storage_path
+                    db.session.commit()
+                    logger.info(f"✅ Recording stored in Supabase: {storage_path}")
+                else:
+                    logger.warning(f"Failed to download/upload recording for call {call_id}")
+
+            if not storage_path:
+                logger.warning(f"No recording available for call {call_id}, skipping AI processing")
+                return
+
             # Get enabled features for this tenant
             enabled_features = get_enabled_features(tenant_id)
             logger.info(f"Processing call {call_id} with features: {enabled_features}")
@@ -1735,7 +1809,7 @@ def process_call_ai_async(call_id, audio_file_path):
             # Step 1: Transcribe audio (required for most features)
             transcription_text = None
             if 'multilingual-transcription' in enabled_features or len(enabled_features) > 0:
-                transcription = transcribe_audio(audio_file_path, call_id)
+                transcription = transcribe_audio(storage_path, call_id, tenant_id)
                 if transcription:
                     # Save transcription to Transcription model
                     trans_obj = Transcription.query.filter_by(cdr_id=call_id).first()
@@ -2767,7 +2841,7 @@ def cancel_subscription():
 @app.route('/api/recording/<int:call_id>', methods=['GET'])
 @jwt_required()
 def get_recording(call_id):
-    """Download/stream recording file"""
+    """Download/stream recording file or return Supabase signed URL"""
     claims = get_jwt()
     tenant_id = claims.get('tenant_id')
 
@@ -2775,10 +2849,24 @@ def get_recording(call_id):
     if not call:
         return jsonify({'error': 'Call not found'}), 404
 
-    if not call.recording_local_path or not os.path.exists(call.recording_local_path):
+    if not call.recordfiles:
         return jsonify({'error': 'Recording not available'}), 404
 
-    return send_file(call.recording_local_path, as_attachment=True)
+    storage_manager = get_storage_manager()
+
+    # If recording is in Supabase Storage, return signed URL
+    if storage_manager and call.recordfiles.startswith('tenant_'):
+        signed_url = storage_manager.get_signed_url(call.recordfiles, expires_in=3600)
+        if signed_url:
+            return jsonify({'url': signed_url, 'type': 'supabase'}), 200
+        else:
+            return jsonify({'error': 'Failed to generate signed URL'}), 500
+
+    # If it's a local file, serve it directly
+    if os.path.exists(call.recordfiles):
+        return send_file(call.recordfiles, as_attachment=True)
+
+    return jsonify({'error': 'Recording not found'}), 404
 
 
 # ============================================================================
