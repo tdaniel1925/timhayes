@@ -30,7 +30,8 @@
       "Bash(npm install:*)",
       "Bash(npm run dev:*)",
       "Bash(timeout /t 60)",
-      "Bash(del nul)"
+      "Bash(del nul)",
+      "Bash(del package-lock.json)"
     ],
     "deny": [],
     "ask": []

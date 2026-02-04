@@ -20,13 +20,11 @@ import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import SetupRequest from './pages/SetupRequest';
-import Checkout from './pages/Checkout';
 import CallDetail from './pages/CallDetail';
 import AdminSetupRequests from './pages/AdminSetupRequests';
 import Notifications from './pages/Notifications';
 import UserManagement from './pages/UserManagement';
 import IntegrationsPanel from './pages/IntegrationsPanel';
-import SubscriptionManagement from './pages/SubscriptionManagement';
 
 // Super Admin Pages
 import SuperAdminLogin from './pages/SuperAdminLogin';
@@ -108,7 +106,6 @@ function AppRoutes() {
         }
       />
       <Route path="/setup-request" element={<SetupRequest />} />
-      <Route path="/checkout/:requestId" element={<Checkout />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
 
       {/* Protected routes */}
@@ -165,14 +162,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <IntegrationsPanel />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/subscription"
-        element={
-          <ProtectedRoute>
-            <SubscriptionManagement />
           </ProtectedRoute>
         }
       />
