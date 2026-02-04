@@ -271,9 +271,12 @@ class Tenant(db.Model):
 
     # Subscription
     plan = db.Column(db.String(50), default='starter')
+    max_users = db.Column(db.Integer, default=5)
+    max_calls_per_month = db.Column(db.Integer, default=1000)
     plan_limits = db.Column(db.Text)  # JSON: {calls_per_month: 500, recording_storage_gb: 10}
     usage_this_month = db.Column(db.Integer, default=0)  # Call count this month
     billing_cycle_start = db.Column(db.DateTime)
+    subscription_status = db.Column(db.String(50), default='active')
 
     # PayPal subscription
     paypal_subscription_id = db.Column(db.String(200))
