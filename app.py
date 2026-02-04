@@ -33,6 +33,9 @@ import secrets as crypto_secrets
 from dotenv import load_dotenv
 load_dotenv()
 
+# OpenAI for transcription and sentiment analysis
+from openai import OpenAI
+
 # Import error handling system
 from error_handlers import (
     register_error_handlers,
@@ -93,6 +96,22 @@ if not ENCRYPTION_KEY:
     ENCRYPTION_KEY = Fernet.generate_key().decode()
 
 cipher_suite = Fernet(ENCRYPTION_KEY.encode())
+
+# OpenAI Configuration
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+TRANSCRIPTION_ENABLED = os.getenv('TRANSCRIPTION_ENABLED', 'false').lower() == 'true'
+SENTIMENT_ENABLED = os.getenv('SENTIMENT_ENABLED', 'false').lower() == 'true'
+
+# Initialize OpenAI client if API key is set
+openai_client = None
+if OPENAI_API_KEY:
+    try:
+        openai_client = OpenAI(api_key=OPENAI_API_KEY)
+        logger.info("✅ OpenAI client initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize OpenAI client: {e}")
+else:
+    logger.warning("⚠️  OPENAI_API_KEY not set - AI features will be disabled")
 
 # ============================================================================
 # PHONE SYSTEM PRESETS
@@ -626,6 +645,158 @@ def increment_usage(tenant_id):
 
 
 # ============================================================================
+# AI PROCESSING FUNCTIONS (OpenAI Integration)
+# ============================================================================
+
+def transcribe_audio(audio_file_path, call_id=None):
+    """
+    Transcribe audio file using OpenAI Whisper
+
+    Args:
+        audio_file_path: Path to audio file (WAV, MP3, etc.)
+        call_id: Optional call ID for logging
+
+    Returns:
+        str: Transcribed text or None if transcription fails
+    """
+    if not openai_client or not TRANSCRIPTION_ENABLED:
+        logger.debug(f"Transcription skipped for call {call_id}: OpenAI not configured or transcription disabled")
+        return None
+
+    try:
+        # Check if file exists
+        if not os.path.exists(audio_file_path):
+            logger.warning(f"Audio file not found: {audio_file_path}")
+            return None
+
+        # Open and transcribe audio file
+        with open(audio_file_path, 'rb') as audio_file:
+            logger.info(f"Transcribing audio for call {call_id}: {audio_file_path}")
+
+            # Use Whisper API
+            transcript = openai_client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                response_format="text"
+            )
+
+            logger.info(f"✅ Transcription complete for call {call_id} ({len(transcript)} characters)")
+            return transcript
+
+    except Exception as e:
+        logger.error(f"Transcription failed for call {call_id}: {e}", exc_info=True)
+        return None
+
+
+def analyze_sentiment(transcription_text, call_id=None):
+    """
+    Analyze sentiment of call transcription using OpenAI GPT
+
+    Args:
+        transcription_text: The transcribed call text
+        call_id: Optional call ID for logging
+
+    Returns:
+        dict: {'sentiment': 'POSITIVE/NEGATIVE/NEUTRAL', 'score': 0.0-1.0, 'reasoning': str}
+              or None if analysis fails
+    """
+    if not openai_client or not SENTIMENT_ENABLED:
+        logger.debug(f"Sentiment analysis skipped for call {call_id}: OpenAI not configured or sentiment disabled")
+        return None
+
+    if not transcription_text or len(transcription_text.strip()) == 0:
+        logger.warning(f"Empty transcription for call {call_id}, cannot analyze sentiment")
+        return None
+
+    try:
+        logger.info(f"Analyzing sentiment for call {call_id}")
+
+        # Use GPT to analyze sentiment
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",  # Cost-effective model for sentiment
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a sentiment analysis assistant for customer service calls. Analyze the overall sentiment and customer satisfaction. Respond in JSON format with: sentiment (POSITIVE, NEGATIVE, or NEUTRAL), score (0.0 to 1.0 where 1.0 is most positive), and brief reasoning."
+                },
+                {
+                    "role": "user",
+                    "content": f"Analyze the sentiment of this call transcription:\n\n{transcription_text[:2000]}"  # Limit to first 2000 chars for cost
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3
+        )
+
+        # Parse response
+        result = json.loads(response.choices[0].message.content)
+
+        sentiment = result.get('sentiment', 'NEUTRAL').upper()
+        score = float(result.get('score', 0.5))
+        reasoning = result.get('reasoning', '')
+
+        # Validate sentiment value
+        if sentiment not in ['POSITIVE', 'NEGATIVE', 'NEUTRAL']:
+            sentiment = 'NEUTRAL'
+
+        # Clamp score to 0-1 range
+        score = max(0.0, min(1.0, score))
+
+        logger.info(f"✅ Sentiment analysis complete for call {call_id}: {sentiment} ({score:.2f})")
+
+        return {
+            'sentiment': sentiment,
+            'score': score,
+            'reasoning': reasoning
+        }
+
+    except Exception as e:
+        logger.error(f"Sentiment analysis failed for call {call_id}: {e}", exc_info=True)
+        return None
+
+
+def process_call_ai_async(call_id, audio_file_path):
+    """
+    Process call with AI features in background thread
+
+    Args:
+        call_id: Database ID of the call
+        audio_file_path: Path to recording file
+    """
+    def ai_worker():
+        try:
+            # Get call from database
+            call = CDRRecord.query.get(call_id)
+            if not call:
+                logger.error(f"Call {call_id} not found for AI processing")
+                return
+
+            # Step 1: Transcribe audio
+            transcription = transcribe_audio(audio_file_path, call_id)
+            if transcription:
+                call.transcription = transcription
+                db.session.commit()
+                logger.info(f"Transcription saved for call {call_id}")
+
+                # Step 2: Analyze sentiment from transcription
+                sentiment_result = analyze_sentiment(transcription, call_id)
+                if sentiment_result:
+                    call.sentiment = sentiment_result['sentiment']
+                    call.sentiment_score = sentiment_result['score']
+                    db.session.commit()
+                    logger.info(f"Sentiment saved for call {call_id}: {sentiment_result['sentiment']}")
+
+        except Exception as e:
+            logger.error(f"AI processing failed for call {call_id}: {e}", exc_info=True)
+            db.session.rollback()
+
+    # Run in background thread
+    thread = threading.Thread(target=ai_worker, daemon=True)
+    thread.start()
+    logger.info(f"Started AI processing thread for call {call_id}")
+
+
+# ============================================================================
 # AUTHENTICATION ENDPOINTS
 # ============================================================================
 
@@ -1081,6 +1252,12 @@ def receive_cdr(subdomain):
 
         # Increment usage counter
         increment_usage(tenant.id)
+
+        # Trigger AI processing if recording exists
+        recording_path = cdr_data.get('recordfiles')
+        if recording_path and (TRANSCRIPTION_ENABLED or SENTIMENT_ENABLED):
+            logger.info(f"Triggering AI processing for call {cdr.id} with recording: {recording_path}")
+            process_call_ai_async(cdr.id, recording_path)
 
         return jsonify({'status': 'success'}), 200
 
