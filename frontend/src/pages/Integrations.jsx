@@ -6,7 +6,14 @@ export default function Integrations() {
   const platforms = [
     {
       name: 'Grandstream UCM',
-      logo: '📱',
+      logoComponent: (
+        <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
+          <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+            <path d="M7 9h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z"/>
+          </svg>
+        </div>
+      ),
       description: 'Native support for Grandstream UCM series',
       status: 'Fully Supported',
       setup: 'Admin Portal → CDR → HTTP Callback',
@@ -14,7 +21,13 @@ export default function Integrations() {
     },
     {
       name: 'RingCentral',
-      logo: '📞',
+      logoComponent: (
+        <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+          <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+          </svg>
+        </div>
+      ),
       description: 'Enterprise cloud communications platform',
       status: 'Fully Supported',
       setup: 'Developer Console → Webhooks',
@@ -22,7 +35,11 @@ export default function Integrations() {
     },
     {
       name: '3CX',
-      logo: '☎️',
+      logoComponent: (
+        <div className="w-16 h-16 bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-xl flex items-center justify-center">
+          <span className="text-2xl font-bold text-white">3CX</span>
+        </div>
+      ),
       description: 'Software-based PBX solution',
       status: 'Fully Supported',
       setup: 'Management Console → Call Reporting',
@@ -30,7 +47,13 @@ export default function Integrations() {
     },
     {
       name: 'FreePBX',
-      logo: '🔧',
+      logoComponent: (
+        <div className="w-16 h-16 bg-gradient-to-br from-red-600 to-red-700 rounded-xl flex items-center justify-center">
+          <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+        </div>
+      ),
       description: 'Open source Asterisk-based PBX',
       status: 'Fully Supported',
       setup: 'Advanced Settings → Custom Destinations',
@@ -38,7 +61,13 @@ export default function Integrations() {
     },
     {
       name: 'Asterisk',
-      logo: '⭐',
+      logoComponent: (
+        <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl flex items-center justify-center">
+          <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7-6.3-4.7-6.3 4.7 2.3-7-6-4.6h7.6z"/>
+          </svg>
+        </div>
+      ),
       description: 'The world\'s most popular open source PBX',
       status: 'Fully Supported',
       setup: 'extensions.conf → Custom dialplan',
@@ -46,7 +75,13 @@ export default function Integrations() {
     },
     {
       name: 'Yeastar',
-      logo: '🌟',
+      logoComponent: (
+        <div className="w-16 h-16 bg-gradient-to-br from-cyan-600 to-cyan-700 rounded-xl flex items-center justify-center">
+          <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+      ),
       description: 'SMB-focused PBX platform',
       status: 'Fully Supported',
       setup: 'PBX Settings → API & Webhooks',
@@ -54,7 +89,13 @@ export default function Integrations() {
     },
     {
       name: 'VitalPBX',
-      logo: '💚',
+      logoComponent: (
+        <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-green-700 rounded-xl flex items-center justify-center">
+          <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+        </div>
+      ),
       description: 'Modern unified communications platform',
       status: 'Fully Supported',
       setup: 'Admin Panel → Advanced Settings',
@@ -62,7 +103,13 @@ export default function Integrations() {
     },
     {
       name: 'Generic Webhook',
-      logo: '🔗',
+      logoComponent: (
+        <div className="w-16 h-16 bg-gradient-to-br from-gray-700 to-gray-800 rounded-xl flex items-center justify-center">
+          <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+          </svg>
+        </div>
+      ),
       description: 'Any system with HTTP webhook support',
       status: 'Universal Support',
       setup: 'Configure POST endpoint in your PBX',
@@ -75,25 +122,42 @@ export default function Integrations() {
       step: '1',
       title: 'Get Your Webhook URL',
       description: 'Log into AudiaPro and copy your unique webhook URL from the Integrations page',
-      icon: '🔗'
+      iconComponent: (
+        <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+        </svg>
+      )
     },
     {
       step: '2',
       title: 'Configure Your PBX',
       description: 'Add the webhook URL to your phone system\'s CDR or event notification settings',
-      icon: '⚙️'
+      iconComponent: (
+        <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      )
     },
     {
       step: '3',
       title: 'Set Authentication',
       description: 'Enter the webhook credentials (username/password) provided by AudiaPro',
-      icon: '🔐'
+      iconComponent: (
+        <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      )
     },
     {
       step: '4',
       title: 'Test Connection',
       description: 'Make a test call and verify it appears in your AudiaPro dashboard',
-      icon: '✅'
+      iconComponent: (
+        <svg className="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
     }
   ];
 
@@ -165,7 +229,7 @@ export default function Integrations() {
                 key={index}
                 className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-xl hover:border-blue-300 transition-all"
               >
-                <div className="text-5xl mb-4">{platform.logo}</div>
+                <div className="mb-4">{platform.logoComponent}</div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">{platform.name}</h3>
                 <p className="text-sm text-gray-600 mb-4">{platform.description}</p>
 
@@ -216,7 +280,7 @@ export default function Integrations() {
                   <div className="hidden md:block absolute top-16 left-1/2 w-full h-0.5 bg-gradient-to-r from-blue-400 to-indigo-400"></div>
                 )}
                 <div className="relative inline-flex items-center justify-center w-32 h-32 bg-white rounded-2xl border-4 border-blue-500 shadow-lg mb-4">
-                  <div className="text-5xl">{item.icon}</div>
+                  {item.iconComponent}
                   <div className="absolute -top-3 -right-3 w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
                     {item.step}
                   </div>

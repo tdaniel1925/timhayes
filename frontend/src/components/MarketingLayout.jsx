@@ -7,9 +7,9 @@ export default function MarketingLayout({ children }) {
 
   const navigation = [
     { name: 'Features', href: '/features' },
-    { name: 'Book Demo', href: '/book-demo' },
-    { name: 'How It Works', href: '/how-it-works' },
+    { name: 'Pricing', href: '/pricing' },
     { name: 'Integrations', href: '/platform-integrations' },
+    { name: 'How It Works', href: '/how-it-works' },
     { name: 'Contact', href: '/contact' },
   ];
 
@@ -150,9 +150,10 @@ export default function MarketingLayout({ children }) {
               <h3 className="font-semibold text-white mb-3">Product</h3>
               <ul className="space-y-2 text-sm">
                 <li><Link to="/features" className="hover:text-white transition-colors">Features</Link></li>
-                <li><Link to="/book-demo" className="hover:text-white transition-colors">Book Demo</Link></li>
-                <li><Link to="/integrations" className="hover:text-white transition-colors">Integrations</Link></li>
+                <li><Link to="/pricing" className="hover:text-white transition-colors">Pricing</Link></li>
+                <li><Link to="/platform-integrations" className="hover:text-white transition-colors">Integrations</Link></li>
                 <li><Link to="/how-it-works" className="hover:text-white transition-colors">How It Works</Link></li>
+                <li><Link to="/book-demo" className="hover:text-white transition-colors">Book Demo</Link></li>
               </ul>
             </div>
 
