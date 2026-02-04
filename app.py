@@ -396,6 +396,7 @@ class CDRRecord(db.Model):
     dst_trunk_name = db.Column(db.String(200))
     recording_downloaded = db.Column(db.Boolean, default=False)
     recording_local_path = db.Column(db.Text)
+    call_date = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     received_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Relationships
