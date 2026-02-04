@@ -620,6 +620,82 @@ class SuperAdmin(db.Model):
         return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
 
 
+class AIFeature(db.Model):
+    """AI features that can be enabled per tenant"""
+    __tablename__ = 'ai_features'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    slug = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.Text)
+    long_description = db.Column(db.Text)  # For marketing pages
+
+    # Categorization
+    category = db.Column(db.String(50))  # coaching, compliance, revenue, insights, customer_intelligence, real_time, analytics, multilingual, integration
+    icon = db.Column(db.String(50))  # Icon name for UI
+
+    # Pricing
+    monthly_price = db.Column(db.Float, default=0)
+    setup_fee = db.Column(db.Float, default=0)
+    price_per_call = db.Column(db.Float, default=0)  # Additional per-call pricing
+
+    # Feature configuration
+    requires_openai = db.Column(db.Boolean, default=False)
+    openai_model = db.Column(db.String(50))  # gpt-4, gpt-3.5-turbo, whisper-1
+    processing_time_estimate = db.Column(db.Integer)  # Seconds
+
+    # Marketing
+    benefit_summary = db.Column(db.Text)  # Short benefit description
+    use_cases = db.Column(db.Text)  # JSON array of use case examples
+    roi_metrics = db.Column(db.Text)  # JSON object with ROI data
+
+    # Status
+    is_active = db.Column(db.Boolean, default=True)
+    is_beta = db.Column(db.Boolean, default=False)
+    requires_approval = db.Column(db.Boolean, default=False)  # Some features need super admin approval
+
+    # Display order
+    display_order = db.Column(db.Integer, default=0)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    tenant_features = db.relationship('TenantAIFeature', backref='feature', lazy=True, cascade='all, delete-orphan')
+
+
+class TenantAIFeature(db.Model):
+    """Junction table: which AI features are enabled for which tenant"""
+    __tablename__ = 'tenant_ai_features'
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=False)
+    ai_feature_id = db.Column(db.Integer, db.ForeignKey('ai_features.id'), nullable=False)
+
+    # Status
+    enabled = db.Column(db.Boolean, default=True)
+
+    # Pricing overrides (for custom deals)
+    custom_monthly_price = db.Column(db.Float)  # Override default pricing
+    custom_setup_fee = db.Column(db.Float)
+
+    # Usage tracking
+    usage_count = db.Column(db.Integer, default=0)  # How many times this feature was used
+    last_used_at = db.Column(db.DateTime)
+
+    # Configuration (feature-specific settings in JSON)
+    configuration = db.Column(db.Text)  # JSON object with feature-specific settings
+
+    # Timestamps
+    enabled_at = db.Column(db.DateTime, default=datetime.utcnow)
+    disabled_at = db.Column(db.DateTime)
+
+    # Who enabled it
+    enabled_by = db.Column(db.String(200))  # Super admin email who enabled it
+
+    __table_args__ = (db.UniqueConstraint('tenant_id', 'ai_feature_id', name='_tenant_feature_uc'),)
+
+
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
@@ -3513,6 +3589,442 @@ def superadmin_revenue_dashboard():
 
 
 # ============================================================================
+# AI FEATURE MANAGEMENT (SUPER ADMIN)
+# ============================================================================
+
+@app.route('/api/superadmin/ai-features', methods=['GET'])
+@jwt_required()
+def get_all_ai_features():
+    """Get all available AI features (super admin only)"""
+    try:
+        require_super_admin()
+
+        category = request.args.get('category')
+        include_inactive = request.args.get('include_inactive', 'false').lower() == 'true'
+
+        query = AIFeature.query
+
+        if category:
+            query = query.filter_by(category=category)
+
+        if not include_inactive:
+            query = query.filter_by(is_active=True)
+
+        features = query.order_by(AIFeature.display_order, AIFeature.name).all()
+
+        return jsonify({
+            'features': [{
+                'id': f.id,
+                'name': f.name,
+                'slug': f.slug,
+                'description': f.description,
+                'long_description': f.long_description,
+                'category': f.category,
+                'icon': f.icon,
+                'monthly_price': float(f.monthly_price) if f.monthly_price else 0,
+                'setup_fee': float(f.setup_fee) if f.setup_fee else 0,
+                'price_per_call': float(f.price_per_call) if f.price_per_call else 0,
+                'requires_openai': f.requires_openai,
+                'openai_model': f.openai_model,
+                'processing_time_estimate': f.processing_time_estimate,
+                'benefit_summary': f.benefit_summary,
+                'use_cases': json.loads(f.use_cases) if f.use_cases else [],
+                'roi_metrics': json.loads(f.roi_metrics) if f.roi_metrics else {},
+                'is_active': f.is_active,
+                'is_beta': f.is_beta,
+                'requires_approval': f.requires_approval,
+                'display_order': f.display_order
+            } for f in features]
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get AI features error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/ai-features', methods=['POST'])
+@jwt_required()
+def create_ai_feature():
+    """Create a new AI feature (super admin only)"""
+    try:
+        require_super_admin()
+        data = request.get_json()
+
+        # Validate required fields
+        required_fields = ['name', 'slug', 'description', 'category']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        # Check if slug already exists
+        existing = AIFeature.query.filter_by(slug=data['slug']).first()
+        if existing:
+            return jsonify({'error': 'Feature with this slug already exists'}), 400
+
+        feature = AIFeature(
+            name=data['name'],
+            slug=data['slug'],
+            description=data['description'],
+            long_description=data.get('long_description'),
+            category=data['category'],
+            icon=data.get('icon'),
+            monthly_price=data.get('monthly_price', 0),
+            setup_fee=data.get('setup_fee', 0),
+            price_per_call=data.get('price_per_call', 0),
+            requires_openai=data.get('requires_openai', False),
+            openai_model=data.get('openai_model'),
+            processing_time_estimate=data.get('processing_time_estimate'),
+            benefit_summary=data.get('benefit_summary'),
+            use_cases=json.dumps(data.get('use_cases', [])),
+            roi_metrics=json.dumps(data.get('roi_metrics', {})),
+            is_active=data.get('is_active', True),
+            is_beta=data.get('is_beta', False),
+            requires_approval=data.get('requires_approval', False),
+            display_order=data.get('display_order', 0)
+        )
+
+        db.session.add(feature)
+        db.session.commit()
+
+        log_audit('ai_feature_created', 'ai_feature', feature.id, {'name': feature.name})
+
+        return jsonify({
+            'message': 'AI feature created successfully',
+            'feature': {
+                'id': feature.id,
+                'name': feature.name,
+                'slug': feature.slug
+            }
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Create AI feature error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/ai-features/<int:feature_id>', methods=['PUT'])
+@jwt_required()
+def update_ai_feature(feature_id):
+    """Update an AI feature (super admin only)"""
+    try:
+        require_super_admin()
+        data = request.get_json()
+
+        feature = AIFeature.query.get(feature_id)
+        if not feature:
+            return jsonify({'error': 'AI feature not found'}), 404
+
+        # Update fields
+        if 'name' in data:
+            feature.name = data['name']
+        if 'description' in data:
+            feature.description = data['description']
+        if 'long_description' in data:
+            feature.long_description = data['long_description']
+        if 'category' in data:
+            feature.category = data['category']
+        if 'icon' in data:
+            feature.icon = data['icon']
+        if 'monthly_price' in data:
+            feature.monthly_price = data['monthly_price']
+        if 'setup_fee' in data:
+            feature.setup_fee = data['setup_fee']
+        if 'price_per_call' in data:
+            feature.price_per_call = data['price_per_call']
+        if 'benefit_summary' in data:
+            feature.benefit_summary = data['benefit_summary']
+        if 'is_active' in data:
+            feature.is_active = data['is_active']
+        if 'is_beta' in data:
+            feature.is_beta = data['is_beta']
+        if 'display_order' in data:
+            feature.display_order = data['display_order']
+
+        db.session.commit()
+
+        log_audit('ai_feature_updated', 'ai_feature', feature.id, {'name': feature.name})
+
+        return jsonify({'message': 'AI feature updated successfully'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Update AI feature error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/tenants/<int:tenant_id>/features', methods=['GET'])
+@jwt_required()
+def get_tenant_ai_features(tenant_id):
+    """Get AI features enabled for a specific tenant (super admin only)"""
+    try:
+        require_super_admin()
+
+        tenant = Tenant.query.get(tenant_id)
+        if not tenant:
+            return jsonify({'error': 'Tenant not found'}), 404
+
+        # Get all available features
+        all_features = AIFeature.query.filter_by(is_active=True).order_by(
+            AIFeature.category, AIFeature.display_order
+        ).all()
+
+        # Get tenant's enabled features
+        tenant_features = TenantAIFeature.query.filter_by(
+            tenant_id=tenant_id
+        ).all()
+
+        # Create a map of enabled features
+        enabled_map = {tf.ai_feature_id: tf for tf in tenant_features}
+
+        # Build response
+        features_data = []
+        total_monthly_cost = 0
+
+        for feature in all_features:
+            tenant_feature = enabled_map.get(feature.id)
+            is_enabled = tenant_feature is not None and tenant_feature.enabled
+
+            # Calculate pricing
+            monthly_price = tenant_feature.custom_monthly_price if (tenant_feature and tenant_feature.custom_monthly_price) else feature.monthly_price
+            setup_fee = tenant_feature.custom_setup_fee if (tenant_feature and tenant_feature.custom_setup_fee) else feature.setup_fee
+
+            if is_enabled and monthly_price:
+                total_monthly_cost += monthly_price
+
+            features_data.append({
+                'feature_id': feature.id,
+                'name': feature.name,
+                'slug': feature.slug,
+                'description': feature.description,
+                'category': feature.category,
+                'icon': feature.icon,
+                'default_monthly_price': float(feature.monthly_price) if feature.monthly_price else 0,
+                'default_setup_fee': float(feature.setup_fee) if feature.setup_fee else 0,
+                'monthly_price': float(monthly_price) if monthly_price else 0,
+                'setup_fee': float(setup_fee) if setup_fee else 0,
+                'is_enabled': is_enabled,
+                'enabled_at': tenant_feature.enabled_at.isoformat() if (tenant_feature and tenant_feature.enabled_at) else None,
+                'usage_count': tenant_feature.usage_count if tenant_feature else 0,
+                'last_used_at': tenant_feature.last_used_at.isoformat() if (tenant_feature and tenant_feature.last_used_at) else None,
+                'enabled_by': tenant_feature.enabled_by if tenant_feature else None,
+                'is_beta': feature.is_beta
+            })
+
+        return jsonify({
+            'tenant': {
+                'id': tenant.id,
+                'company_name': tenant.company_name,
+                'subdomain': tenant.subdomain
+            },
+            'features': features_data,
+            'total_monthly_cost': round(total_monthly_cost, 2)
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get tenant AI features error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/tenants/<int:tenant_id>/features', methods=['POST'])
+@jwt_required()
+def enable_tenant_ai_features(tenant_id):
+    """Enable/disable multiple AI features for a tenant (super admin only)"""
+    try:
+        require_super_admin()
+        claims = get_jwt()
+        admin_email = claims.get('email', 'unknown')
+
+        data = request.get_json()
+        feature_updates = data.get('features', [])  # Array of {feature_id, enabled, custom_monthly_price?, custom_setup_fee?}
+
+        tenant = Tenant.query.get(tenant_id)
+        if not tenant:
+            return jsonify({'error': 'Tenant not found'}), 404
+
+        enabled_count = 0
+        disabled_count = 0
+
+        for update in feature_updates:
+            feature_id = update.get('feature_id')
+            enabled = update.get('enabled', True)
+
+            # Check if feature exists
+            feature = AIFeature.query.get(feature_id)
+            if not feature:
+                continue
+
+            # Check if tenant already has this feature
+            tenant_feature = TenantAIFeature.query.filter_by(
+                tenant_id=tenant_id,
+                ai_feature_id=feature_id
+            ).first()
+
+            if enabled:
+                if tenant_feature:
+                    # Update existing
+                    tenant_feature.enabled = True
+                    tenant_feature.enabled_at = datetime.utcnow()
+                    tenant_feature.enabled_by = admin_email
+                    if 'custom_monthly_price' in update:
+                        tenant_feature.custom_monthly_price = update['custom_monthly_price']
+                    if 'custom_setup_fee' in update:
+                        tenant_feature.custom_setup_fee = update['custom_setup_fee']
+                else:
+                    # Create new
+                    tenant_feature = TenantAIFeature(
+                        tenant_id=tenant_id,
+                        ai_feature_id=feature_id,
+                        enabled=True,
+                        enabled_by=admin_email,
+                        custom_monthly_price=update.get('custom_monthly_price'),
+                        custom_setup_fee=update.get('custom_setup_fee')
+                    )
+                    db.session.add(tenant_feature)
+                enabled_count += 1
+            else:
+                if tenant_feature:
+                    tenant_feature.enabled = False
+                    tenant_feature.disabled_at = datetime.utcnow()
+                    disabled_count += 1
+
+        db.session.commit()
+
+        log_audit('tenant_features_updated', 'tenant', tenant_id, {
+            'enabled': enabled_count,
+            'disabled': disabled_count
+        })
+
+        return jsonify({
+            'message': 'Features updated successfully',
+            'enabled_count': enabled_count,
+            'disabled_count': disabled_count
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Enable tenant AI features error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/tenants/<int:tenant_id>/features/<int:feature_id>', methods=['DELETE'])
+@jwt_required()
+def disable_tenant_ai_feature(tenant_id, feature_id):
+    """Disable a specific AI feature for a tenant (super admin only)"""
+    try:
+        require_super_admin()
+
+        tenant_feature = TenantAIFeature.query.filter_by(
+            tenant_id=tenant_id,
+            ai_feature_id=feature_id
+        ).first()
+
+        if not tenant_feature:
+            return jsonify({'error': 'Feature not enabled for this tenant'}), 404
+
+        tenant_feature.enabled = False
+        tenant_feature.disabled_at = datetime.utcnow()
+
+        db.session.commit()
+
+        log_audit('tenant_feature_disabled', 'tenant_feature', tenant_feature.id, {
+            'tenant_id': tenant_id,
+            'feature_id': feature_id
+        })
+
+        return jsonify({'message': 'Feature disabled successfully'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Disable tenant AI feature error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/features', methods=['GET'])
+def get_public_ai_features():
+    """Get all active AI features (public endpoint for marketing pages)"""
+    try:
+        category = request.args.get('category')
+
+        query = AIFeature.query.filter_by(is_active=True)
+
+        if category:
+            query = query.filter_by(category=category)
+
+        features = query.order_by(AIFeature.category, AIFeature.display_order).all()
+
+        # Group by category
+        features_by_category = {}
+        for feature in features:
+            if feature.category not in features_by_category:
+                features_by_category[feature.category] = []
+
+            features_by_category[feature.category].append({
+                'id': feature.id,
+                'name': feature.name,
+                'slug': feature.slug,
+                'description': feature.description,
+                'long_description': feature.long_description,
+                'icon': feature.icon,
+                'monthly_price': float(feature.monthly_price) if feature.monthly_price else 0,
+                'setup_fee': float(feature.setup_fee) if feature.setup_fee else 0,
+                'benefit_summary': feature.benefit_summary,
+                'use_cases': json.loads(feature.use_cases) if feature.use_cases else [],
+                'roi_metrics': json.loads(feature.roi_metrics) if feature.roi_metrics else {},
+                'is_beta': feature.is_beta
+            })
+
+        return jsonify({
+            'features': features_by_category
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get public AI features error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/features', methods=['GET'])
+@jwt_required()
+def get_my_tenant_features():
+    """Get AI features enabled for the current user's tenant"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        # Get enabled features for this tenant
+        tenant_features = TenantAIFeature.query.filter_by(
+            tenant_id=tenant_id,
+            enabled=True
+        ).all()
+
+        features_data = []
+        for tf in tenant_features:
+            feature = AIFeature.query.get(tf.ai_feature_id)
+            if feature and feature.is_active:
+                features_data.append({
+                    'id': feature.id,
+                    'name': feature.name,
+                    'slug': feature.slug,
+                    'description': feature.description,
+                    'category': feature.category,
+                    'icon': feature.icon,
+                    'is_beta': feature.is_beta,
+                    'usage_count': tf.usage_count
+                })
+
+        return jsonify({
+            'features': features_data
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get my tenant features error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
 # FRONTEND SERVING
 # ============================================================================
 
@@ -4438,6 +4950,66 @@ def migrate_database():
             migrations_applied.append("Added subscription_status to tenants")
             logger.info("✅ Added subscription_status column to tenants")
 
+        # Migration 5: Create ai_features table
+        tables = inspector.get_table_names()
+        if 'ai_features' not in tables:
+            db.session.execute(text("""
+                CREATE TABLE ai_features (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(100) UNIQUE NOT NULL,
+                    slug VARCHAR(100) UNIQUE NOT NULL,
+                    description TEXT,
+                    long_description TEXT,
+                    category VARCHAR(50),
+                    icon VARCHAR(50),
+                    monthly_price FLOAT DEFAULT 0,
+                    setup_fee FLOAT DEFAULT 0,
+                    price_per_call FLOAT DEFAULT 0,
+                    requires_openai BOOLEAN DEFAULT FALSE,
+                    openai_model VARCHAR(50),
+                    processing_time_estimate INTEGER,
+                    benefit_summary TEXT,
+                    use_cases TEXT,
+                    roi_metrics TEXT,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    is_beta BOOLEAN DEFAULT FALSE,
+                    requires_approval BOOLEAN DEFAULT FALSE,
+                    display_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            migrations_applied.append("Created ai_features table")
+            logger.info("✅ Created ai_features table")
+
+        # Migration 6: Create tenant_ai_features junction table
+        if 'tenant_ai_features' not in tables:
+            db.session.execute(text("""
+                CREATE TABLE tenant_ai_features (
+                    id SERIAL PRIMARY KEY,
+                    tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                    ai_feature_id INTEGER NOT NULL REFERENCES ai_features(id) ON DELETE CASCADE,
+                    enabled BOOLEAN DEFAULT TRUE,
+                    custom_monthly_price FLOAT,
+                    custom_setup_fee FLOAT,
+                    usage_count INTEGER DEFAULT 0,
+                    last_used_at TIMESTAMP,
+                    configuration TEXT,
+                    enabled_at TIMESTAMP DEFAULT NOW(),
+                    disabled_at TIMESTAMP,
+                    enabled_by VARCHAR(200),
+                    UNIQUE(tenant_id, ai_feature_id)
+                )
+            """))
+            db.session.execute(text("""
+                CREATE INDEX idx_tenant_ai_features_tenant ON tenant_ai_features(tenant_id)
+            """))
+            db.session.execute(text("""
+                CREATE INDEX idx_tenant_ai_features_feature ON tenant_ai_features(ai_feature_id)
+            """))
+            migrations_applied.append("Created tenant_ai_features table with indexes")
+            logger.info("✅ Created tenant_ai_features table")
+
         db.session.commit()
 
         return jsonify({
@@ -4450,6 +5022,628 @@ def migrate_database():
     except Exception as e:
         db.session.rollback()
         logger.error(f"Migration failed: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/admin/seed-ai-features', methods=['POST'])
+@jwt_required()
+def seed_ai_features():
+    """
+    Seed database with all AI features
+    Only accessible by super admin
+    """
+    try:
+        require_super_admin()
+
+        features_data = [
+            # CALL QUALITY & COACHING
+            {
+                'name': 'AI Call Summaries',
+                'slug': 'call-summaries',
+                'description': 'Automatic 2-3 sentence summary of every call using GPT-4',
+                'long_description': 'Leverage advanced AI to automatically generate concise, accurate summaries of every customer interaction. Save hours of manual note-taking and ensure no critical details are missed.',
+                'category': 'coaching',
+                'icon': 'document-text',
+                'monthly_price': 99.00,
+                'setup_fee': 0,
+                'price_per_call': 0.05,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'processing_time_estimate': 5,
+                'benefit_summary': 'Save 80% of time spent on call documentation',
+                'use_cases': json.dumps([
+                    'Customer support call logs',
+                    'Sales conversation notes',
+                    'Manager review preparation'
+                ]),
+                'roi_metrics': json.dumps({
+                    'time_saved_per_call': '3-5 minutes',
+                    'accuracy_improvement': '95%',
+                    'cost_per_call': '$0.05'
+                }),
+                'display_order': 1
+            },
+            {
+                'name': 'Action Item Extraction',
+                'slug': 'action-items',
+                'description': 'Automatically identify follow-up tasks, commitments, and next steps from calls',
+                'long_description': 'Never miss a follow-up again. Our AI automatically extracts all action items, commitments, and next steps mentioned during calls, creating a structured task list for your team.',
+                'category': 'coaching',
+                'icon': 'clipboard-list',
+                'monthly_price': 79.00,
+                'setup_fee': 0,
+                'price_per_call': 0.03,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'processing_time_estimate': 5,
+                'benefit_summary': 'Increase follow-through rate by 60%',
+                'use_cases': json.dumps([
+                    'Sales pipeline management',
+                    'Customer support ticket creation',
+                    'Project coordination calls'
+                ]),
+                'roi_metrics': json.dumps({
+                    'follow_up_rate_increase': '60%',
+                    'deals_lost_to_missed_followup': '25% reduction'
+                }),
+                'display_order': 2
+            },
+            {
+                'name': 'Call Quality Scoring',
+                'slug': 'quality-scoring',
+                'description': 'Score calls on professionalism, greeting, closing, objection handling (1-100)',
+                'long_description': 'Objective, consistent quality scores for every call based on key performance indicators. Identify coaching opportunities and track improvement over time.',
+                'category': 'coaching',
+                'icon': 'star',
+                'monthly_price': 149.00,
+                'setup_fee': 99.00,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'processing_time_estimate': 10,
+                'benefit_summary': 'Improve agent performance by 35% within 3 months',
+                'use_cases': json.dumps([
+                    'Agent performance reviews',
+                    'Quality assurance audits',
+                    'Training effectiveness measurement'
+                ]),
+                'roi_metrics': json.dumps({
+                    'performance_improvement': '35%',
+                    'customer_satisfaction_increase': '22%',
+                    'qa_time_reduction': '70%'
+                }),
+                'display_order': 3
+            },
+            {
+                'name': 'Talk Time Analysis',
+                'slug': 'talk-time',
+                'description': 'Agent vs customer talk ratio, silence detection, interruption tracking',
+                'long_description': 'Understand conversation dynamics with detailed talk time metrics. Identify agents who talk too much or too little, detect excessive silence, and track interruption patterns.',
+                'category': 'coaching',
+                'icon': 'chart-bar',
+                'monthly_price': 69.00,
+                'benefit_summary': 'Optimize conversation balance for better outcomes',
+                'use_cases': json.dumps([
+                    'Sales coaching',
+                    'Active listening training',
+                    'Call efficiency optimization'
+                ]),
+                'roi_metrics': json.dumps({
+                    'optimal_talk_ratio': '40:60 agent:customer',
+                    'close_rate_improvement': '18%'
+                }),
+                'display_order': 4
+            },
+            {
+                'name': 'Script Adherence Detection',
+                'slug': 'script-adherence',
+                'description': 'Check if agents follow required scripts, compliance statements, and key talking points',
+                'long_description': 'Ensure regulatory compliance and best practices by automatically verifying agents follow required scripts. Upload your scripts and get instant adherence scores.',
+                'category': 'coaching',
+                'icon': 'check-circle',
+                'monthly_price': 129.00,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'processing_time_estimate': 8,
+                'benefit_summary': 'Achieve 95%+ compliance with required scripts',
+                'use_cases': json.dumps([
+                    'Financial services disclosures',
+                    'Healthcare privacy statements',
+                    'Sales qualification questions'
+                ]),
+                'roi_metrics': json.dumps({
+                    'compliance_rate': '95%+',
+                    'audit_pass_rate': '98%'
+                }),
+                'display_order': 5
+            },
+
+            # COMPLIANCE & RISK MANAGEMENT
+            {
+                'name': 'Keyword & Compliance Monitoring',
+                'slug': 'compliance-monitoring',
+                'description': 'Real-time alerts for prohibited words, competitor mentions, compliance violations',
+                'long_description': 'Protect your business with real-time monitoring of sensitive keywords. Set up custom watchlists for compliance terms, competitor mentions, prohibited language, and get instant alerts.',
+                'category': 'compliance',
+                'icon': 'shield-check',
+                'monthly_price': 199.00,
+                'setup_fee': 149.00,
+                'benefit_summary': 'Prevent compliance violations before they become problems',
+                'use_cases': json.dumps([
+                    'TCPA compliance monitoring',
+                    'PCI-DSS credit card data detection',
+                    'Competitor mention tracking',
+                    'Profanity/abuse detection'
+                ]),
+                'roi_metrics': json.dumps({
+                    'violation_reduction': '87%',
+                    'average_fine_avoided': '$50,000',
+                    'legal_risk_reduction': 'Significant'
+                }),
+                'display_order': 6
+            },
+            {
+                'name': 'Sentiment Analysis',
+                'slug': 'sentiment-analysis',
+                'description': 'Detect customer emotions (positive, negative, neutral) with confidence scores',
+                'long_description': 'Understand customer emotions in real-time. Our AI analyzes tone, word choice, and conversation patterns to identify frustrated customers who need immediate attention.',
+                'category': 'compliance',
+                'icon': 'emoji-happy',
+                'monthly_price': 89.00,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'processing_time_estimate': 5,
+                'benefit_summary': 'Identify at-risk customers before they churn',
+                'use_cases': json.dumps([
+                    'Escalation triggers',
+                    'Customer satisfaction tracking',
+                    'Churn risk identification'
+                ]),
+                'roi_metrics': json.dumps({
+                    'negative_sentiment_detection': '92% accuracy',
+                    'churn_prevention': '31%',
+                    'csat_correlation': '0.84'
+                }),
+                'display_order': 7
+            },
+
+            # REVENUE INTELLIGENCE
+            {
+                'name': 'Intent Detection',
+                'slug': 'intent-detection',
+                'description': 'Classify call intent (sales inquiry, support request, billing, cancellation)',
+                'long_description': 'Automatically categorize every call by customer intent. Route follow-ups to the right team, prioritize high-value opportunities, and identify churn risks.',
+                'category': 'revenue',
+                'icon': 'lightning-bolt',
+                'monthly_price': 99.00,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'processing_time_estimate': 5,
+                'benefit_summary': 'Improve routing accuracy by 80%',
+                'use_cases': json.dumps([
+                    'Automatic call routing',
+                    'Lead qualification',
+                    'Churn risk flagging'
+                ]),
+                'roi_metrics': json.dumps({
+                    'routing_accuracy': '92%',
+                    'first_call_resolution': '+28%'
+                }),
+                'display_order': 8
+            },
+            {
+                'name': 'Objection Handling Analysis',
+                'slug': 'objection-handling',
+                'description': 'Detect common sales objections and how effectively agents overcome them',
+                'long_description': 'Master objection handling across your sales team. Identify the most common objections, track successful responses, and coach agents on proven techniques.',
+                'category': 'revenue',
+                'icon': 'shield-exclamation',
+                'monthly_price': 149.00,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'processing_time_estimate': 10,
+                'benefit_summary': 'Increase close rate by 25%',
+                'use_cases': json.dumps([
+                    'Sales training',
+                    'Competitive intelligence',
+                    'Pricing optimization'
+                ]),
+                'roi_metrics': json.dumps({
+                    'close_rate_improvement': '25%',
+                    'objection_overcome_rate': '+40%'
+                }),
+                'display_order': 9
+            },
+            {
+                'name': 'Deal Risk Prediction',
+                'slug': 'deal-risk',
+                'description': 'Predict likelihood of deal closure based on conversation patterns',
+                'long_description': 'AI-powered deal scoring based on hundreds of conversation signals. Get early warnings on at-risk deals and prioritize where to focus your effort.',
+                'category': 'revenue',
+                'icon': 'exclamation-triangle',
+                'monthly_price': 199.00,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'processing_time_estimate': 10,
+                'benefit_summary': 'Forecast accuracy improvement of 35%',
+                'use_cases': json.dumps([
+                    'Sales pipeline forecasting',
+                    'Manager intervention triggers',
+                    'Commission accuracy'
+                ]),
+                'roi_metrics': json.dumps({
+                    'forecast_accuracy': '+35%',
+                    'deal_save_rate': '42%'
+                }),
+                'display_order': 10
+            },
+
+            # AUTOMATED INSIGHTS
+            {
+                'name': 'Topic Extraction',
+                'slug': 'topic-extraction',
+                'description': 'Identify main topics discussed (pricing, features, support issues, etc.)',
+                'long_description': 'Automatically tag every call with relevant topics and themes. Understand what customers are really talking about across thousands of conversations.',
+                'category': 'insights',
+                'icon': 'tag',
+                'monthly_price': 79.00,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'processing_time_estimate': 5,
+                'benefit_summary': 'Surface trending issues 10x faster',
+                'use_cases': json.dumps([
+                    'Product feedback analysis',
+                    'Common pain point identification',
+                    'Feature request tracking'
+                ]),
+                'roi_metrics': json.dumps({
+                    'issue_detection_speed': '10x faster',
+                    'product_roadmap_input': 'Continuous'
+                }),
+                'display_order': 11
+            },
+
+            # CUSTOMER INTELLIGENCE
+            {
+                'name': 'Emotion Detection',
+                'slug': 'emotion-detection',
+                'description': 'Identify specific emotions (anger, frustration, excitement, confusion)',
+                'long_description': 'Go beyond basic sentiment to detect specific emotions like frustration, excitement, confusion, or urgency. Trigger appropriate workflows based on emotional state.',
+                'category': 'customer_intelligence',
+                'icon': 'heart',
+                'monthly_price': 129.00,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'processing_time_estimate': 7,
+                'benefit_summary': 'Reduce escalations by 45%',
+                'use_cases': json.dumps([
+                    'Automatic escalation triggers',
+                    'Empathy training',
+                    'VIP customer identification'
+                ]),
+                'roi_metrics': json.dumps({
+                    'escalation_reduction': '45%',
+                    'customer_satisfaction': '+18%'
+                }),
+                'display_order': 12
+            },
+            {
+                'name': 'Churn Prediction',
+                'slug': 'churn-prediction',
+                'description': 'Identify at-risk customers based on conversation patterns',
+                'long_description': 'Predictive analytics that identify customers likely to churn based on language patterns, sentiment shifts, and topic trends. Get alerts in time to save the relationship.',
+                'category': 'customer_intelligence',
+                'icon': 'user-minus',
+                'monthly_price': 249.00,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'processing_time_estimate': 15,
+                'benefit_summary': 'Reduce churn by 27%',
+                'use_cases': json.dumps([
+                    'Proactive retention campaigns',
+                    'Account health scoring',
+                    'Customer success prioritization'
+                ]),
+                'roi_metrics': json.dumps({
+                    'churn_reduction': '27%',
+                    'prediction_accuracy': '81%',
+                    'ltv_increase': '34%'
+                }),
+                'display_order': 13
+            },
+            {
+                'name': 'Customer Journey Mapping',
+                'slug': 'journey-mapping',
+                'description': 'Track customer interactions across multiple calls over time',
+                'long_description': 'See the complete customer story across all touchpoints. Understand the path from first contact to closed deal or support resolution.',
+                'category': 'customer_intelligence',
+                'icon': 'map',
+                'monthly_price': 179.00,
+                'benefit_summary': 'Identify conversion bottlenecks and optimize touchpoints',
+                'use_cases': json.dumps([
+                    'Sales cycle optimization',
+                    'Onboarding improvement',
+                    'Support experience mapping'
+                ]),
+                'roi_metrics': json.dumps({
+                    'conversion_rate_lift': '22%',
+                    'sales_cycle_reduction': '15%'
+                }),
+                'display_order': 14
+            },
+
+            # REAL-TIME AI
+            {
+                'name': 'Real-Time Agent Assist',
+                'slug': 'real-time-assist',
+                'description': 'Live suggestions, knowledge base articles, next best actions during calls',
+                'long_description': 'Give agents superpowers with real-time AI assistance. Surface relevant knowledge articles, suggest responses to objections, and guide toward best outcomes - all during live calls.',
+                'category': 'real_time',
+                'icon': 'support',
+                'monthly_price': 299.00,
+                'setup_fee': 499.00,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'processing_time_estimate': 2,
+                'benefit_summary': 'Improve first-call resolution by 40%',
+                'use_cases': json.dumps([
+                    'New agent onboarding',
+                    'Complex product support',
+                    'Sales battle cards'
+                ]),
+                'roi_metrics': json.dumps({
+                    'fcr_improvement': '40%',
+                    'handle_time_reduction': '25%',
+                    'csat_increase': '+31%'
+                }),
+                'display_order': 15,
+                'is_beta': True
+            },
+
+            # ADVANCED ANALYTICS
+            {
+                'name': 'Conversation Intelligence Dashboard',
+                'slug': 'conversation-intelligence',
+                'description': 'Advanced analytics on topics, trends, patterns across all calls',
+                'long_description': 'Executive dashboard with deep conversation analytics. Identify trends, spot emerging issues, and make data-driven decisions based on thousands of customer interactions.',
+                'category': 'analytics',
+                'icon': 'chart-pie',
+                'monthly_price': 199.00,
+                'benefit_summary': 'Turn conversations into strategic insights',
+                'use_cases': json.dumps([
+                    'Executive reporting',
+                    'Product strategy',
+                    'Market intelligence'
+                ]),
+                'roi_metrics': json.dumps({
+                    'strategic_insight_generation': 'Weekly',
+                    'competitive_intelligence': 'Real-time'
+                }),
+                'display_order': 16
+            },
+            {
+                'name': 'Agent Performance Analytics',
+                'slug': 'performance-analytics',
+                'description': 'Individual and team leaderboards, improvement tracking, coaching insights',
+                'long_description': 'Comprehensive performance management with individual scorecards, team comparisons, trend tracking, and personalized coaching recommendations.',
+                'category': 'analytics',
+                'icon': 'trending-up',
+                'monthly_price': 149.00,
+                'benefit_summary': 'Data-driven coaching that improves performance 3x faster',
+                'use_cases': json.dumps([
+                    'Performance reviews',
+                    'Team competitions',
+                    'Training needs analysis'
+                ]),
+                'roi_metrics': json.dumps({
+                    'coaching_effectiveness': '3x improvement',
+                    'top_performer_replication': 'Systematic'
+                }),
+                'display_order': 17
+            },
+            {
+                'name': 'Predictive Analytics',
+                'slug': 'predictive-analytics',
+                'description': 'Forecasting trends, volume predictions, outcome probabilities',
+                'long_description': 'AI-powered forecasting for call volumes, customer needs, seasonal trends, and business outcomes. Plan resources and strategy with confidence.',
+                'category': 'analytics',
+                'icon': 'crystal-ball',
+                'monthly_price': 299.00,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'benefit_summary': 'Optimize staffing and reduce costs by 20%',
+                'use_cases': json.dumps([
+                    'Workforce planning',
+                    'Budget forecasting',
+                    'Seasonal preparation'
+                ]),
+                'roi_metrics': json.dumps({
+                    'staffing_optimization': '20% cost reduction',
+                    'forecast_accuracy': '89%'
+                }),
+                'display_order': 18
+            },
+
+            # MULTILINGUAL
+            {
+                'name': 'Multi-Language Transcription',
+                'slug': 'multilingual-transcription',
+                'description': 'Transcribe calls in 50+ languages with automatic language detection',
+                'long_description': 'Global support with automatic language detection and transcription in over 50 languages. All AI features work across languages automatically.',
+                'category': 'multilingual',
+                'icon': 'globe',
+                'monthly_price': 149.00,
+                'requires_openai': True,
+                'openai_model': 'whisper-1',
+                'processing_time_estimate': 10,
+                'benefit_summary': 'Expand to global markets without language barriers',
+                'use_cases': json.dumps([
+                    'International customer support',
+                    'Global sales teams',
+                    'Multilingual compliance'
+                ]),
+                'roi_metrics': json.dumps({
+                    'supported_languages': '50+',
+                    'accuracy_per_language': '95%+',
+                    'market_expansion': 'Global'
+                }),
+                'display_order': 19
+            },
+            {
+                'name': 'Translation Services',
+                'slug': 'translation',
+                'description': 'Real-time translation of transcripts to any target language',
+                'long_description': 'Translate call transcripts to any language for global team collaboration, compliance documentation, or customer delivery.',
+                'category': 'multilingual',
+                'icon': 'translate',
+                'monthly_price': 99.00,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'processing_time_estimate': 8,
+                'benefit_summary': 'Enable global team collaboration',
+                'use_cases': json.dumps([
+                    'Distributed team coordination',
+                    'International compliance',
+                    'Customer documentation'
+                ]),
+                'roi_metrics': json.dumps({
+                    'collaboration_efficiency': '+45%',
+                    'compliance_coverage': 'Global'
+                }),
+                'display_order': 20
+            },
+
+            # INTEGRATION INTELLIGENCE
+            {
+                'name': 'CRM Auto-Update',
+                'slug': 'crm-integration',
+                'description': 'Automatically update Salesforce/HubSpot with call notes, outcomes, next steps',
+                'long_description': 'Eliminate manual data entry with automatic CRM updates. Call summaries, action items, sentiment, and custom fields are pushed to your CRM automatically.',
+                'category': 'integration',
+                'icon': 'database',
+                'monthly_price': 199.00,
+                'setup_fee': 299.00,
+                'benefit_summary': 'Save 2 hours per agent per day on data entry',
+                'use_cases': json.dumps([
+                    'Salesforce integration',
+                    'HubSpot sync',
+                    'Pipeline management'
+                ]),
+                'roi_metrics': json.dumps({
+                    'time_saved_per_agent': '2 hours/day',
+                    'data_accuracy': '99%',
+                    'crm_adoption': '+67%'
+                }),
+                'display_order': 21
+            },
+            {
+                'name': 'Smart Call Routing',
+                'slug': 'smart-routing',
+                'description': 'AI-powered routing based on intent, sentiment, customer value',
+                'long_description': 'Intelligent call routing that considers customer intent, emotional state, account value, and agent skills to optimize every connection.',
+                'category': 'integration',
+                'icon': 'switch-horizontal',
+                'monthly_price': 249.00,
+                'setup_fee': 399.00,
+                'benefit_summary': 'Increase first-call resolution by 35%',
+                'use_cases': json.dumps([
+                    'VIP customer routing',
+                    'Skill-based routing',
+                    'Churn risk prioritization'
+                ]),
+                'roi_metrics': json.dumps({
+                    'fcr_improvement': '35%',
+                    'customer_satisfaction': '+28%',
+                    'agent_utilization': '+22%'
+                }),
+                'display_order': 22,
+                'is_beta': True
+            },
+            {
+                'name': 'Automated Follow-Ups',
+                'slug': 'automated-followups',
+                'description': 'Trigger emails, SMS, tasks based on call outcomes and AI insights',
+                'long_description': 'Automatic workflow triggers based on call outcomes. Send follow-up emails, create tasks, schedule callbacks, or escalate issues - all based on AI analysis.',
+                'category': 'integration',
+                'icon': 'mail',
+                'monthly_price': 149.00,
+                'benefit_summary': 'Never miss a follow-up, increase conversion by 40%',
+                'use_cases': json.dumps([
+                    'Quote follow-ups',
+                    'Support ticket creation',
+                    'Renewal reminders'
+                ]),
+                'roi_metrics': json.dumps({
+                    'follow_up_rate': '100%',
+                    'conversion_lift': '40%',
+                    'manual_work_eliminated': '90%'
+                }),
+                'display_order': 23
+            },
+            {
+                'name': 'Custom Entity Extraction',
+                'slug': 'custom-entities',
+                'description': 'Extract custom business entities (product names, competitor mentions, pricing)',
+                'long_description': 'Train AI to extract your specific business entities - product SKUs, competitor names, pricing tiers, contract terms, or any custom data points relevant to your business.',
+                'category': 'integration',
+                'icon': 'finger-print',
+                'monthly_price': 179.00,
+                'setup_fee': 499.00,
+                'requires_openai': True,
+                'openai_model': 'gpt-4',
+                'benefit_summary': 'Capture business-critical data automatically',
+                'use_cases': json.dumps([
+                    'Product mention tracking',
+                    'Competitive intelligence',
+                    'Contract term extraction'
+                ]),
+                'roi_metrics': json.dumps({
+                    'data_capture_rate': '97%',
+                    'manual_review_reduction': '85%'
+                }),
+                'display_order': 24
+            },
+        ]
+
+        # Insert or update features
+        created_count = 0
+        updated_count = 0
+
+        for feature_data in features_data:
+            existing = AIFeature.query.filter_by(slug=feature_data['slug']).first()
+
+            if existing:
+                # Update existing feature
+                for key, value in feature_data.items():
+                    setattr(existing, key, value)
+                updated_count += 1
+            else:
+                # Create new feature
+                feature = AIFeature(**feature_data)
+                db.session.add(feature)
+                created_count += 1
+
+        db.session.commit()
+
+        log_audit('ai_features_seeded', details={
+            'created': created_count,
+            'updated': updated_count,
+            'total': len(features_data)
+        })
+
+        return jsonify({
+            'success': True,
+            'message': 'AI features seeded successfully',
+            'created': created_count,
+            'updated': updated_count,
+            'total': len(features_data)
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Seed AI features error: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': str(e)

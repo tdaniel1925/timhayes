@@ -90,6 +90,74 @@ def run_migration():
         else:
             print("  ⏭️  subscription_status already exists in tenants")
 
+        # Migration 5: Create ai_features table
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+
+        if 'ai_features' not in tables:
+            print("  ➕ Creating ai_features table...")
+            conn.execute(text("""
+                CREATE TABLE ai_features (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(100) UNIQUE NOT NULL,
+                    slug VARCHAR(100) UNIQUE NOT NULL,
+                    description TEXT,
+                    long_description TEXT,
+                    category VARCHAR(50),
+                    icon VARCHAR(50),
+                    monthly_price FLOAT DEFAULT 0,
+                    setup_fee FLOAT DEFAULT 0,
+                    price_per_call FLOAT DEFAULT 0,
+                    requires_openai BOOLEAN DEFAULT FALSE,
+                    openai_model VARCHAR(50),
+                    processing_time_estimate INTEGER,
+                    benefit_summary TEXT,
+                    use_cases TEXT,
+                    roi_metrics TEXT,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    is_beta BOOLEAN DEFAULT FALSE,
+                    requires_approval BOOLEAN DEFAULT FALSE,
+                    display_order INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """))
+            migrations.append("Created ai_features table")
+            print("     ✅ ai_features table created")
+        else:
+            print("  ⏭️  ai_features table already exists")
+
+        # Migration 6: Create tenant_ai_features junction table
+        if 'tenant_ai_features' not in tables:
+            print("  ➕ Creating tenant_ai_features table...")
+            conn.execute(text("""
+                CREATE TABLE tenant_ai_features (
+                    id SERIAL PRIMARY KEY,
+                    tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                    ai_feature_id INTEGER NOT NULL REFERENCES ai_features(id) ON DELETE CASCADE,
+                    enabled BOOLEAN DEFAULT TRUE,
+                    custom_monthly_price FLOAT,
+                    custom_setup_fee FLOAT,
+                    usage_count INTEGER DEFAULT 0,
+                    last_used_at TIMESTAMP,
+                    configuration TEXT,
+                    enabled_at TIMESTAMP DEFAULT NOW(),
+                    disabled_at TIMESTAMP,
+                    enabled_by VARCHAR(200),
+                    UNIQUE(tenant_id, ai_feature_id)
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX idx_tenant_ai_features_tenant ON tenant_ai_features(tenant_id)
+            """))
+            conn.execute(text("""
+                CREATE INDEX idx_tenant_ai_features_feature ON tenant_ai_features(ai_feature_id)
+            """))
+            migrations.append("Created tenant_ai_features table")
+            print("     ✅ tenant_ai_features table created with indexes")
+        else:
+            print("  ⏭️  tenant_ai_features table already exists")
+
         # Commit all changes
         conn.commit()
 
@@ -107,6 +175,7 @@ def verify_schema():
     print("🔍 Verifying schema...\n")
 
     inspector = inspect(engine)
+    tables = inspector.get_table_names()
 
     # Check cdr_records table
     cdr_columns = [col['name'] for col in inspector.get_columns('cdr_records')]
@@ -119,6 +188,20 @@ def verify_schema():
     assert 'max_users' in tenant_columns, "max_users column missing!"
     assert 'max_calls_per_month' in tenant_columns, "max_calls_per_month column missing!"
     assert 'subscription_status' in tenant_columns, "subscription_status column missing!"
+
+    # Check ai_features table
+    assert 'ai_features' in tables, "ai_features table missing!"
+    ai_feature_columns = [col['name'] for col in inspector.get_columns('ai_features')]
+    print(f"📋 ai_features table: {len(ai_feature_columns)} columns")
+    assert 'slug' in ai_feature_columns, "slug column missing!"
+    assert 'monthly_price' in ai_feature_columns, "monthly_price column missing!"
+
+    # Check tenant_ai_features table
+    assert 'tenant_ai_features' in tables, "tenant_ai_features table missing!"
+    tenant_ai_columns = [col['name'] for col in inspector.get_columns('tenant_ai_features')]
+    print(f"📋 tenant_ai_features table: {len(tenant_ai_columns)} columns")
+    assert 'tenant_id' in tenant_ai_columns, "tenant_id column missing!"
+    assert 'ai_feature_id' in tenant_ai_columns, "ai_feature_id column missing!"
 
     print("\n✅ Schema verification passed!\n")
 

@@ -14,8 +14,15 @@ export default function TenantDetail() {
   const [formData, setFormData] = useState({});
   const [saving, setSaving] = useState(false);
 
+  // AI Features state
+  const [features, setFeatures] = useState([]);
+  const [featuresLoading, setFeaturesLoading] = useState(false);
+  const [featuresSaving, setFeaturesSaving] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState({});
+
   useEffect(() => {
     fetchTenant();
+    fetchFeatures();
   }, [tenantId]);
 
   const fetchTenant = async () => {
@@ -49,6 +56,86 @@ export default function TenantDetail() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchFeatures = async () => {
+    setFeaturesLoading(true);
+    try {
+      const token = localStorage.getItem('superadmin_token');
+      const response = await axios.get(`${API_URL}/superadmin/tenants/${tenantId}/features`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setFeatures(response.data.features || []);
+
+      // Auto-expand categories that have enabled features
+      const expanded = {};
+      response.data.features?.forEach(f => {
+        if (f.is_enabled) {
+          expanded[f.category] = true;
+        }
+      });
+      setExpandedCategories(expanded);
+    } catch (err) {
+      console.error('Error fetching features:', err);
+    } finally {
+      setFeaturesLoading(false);
+    }
+  };
+
+  const toggleFeature = (featureId) => {
+    setFeatures(features.map(f =>
+      f.feature_id === featureId
+        ? { ...f, is_enabled: !f.is_enabled }
+        : f
+    ));
+  };
+
+  const updateFeaturePrice = (featureId, field, value) => {
+    setFeatures(features.map(f =>
+      f.feature_id === featureId
+        ? { ...f, [field]: parseFloat(value) || 0 }
+        : f
+    ));
+  };
+
+  const saveFeatures = async () => {
+    setFeaturesSaving(true);
+    setError('');
+
+    try {
+      const token = localStorage.getItem('superadmin_token');
+
+      // Format features for API
+      const featureUpdates = features.map(f => ({
+        feature_id: f.feature_id,
+        enabled: f.is_enabled,
+        custom_monthly_price: f.monthly_price !== f.default_monthly_price ? f.monthly_price : null,
+        custom_setup_fee: f.setup_fee !== f.default_setup_fee ? f.setup_fee : null
+      }));
+
+      await axios.post(
+        `${API_URL}/superadmin/tenants/${tenantId}/features`,
+        { features: featureUpdates },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Refresh features
+      await fetchFeatures();
+      alert('Features updated successfully!');
+    } catch (err) {
+      console.error('Error saving features:', err);
+      setError(err.response?.data?.error || 'Failed to save features');
+    } finally {
+      setFeaturesSaving(false);
+    }
+  };
+
+  const toggleCategory = (category) => {
+    setExpandedCategories({
+      ...expandedCategories,
+      [category]: !expandedCategories[category]
+    });
   };
 
   const handleChange = (e) => {
@@ -378,7 +465,7 @@ export default function TenantDetail() {
         </div>
 
         {/* Users */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Users</h3>
           {tenant.users && tenant.users.length > 0 ? (
             <div className="overflow-x-auto">
@@ -421,6 +508,184 @@ export default function TenantDetail() {
             </div>
           ) : (
             <p className="text-gray-500 text-center py-8">No users yet</p>
+          )}
+        </div>
+
+        {/* AI Features Management */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">AI Features & Pricing</h3>
+              <p className="text-sm text-gray-600 mt-1">Configure which AI features are enabled for this tenant</p>
+            </div>
+            <button
+              onClick={saveFeatures}
+              disabled={featuresSaving}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {featuresSaving ? 'Saving...' : 'Save Feature Changes'}
+            </button>
+          </div>
+
+          {featuresLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-2 text-sm text-gray-600">Loading features...</p>
+            </div>
+          ) : (
+            <>
+              {/* Summary Card */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 mb-6 border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700">Total Monthly Cost</h4>
+                    <p className="text-3xl font-bold text-blue-600 mt-1">
+                      ${features.filter(f => f.is_enabled).reduce((sum, f) => sum + (f.monthly_price || 0), 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600">Enabled Features</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {features.filter(f => f.is_enabled).length} / {features.length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Features by Category */}
+              {['coaching', 'compliance', 'revenue', 'insights', 'customer_intelligence', 'real_time', 'analytics', 'multilingual', 'integration'].map(category => {
+                const categoryFeatures = features.filter(f => f.category === category);
+                if (categoryFeatures.length === 0) return null;
+
+                const categoryNames = {
+                  'coaching': 'Call Quality & Coaching',
+                  'compliance': 'Compliance & Risk Management',
+                  'revenue': 'Revenue Intelligence',
+                  'insights': 'Automated Insights',
+                  'customer_intelligence': 'Customer Intelligence',
+                  'real_time': 'Real-Time AI',
+                  'analytics': 'Advanced Analytics',
+                  'multilingual': 'Multilingual & Global',
+                  'integration': 'Integration Intelligence'
+                };
+
+                const isExpanded = expandedCategories[category];
+                const enabledCount = categoryFeatures.filter(f => f.is_enabled).length;
+
+                return (
+                  <div key={category} className="mb-4 border border-gray-200 rounded-lg overflow-hidden">
+                    {/* Category Header */}
+                    <div
+                      onClick={() => toggleCategory(category)}
+                      className="flex items-center justify-between p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center">
+                        <svg
+                          className={`w-5 h-5 mr-2 transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <h4 className="font-semibold text-gray-900">{categoryNames[category]}</h4>
+                        <span className="ml-3 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                          {enabledCount} enabled
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        ${categoryFeatures.filter(f => f.is_enabled).reduce((sum, f) => sum + (f.monthly_price || 0), 0).toFixed(2)}/mo
+                      </div>
+                    </div>
+
+                    {/* Category Features */}
+                    {isExpanded && (
+                      <div className="divide-y divide-gray-100">
+                        {categoryFeatures.map(feature => (
+                          <div key={feature.feature_id} className="p-4 hover:bg-gray-50">
+                            <div className="flex items-start">
+                              {/* Enable/Disable Toggle */}
+                              <div className="flex items-center h-6 mr-4">
+                                <input
+                                  type="checkbox"
+                                  checked={feature.is_enabled}
+                                  onChange={() => toggleFeature(feature.feature_id)}
+                                  className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                />
+                              </div>
+
+                              {/* Feature Info */}
+                              <div className="flex-1">
+                                <div className="flex items-center mb-1">
+                                  <h5 className="font-medium text-gray-900">{feature.name}</h5>
+                                  {feature.is_beta && (
+                                    <span className="ml-2 px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-medium">
+                                      BETA
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-600 mb-2">{feature.description}</p>
+
+                                {/* Pricing Inputs */}
+                                {feature.is_enabled && (
+                                  <div className="flex items-center space-x-4 mt-3">
+                                    <div className="flex items-center">
+                                      <label className="text-xs text-gray-600 mr-2">Monthly Price:</label>
+                                      <div className="relative">
+                                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={feature.monthly_price || 0}
+                                          onChange={(e) => updateFeaturePrice(feature.feature_id, 'monthly_price', e.target.value)}
+                                          className="pl-6 pr-3 py-1 w-28 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        />
+                                      </div>
+                                      {feature.monthly_price !== feature.default_monthly_price && (
+                                        <span className="ml-2 text-xs text-blue-600">
+                                          (default: ${feature.default_monthly_price})
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {feature.default_setup_fee > 0 && (
+                                      <div className="flex items-center">
+                                        <label className="text-xs text-gray-600 mr-2">Setup Fee:</label>
+                                        <div className="relative">
+                                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                                          <input
+                                            type="number"
+                                            step="0.01"
+                                            value={feature.setup_fee || 0}
+                                            onChange={(e) => updateFeaturePrice(feature.feature_id, 'setup_fee', e.target.value)}
+                                            className="pl-6 pr-3 py-1 w-28 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                          />
+                                        </div>
+                                        {feature.setup_fee !== feature.default_setup_fee && (
+                                          <span className="ml-2 text-xs text-blue-600">
+                                            (default: ${feature.default_setup_fee})
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {feature.usage_count > 0 && (
+                                      <div className="text-xs text-gray-500">
+                                        Used {feature.usage_count} times
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
       </main>
