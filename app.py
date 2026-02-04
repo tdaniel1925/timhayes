@@ -4919,47 +4919,6 @@ def get_my_tenant_features():
 
 
 # ============================================================================
-# FRONTEND SERVING
-# ============================================================================
-
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve_frontend(path):
-    """Serve React frontend - catch-all for non-API routes"""
-    # Skip API routes (they have their own handlers)
-    if path.startswith('api/'):
-        from flask import abort
-        abort(404)
-
-    try:
-        # Check if requesting a static file
-        if path and os.path.exists(os.path.join(app.static_folder, path)):
-            return send_from_directory(app.static_folder, path)
-
-        # For all other routes, serve index.html (React Router will handle client-side routing)
-        index_path = os.path.join(app.static_folder, 'index.html')
-        if os.path.exists(index_path):
-            return send_from_directory(app.static_folder, 'index.html')
-        else:
-            logger.error(f"index.html not found at {index_path}")
-            return jsonify({
-                'error': 'Frontend not built',
-                'message': 'Please build the frontend: cd frontend && npm run build',
-                'api_status': 'Backend API is running',
-                'static_folder': app.static_folder,
-                'index_exists': os.path.exists(index_path)
-            }), 503
-    except Exception as e:
-        logger.error(f"Frontend serving error for path '{path}': {e}", exc_info=True)
-        return jsonify({
-            'error': 'Error serving frontend',
-            'message': str(e),
-            'path': path,
-            'static_folder': app.static_folder
-        }), 500
-
-
-# ============================================================================
 # EXPORT AND REPORTING ENDPOINTS
 # ============================================================================
 
@@ -6820,6 +6779,47 @@ def initialize_database():
     if not hasattr(app, '_database_initialized'):
         init_db()
         app._database_initialized = True
+
+
+# ============================================================================
+# FRONTEND SERVING - MUST BE LAST ROUTE (CATCH-ALL)
+# ============================================================================
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    """Serve React frontend - catch-all for non-API routes"""
+    # Skip API routes (they have their own handlers)
+    if path.startswith('api/'):
+        from flask import abort
+        abort(404)
+
+    try:
+        # Check if requesting a static file
+        if path and os.path.exists(os.path.join(app.static_folder, path)):
+            return send_from_directory(app.static_folder, path)
+
+        # For all other routes, serve index.html (React Router will handle client-side routing)
+        index_path = os.path.join(app.static_folder, 'index.html')
+        if os.path.exists(index_path):
+            return send_from_directory(app.static_folder, 'index.html')
+        else:
+            logger.error(f"index.html not found at {index_path}")
+            return jsonify({
+                'error': 'Frontend not built',
+                'message': 'Please build the frontend: cd frontend && npm run build',
+                'api_status': 'Backend API is running',
+                'static_folder': app.static_folder,
+                'index_exists': os.path.exists(index_path)
+            }), 503
+    except Exception as e:
+        logger.error(f"Frontend serving error for path '{path}': {e}", exc_info=True)
+        return jsonify({
+            'error': 'Error serving frontend',
+            'message': str(e),
+            'path': path,
+            'static_folder': app.static_folder
+        }), 500
 
 
 if __name__ == '__main__':
