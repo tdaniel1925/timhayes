@@ -306,6 +306,13 @@ export default function Dashboard() {
                 >
                   Integrations
                 </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate('/team-performance')}
+                  className="text-sm font-semibold text-blue-600"
+                >
+                  📊 Team Performance
+                </Button>
               </>
             )}
             <Button

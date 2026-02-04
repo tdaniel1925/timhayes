@@ -28,6 +28,7 @@ import UserManagement from './pages/UserManagement';
 import IntegrationsPanel from './pages/IntegrationsPanel';
 import TenantsPage from './pages/TenantsPage';
 import CreateTenantPage from './pages/CreateTenantPage';
+import TeamPerformance from './pages/TeamPerformance';
 
 // Super Admin Pages
 import SuperAdminLogin from './pages/SuperAdminLogin';
@@ -182,6 +183,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <CreateTenantPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/team-performance"
+        element={
+          <ProtectedRoute>
+            <TeamPerformance />
           </ProtectedRoute>
         }
       />

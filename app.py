@@ -2727,6 +2727,93 @@ def get_sentiment_trends():
     } for s in sentiments]), 200
 
 
+@app.route('/api/analytics/team-performance', methods=['GET'])
+@jwt_required()
+def get_team_performance():
+    """Get team performance metrics and leaderboard"""
+    claims = get_jwt()
+    tenant_id = claims.get('tenant_id')
+    role = claims.get('role', 'user')
+
+    # Get all users for this tenant (or all tenants for superadmin)
+    if role == 'superadmin':
+        users = User.query.all()
+    else:
+        users = User.query.filter_by(tenant_id=tenant_id).all()
+
+    team_stats = []
+
+    for user in users:
+        # Count calls for this user (where they were the destination)
+        user_calls = CDRRecord.query.filter_by(tenant_id=user.tenant_id, dst=user.extension if hasattr(user, 'extension') else None).all()
+
+        # If no extension, try to match by user assignments (would need additional table)
+        if not user_calls:
+            # For now, include all calls for users without extension matching
+            # This should be enhanced with proper user-to-call assignment
+            continue
+
+        total_calls = len(user_calls)
+        if total_calls == 0:
+            continue
+
+        # Calculate average quality score
+        quality_scores = []
+        for call in user_calls:
+            quality = CallQualityScore.query.filter_by(cdr_id=call.id).first()
+            if quality and quality.overall_score:
+                quality_scores.append(quality.overall_score)
+
+        avg_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0
+
+        # Calculate average sentiment
+        sentiment_scores = {'Positive': 0, 'Neutral': 0, 'Negative': 0}
+        for call in user_calls:
+            trans = Transcription.query.filter_by(cdr_id=call.id).first()
+            if trans and trans.sentiment:
+                sentiment = trans.sentiment.sentiment
+                if sentiment in sentiment_scores:
+                    sentiment_scores[sentiment] += 1
+
+        total_sentiments = sum(sentiment_scores.values())
+        sentiment_percentages = {
+            k: (v / total_sentiments * 100) if total_sentiments > 0 else 0
+            for k, v in sentiment_scores.items()
+        }
+
+        # Calculate total talk time
+        total_duration = sum(call.duration or 0 for call in user_calls)
+
+        # Calculate answer rate
+        answered = len([c for c in user_calls if c.disposition == 'ANSWERED'])
+        answer_rate = (answered / total_calls * 100) if total_calls > 0 else 0
+
+        team_stats.append({
+            'user_id': user.id,
+            'user_name': user.full_name,
+            'user_email': user.email,
+            'total_calls': total_calls,
+            'answered_calls': answered,
+            'answer_rate': round(answer_rate, 1),
+            'avg_quality_score': round(avg_quality, 1),
+            'quality_score_count': len(quality_scores),
+            'sentiment_breakdown': sentiment_percentages,
+            'total_talk_time_minutes': round(total_duration / 60, 1),
+            'avg_call_duration_seconds': round(total_duration / total_calls, 1) if total_calls > 0 else 0
+        })
+
+    # Sort by quality score (highest first)
+    team_stats.sort(key=lambda x: x['avg_quality_score'], reverse=True)
+
+    return jsonify({
+        'team_members': team_stats,
+        'total_team_members': len(team_stats),
+        'team_avg_quality': round(sum(s['avg_quality_score'] for s in team_stats) / len(team_stats), 1) if team_stats else 0,
+        'team_total_calls': sum(s['total_calls'] for s in team_stats),
+        'team_avg_answer_rate': round(sum(s['answer_rate'] for s in team_stats) / len(team_stats), 1) if team_stats else 0
+    }), 200
+
+
 # ============================================================================
 # SUBSCRIPTION & BILLING MANAGEMENT
 # ============================================================================
