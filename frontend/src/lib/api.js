@@ -2,6 +2,13 @@
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
+// Export the base URL for use in other components
+export const getWebhookBaseUrl = () => {
+  const apiUrl = import.meta.env.VITE_API_URL || window.location.origin + '/api';
+  // Remove /api from the end if present
+  return apiUrl.replace(/\/api$/, '');
+};
+
 async function fetchWithAuth(url, options = {}) {
   const token = localStorage.getItem('access_token');
 

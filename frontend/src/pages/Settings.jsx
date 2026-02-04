@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { api } from '@/lib/api';
+import { api, getWebhookBaseUrl } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -262,7 +262,7 @@ export default function Settings() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                 <p className="text-sm font-medium text-blue-900 mb-2">Your Webhook URL:</p>
                 <code className="block bg-white px-3 py-2 rounded border text-sm">
-                  https://timhayes-production.up.railway.app/api/webhook/cdr/{settings.subdomain}
+                  {getWebhookBaseUrl()}/api/webhook/cdr/{settings.subdomain}
                 </code>
                 <p className="text-xs text-blue-700 mt-2">
                   Use this URL in your phone system CDR configuration
