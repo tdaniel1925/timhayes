@@ -71,7 +71,7 @@ database_url = os.getenv('DATABASE_URL')
 # TEMPORARY: Hardcode Railway database URL until we fix environment variables
 if not database_url:
     database_url = 'postgresql://postgres:jbleFfJMAiljcizINgmQtYOSaUTuuKSK@postgres.railway.internal:5432/railway'
-    logger.warning("Using hardcoded DATABASE_URL - environment variable not set")
+    print("⚠️  Using hardcoded DATABASE_URL - environment variable not set")
 
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
