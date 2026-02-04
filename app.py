@@ -5669,6 +5669,129 @@ def health_check():
     return jsonify(health_status), status_code
 
 
+@app.route('/api/debug/database', methods=['GET'])
+def debug_database():
+    """Debug endpoint to check database configuration and AI features"""
+    try:
+        debug_info = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'database': {},
+            'ai_features': {},
+            'tables': {}
+        }
+
+        # Database URL info (masked for security)
+        db_url = app.config['SQLALCHEMY_DATABASE_URI']
+        if 'postgresql' in db_url:
+            debug_info['database']['type'] = 'PostgreSQL'
+            # Mask password
+            if '@' in db_url:
+                parts = db_url.split('@')
+                user_part = parts[0].split('://')[1].split(':')[0]
+                host_part = '@'.join(parts[1:])
+                debug_info['database']['url_masked'] = f"postgresql://{user_part}:****@{host_part}"
+            else:
+                debug_info['database']['url_masked'] = 'postgresql://****'
+        elif 'sqlite' in db_url:
+            debug_info['database']['type'] = 'SQLite'
+            debug_info['database']['url_masked'] = db_url
+        else:
+            debug_info['database']['type'] = 'Unknown'
+            debug_info['database']['url_masked'] = 'Unknown'
+
+        # Check if ai_features table exists
+        try:
+            result = db.session.execute(text("""
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                AND table_name IN ('ai_features', 'managers', 'tenants', 'cdr_records')
+            """))
+            tables = [row[0] for row in result]
+            debug_info['tables']['existing'] = tables
+        except Exception as e:
+            # Try SQLite syntax
+            try:
+                result = db.session.execute(text("""
+                    SELECT name FROM sqlite_master
+                    WHERE type='table'
+                    AND name IN ('ai_features', 'managers', 'tenants', 'cdr_records')
+                """))
+                tables = [row[0] for row in result]
+                debug_info['tables']['existing'] = tables
+            except Exception as e2:
+                debug_info['tables']['error'] = str(e2)
+
+        # Check AI Features count
+        try:
+            result = db.session.execute(text("SELECT COUNT(*) FROM ai_features"))
+            count = result.fetchone()[0]
+            debug_info['ai_features']['total_count'] = count
+
+            # Get sample features
+            result = db.session.execute(text("SELECT id, name, slug, category FROM ai_features LIMIT 5"))
+            samples = []
+            for row in result:
+                samples.append({
+                    'id': row[0],
+                    'name': row[1],
+                    'slug': row[2],
+                    'category': row[3]
+                })
+            debug_info['ai_features']['samples'] = samples
+
+            # Count by category
+            result = db.session.execute(text("""
+                SELECT category, COUNT(*) as count
+                FROM ai_features
+                GROUP BY category
+                ORDER BY category
+            """))
+            by_category = {}
+            for row in result:
+                by_category[row[0]] = row[1]
+            debug_info['ai_features']['by_category'] = by_category
+
+        except Exception as e:
+            debug_info['ai_features']['error'] = str(e)
+
+        # Check managers table
+        try:
+            result = db.session.execute(text("SELECT COUNT(*) FROM managers"))
+            count = result.fetchone()[0]
+            debug_info['managers'] = {
+                'count': count
+            }
+
+            # Check for super admin
+            result = db.session.execute(text("SELECT email FROM managers WHERE is_super_admin = TRUE LIMIT 1"))
+            row = result.fetchone()
+            if row:
+                debug_info['managers']['super_admin_exists'] = True
+                debug_info['managers']['super_admin_email'] = row[0]
+            else:
+                debug_info['managers']['super_admin_exists'] = False
+
+        except Exception as e:
+            debug_info['managers'] = {'error': str(e)}
+
+        # Environment check
+        debug_info['environment'] = {
+            'DATABASE_URL_set': bool(os.getenv('DATABASE_URL')),
+            'OPENAI_API_KEY_set': bool(os.getenv('OPENAI_API_KEY')),
+            'JWT_SECRET_KEY_set': bool(os.getenv('JWT_SECRET_KEY')),
+            'ENCRYPTION_KEY_set': bool(os.getenv('ENCRYPTION_KEY'))
+        }
+
+        return jsonify(debug_info), 200
+
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'type': type(e).__name__
+        }), 500
+
+
 # ============================================================================
 # DATABASE INITIALIZATION & MIGRATION
 # ============================================================================
