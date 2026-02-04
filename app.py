@@ -10,6 +10,7 @@ import logging
 import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
+from functools import wraps
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
@@ -668,6 +669,95 @@ def increment_usage(tenant_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to increment usage for tenant {tenant_id}: {e}", exc_info=True)
+
+
+# ============================================================================
+# ROLES AND PERMISSIONS SYSTEM
+# ============================================================================
+
+# Define role hierarchy and permissions
+ROLE_PERMISSIONS = {
+    'admin': {
+        'description': 'Full access to all tenant features',
+        'permissions': [
+            'view_all_calls',
+            'view_recordings',
+            'view_transcriptions',
+            'manage_users',
+            'manage_settings',
+            'manage_integrations',
+            'manage_billing',
+            'view_analytics',
+            'manage_notifications',
+            'export_data'
+        ]
+    },
+    'manager': {
+        'description': 'View all calls and manage team members',
+        'permissions': [
+            'view_all_calls',
+            'view_recordings',
+            'view_transcriptions',
+            'view_analytics',
+            'export_data'
+        ]
+    },
+    'user': {
+        'description': 'View own calls only',
+        'permissions': [
+            'view_own_calls',
+            'view_recordings',
+            'view_transcriptions'
+        ]
+    }
+}
+
+def get_user_permissions(role):
+    """Get list of permissions for a given role"""
+    return ROLE_PERMISSIONS.get(role, {}).get('permissions', [])
+
+def has_permission(role, permission):
+    """Check if a role has a specific permission"""
+    permissions = get_user_permissions(role)
+    return permission in permissions
+
+def require_permission(permission):
+    """Decorator to require a specific permission"""
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            claims = get_jwt()
+            role = claims.get('role', 'user')
+
+            if not has_permission(role, permission):
+                return jsonify({
+                    'error': 'Permission denied',
+                    'message': f'Your role ({role}) does not have permission to: {permission}',
+                    'required_permission': permission
+                }), 403
+
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
+def require_role(allowed_roles):
+    """Decorator to require one of the specified roles"""
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            claims = get_jwt()
+            role = claims.get('role', 'user')
+
+            if role not in allowed_roles:
+                return jsonify({
+                    'error': 'Access denied',
+                    'message': f'Your role ({role}) does not have access to this resource',
+                    'required_roles': allowed_roles
+                }), 403
+
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # ============================================================================
@@ -1832,6 +1922,7 @@ def get_settings():
 
 @app.route('/api/settings', methods=['PUT'])
 @jwt_required()
+@require_permission('manage_settings')
 def update_settings():
     """Update tenant settings"""
     claims = get_jwt()
@@ -2685,16 +2776,41 @@ def get_users():
     }), 200
 
 
+@app.route('/api/roles', methods=['GET'])
+@jwt_required()
+def get_roles():
+    """Get available roles and their permissions"""
+    claims = get_jwt()
+    user_role = claims.get('role', 'user')
+
+    # Return all roles with their details
+    roles_info = []
+    for role_name, role_data in ROLE_PERMISSIONS.items():
+        roles_info.append({
+            'name': role_name,
+            'description': role_data.get('description', ''),
+            'permissions': role_data.get('permissions', []),
+            'can_assign': user_role == 'admin'  # Only admins can assign roles
+        })
+
+    # Get current user's permissions
+    current_permissions = get_user_permissions(user_role)
+
+    return jsonify({
+        'available_roles': roles_info,
+        'current_role': user_role,
+        'current_permissions': current_permissions
+    }), 200
+
+
 @app.route('/api/users', methods=['POST'])
 @jwt_required()
+@require_permission('manage_users')
 def create_user():
     """Create new user (admin only)"""
     claims = get_jwt()
     tenant_id = claims.get('tenant_id')
     role = claims.get('role')
-
-    if role != 'admin':
-        return jsonify({'error': 'Admin access required'}), 403
 
     data = request.get_json()
 
@@ -2760,14 +2876,12 @@ def create_user():
 
 @app.route('/api/users/<int:user_id>', methods=['PUT'])
 @jwt_required()
+@require_permission('manage_users')
 def update_user(user_id):
     """Update user (admin only)"""
     claims = get_jwt()
     tenant_id = claims.get('tenant_id')
     role = claims.get('role')
-
-    if role != 'admin':
-        return jsonify({'error': 'Admin access required'}), 403
 
     user_to_update = User.query.filter_by(id=user_id, tenant_id=tenant_id).first()
     if not user_to_update:
@@ -2789,15 +2903,13 @@ def update_user(user_id):
 
 @app.route('/api/users/<int:user_id>', methods=['DELETE'])
 @jwt_required()
+@require_permission('manage_users')
 def delete_user(user_id):
     """Delete user (admin only)"""
     claims = get_jwt()
     tenant_id = claims.get('tenant_id')
     role = claims.get('role')
     current_user_id = get_jwt_identity()
-
-    if role != 'admin':
-        return jsonify({'error': 'Admin access required'}), 403
 
     if user_id == current_user_id:
         return jsonify({'error': 'Cannot delete your own account'}), 400
