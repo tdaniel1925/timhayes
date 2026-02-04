@@ -15,7 +15,7 @@ from datetime import datetime
 # Get database URL from environment or use PostgreSQL
 DATABASE_URL = "postgresql://postgres:jbleFfJMAiljcizINgmQtYOSaUTuuKSK@yamabiko.proxy.rlwy.net:26726/railway"
 
-print(f"🔗 Connecting to database...")
+print(f" Connecting to database...")
 engine = create_engine(DATABASE_URL)
 
 def column_exists(table_name, column_name):
@@ -26,14 +26,14 @@ def column_exists(table_name, column_name):
 
 def run_migration():
     """Run all database migrations"""
-    print("\n📦 Starting database migration...\n")
+    print("\n Starting database migration...\n")
 
     migrations = []
 
     with engine.connect() as conn:
         # Migration 1: Add call_date to cdr_records
         if not column_exists('cdr_records', 'call_date'):
-            print("  ➕ Adding call_date column to cdr_records...")
+            print("   Adding call_date column to cdr_records...")
             conn.execute(text("""
                 ALTER TABLE cdr_records
                 ADD COLUMN call_date TIMESTAMP DEFAULT NOW()
@@ -42,52 +42,52 @@ def run_migration():
                 CREATE INDEX idx_cdr_call_date ON cdr_records(call_date)
             """))
             migrations.append("Added call_date to cdr_records")
-            print("     ✅ call_date column added with index")
+            print("      call_date column added with index")
         else:
-            print("  ⏭️  call_date already exists in cdr_records")
+            print("    call_date already exists in cdr_records")
 
         # Migration 2: Add max_users to tenants
         if not column_exists('tenants', 'max_users'):
-            print("  ➕ Adding max_users column to tenants...")
+            print("   Adding max_users column to tenants...")
             conn.execute(text("""
                 ALTER TABLE tenants
                 ADD COLUMN max_users INTEGER DEFAULT 5
             """))
             migrations.append("Added max_users to tenants")
-            print("     ✅ max_users column added")
+            print("      max_users column added")
         else:
-            print("  ⏭️  max_users already exists in tenants")
+            print("    max_users already exists in tenants")
 
         # Migration 3: Add max_calls_per_month to tenants
         if not column_exists('tenants', 'max_calls_per_month'):
-            print("  ➕ Adding max_calls_per_month column to tenants...")
+            print("   Adding max_calls_per_month column to tenants...")
             conn.execute(text("""
                 ALTER TABLE tenants
                 ADD COLUMN max_calls_per_month INTEGER DEFAULT 1000
             """))
             migrations.append("Added max_calls_per_month to tenants")
-            print("     ✅ max_calls_per_month column added")
+            print("      max_calls_per_month column added")
         else:
-            print("  ⏭️  max_calls_per_month already exists in tenants")
+            print("    max_calls_per_month already exists in tenants")
 
         # Migration 4: Add subscription_status to tenants
         if not column_exists('tenants', 'subscription_status'):
-            print("  ➕ Adding subscription_status column to tenants...")
+            print("   Adding subscription_status column to tenants...")
             conn.execute(text("""
                 ALTER TABLE tenants
                 ADD COLUMN subscription_status VARCHAR(50) DEFAULT 'active'
             """))
             migrations.append("Added subscription_status to tenants")
-            print("     ✅ subscription_status column added")
+            print("      subscription_status column added")
         else:
-            print("  ⏭️  subscription_status already exists in tenants")
+            print("    subscription_status already exists in tenants")
 
         # Migration 5: Create ai_features table
         inspector = inspect(engine)
         tables = inspector.get_table_names()
 
         if 'ai_features' not in tables:
-            print("  ➕ Creating ai_features table...")
+            print("   Creating ai_features table...")
             conn.execute(text("""
                 CREATE TABLE ai_features (
                     id SERIAL PRIMARY KEY,
@@ -115,13 +115,13 @@ def run_migration():
                 )
             """))
             migrations.append("Created ai_features table")
-            print("     ✅ ai_features table created")
+            print("      ai_features table created")
         else:
-            print("  ⏭️  ai_features table already exists")
+            print("    ai_features table already exists")
 
         # Migration 6: Create tenant_ai_features junction table
         if 'tenant_ai_features' not in tables:
-            print("  ➕ Creating tenant_ai_features table...")
+            print("   Creating tenant_ai_features table...")
             conn.execute(text("""
                 CREATE TABLE tenant_ai_features (
                     id SERIAL PRIMARY KEY,
@@ -146,9 +146,9 @@ def run_migration():
                 CREATE INDEX idx_tenant_ai_features_feature ON tenant_ai_features(ai_feature_id)
             """))
             migrations.append("Created tenant_ai_features table")
-            print("     ✅ tenant_ai_features table created with indexes")
+            print("      tenant_ai_features table created with indexes")
         else:
-            print("  ⏭️  tenant_ai_features table already exists")
+            print("    tenant_ai_features table already exists")
 
         # Migration 7: Create AI result tables
         ai_result_tables = {
@@ -255,40 +255,40 @@ def run_migration():
 
         for table_name, create_sql in ai_result_tables.items():
             if table_name not in tables:
-                print(f"  ➕ Creating {table_name} table...")
+                print(f"   Creating {table_name} table...")
                 conn.execute(text(create_sql))
                 migrations.append(f"Created {table_name} table")
-                print(f"     ✅ {table_name} table created")
+                print(f"      {table_name} table created")
             else:
-                print(f"  ⏭️  {table_name} table already exists")
+                print(f"    {table_name} table already exists")
 
         # Commit all changes
         conn.commit()
 
-    print(f"\n✅ Migration complete! {len(migrations)} changes applied:")
+    print(f"\n Migration complete! {len(migrations)} changes applied:")
     for i, migration in enumerate(migrations, 1):
         print(f"   {i}. {migration}")
 
     if not migrations:
-        print("   ℹ️  No migrations needed - database is up to date")
+        print("     No migrations needed - database is up to date")
 
-    print("\n🎉 Database migration successful!\n")
+    print("\n Database migration successful!\n")
 
 def verify_schema():
     """Verify the schema after migration"""
-    print("🔍 Verifying schema...\n")
+    print(" Verifying schema...\n")
 
     inspector = inspect(engine)
     tables = inspector.get_table_names()
 
     # Check cdr_records table
     cdr_columns = [col['name'] for col in inspector.get_columns('cdr_records')]
-    print(f"📋 cdr_records columns: {', '.join(cdr_columns)}")
+    print(f" cdr_records columns: {', '.join(cdr_columns)}")
     assert 'call_date' in cdr_columns, "call_date column missing!"
 
     # Check tenants table
     tenant_columns = [col['name'] for col in inspector.get_columns('tenants')]
-    print(f"📋 tenants columns: {', '.join(tenant_columns)}")
+    print(f" tenants columns: {', '.join(tenant_columns)}")
     assert 'max_users' in tenant_columns, "max_users column missing!"
     assert 'max_calls_per_month' in tenant_columns, "max_calls_per_month column missing!"
     assert 'subscription_status' in tenant_columns, "subscription_status column missing!"
@@ -296,26 +296,26 @@ def verify_schema():
     # Check ai_features table
     assert 'ai_features' in tables, "ai_features table missing!"
     ai_feature_columns = [col['name'] for col in inspector.get_columns('ai_features')]
-    print(f"📋 ai_features table: {len(ai_feature_columns)} columns")
+    print(f" ai_features table: {len(ai_feature_columns)} columns")
     assert 'slug' in ai_feature_columns, "slug column missing!"
     assert 'monthly_price' in ai_feature_columns, "monthly_price column missing!"
 
     # Check tenant_ai_features table
     assert 'tenant_ai_features' in tables, "tenant_ai_features table missing!"
     tenant_ai_columns = [col['name'] for col in inspector.get_columns('tenant_ai_features')]
-    print(f"📋 tenant_ai_features table: {len(tenant_ai_columns)} columns")
+    print(f" tenant_ai_features table: {len(tenant_ai_columns)} columns")
     assert 'tenant_id' in tenant_ai_columns, "tenant_id column missing!"
     assert 'ai_feature_id' in tenant_ai_columns, "ai_feature_id column missing!"
 
-    print("\n✅ Schema verification passed!\n")
+    print("\n Schema verification passed!\n")
 
 if __name__ == '__main__':
     try:
         run_migration()
         verify_schema()
-        print("🚀 Ready for production!\n")
+        print(" Ready for production!\n")
     except Exception as e:
-        print(f"\n❌ Migration failed: {e}\n")
+        print(f"\n Migration failed: {e}\n")
         import traceback
         traceback.print_exc()
         sys.exit(1)
