@@ -5790,13 +5790,23 @@ def debug_database():
         else:
             masked_raw = raw_db_url
 
+        # List ALL database-related environment variables
+        all_env_vars = {}
+        for key in os.environ:
+            if key in ['DATABASE_URL', 'DATABASE_PRIVATE_URL', 'DATABASE_PUBLIC_URL', 'PGDATABASE', 'PGHOST', 'PGPASSWORD', 'PGPORT', 'PGUSER']:
+                all_env_vars[key] = 'EXISTS (masked)'
+            elif 'DATABASE' in key or 'POSTGRES' in key or 'PG' in key:
+                all_env_vars[key] = 'EXISTS'
+
         debug_info['environment'] = {
             'DATABASE_URL_set': bool(os.getenv('DATABASE_URL')),
             'DATABASE_URL_raw': masked_raw,
             'DATABASE_URL_starts_with_postgres': raw_db_url.startswith('postgres://') if raw_db_url != 'NOT SET' else False,
             'OPENAI_API_KEY_set': bool(os.getenv('OPENAI_API_KEY')),
             'JWT_SECRET_KEY_set': bool(os.getenv('JWT_SECRET_KEY')),
-            'ENCRYPTION_KEY_set': bool(os.getenv('ENCRYPTION_KEY'))
+            'ENCRYPTION_KEY_set': bool(os.getenv('ENCRYPTION_KEY')),
+            'all_database_env_vars': all_env_vars,
+            'total_env_vars_count': len(os.environ)
         }
 
         return jsonify(debug_info), 200
