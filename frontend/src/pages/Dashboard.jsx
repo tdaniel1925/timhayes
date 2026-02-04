@@ -274,6 +274,15 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground">{user?.tenant?.company_name}</p>
           </div>
           <div className="flex items-center gap-4">
+            {user?.role === 'superadmin' && (
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/tenants')}
+                className="text-sm font-semibold"
+              >
+                🏢 All Tenants
+              </Button>
+            )}
             {user?.role === 'admin' && (
               <>
                 <Button
