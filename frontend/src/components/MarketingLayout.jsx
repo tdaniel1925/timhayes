@@ -9,7 +9,7 @@ export default function MarketingLayout({ children }) {
     { name: 'Features', href: '/features' },
     { name: 'Pricing', href: '/pricing' },
     { name: 'How It Works', href: '/how-it-works' },
-    { name: 'Integrations', href: '/integrations' },
+    { name: 'Integrations', href: '/platform-integrations' },
     { name: 'Contact', href: '/contact' },
   ];
 

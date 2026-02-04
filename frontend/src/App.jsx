@@ -79,7 +79,7 @@ function AppRoutes() {
       <Route path="/features" element={<Features />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/how-it-works" element={<HowItWorks />} />
-      <Route path="/integrations" element={<Integrations />} />
+      <Route path="/platform-integrations" element={<Integrations />} />
       <Route path="/contact" element={<Contact />} />
 
       {/* Auth Routes (Public - Redirect if Logged In) */}

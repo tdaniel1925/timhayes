@@ -251,7 +251,7 @@ export default function Home() {
 
           <div className="mt-12 text-center">
             <Link
-              to="/integrations"
+              to="/platform-integrations"
               className="inline-flex items-center px-6 py-3 text-base font-medium text-blue-600 hover:text-blue-700"
             >
               View all integrations

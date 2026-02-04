@@ -157,7 +157,7 @@ export default function Contact() {
                   <Link to="/pricing" className="block text-blue-600 hover:text-blue-700 font-medium">
                     → View pricing plans
                   </Link>
-                  <Link to="/integrations" className="block text-blue-600 hover:text-blue-700 font-medium">
+                  <Link to="/platform-integrations" className="block text-blue-600 hover:text-blue-700 font-medium">
                     → Check PBX compatibility
                   </Link>
                   <Link to="/features" className="block text-blue-600 hover:text-blue-700 font-medium">
