@@ -6813,6 +6813,33 @@ def initialize_database():
 # FRONTEND SERVING - MUST BE LAST ROUTE (CATCH-ALL)
 # ============================================================================
 
+# 404 error handler for SPA routing
+@app.errorhandler(404)
+def not_found(e):
+    """Handle 404 errors - serve index.html for non-API routes to support SPA routing"""
+    path = request.path
+
+    # API routes should return JSON 404
+    if path.startswith('/api/'):
+        return jsonify({
+            'code': 'not_found',
+            'error': 'The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.'
+        }), 404
+
+    # For all other routes, serve index.html (React Router handles client-side routing)
+    try:
+        index_path = os.path.join(app.static_folder, 'index.html')
+        if os.path.exists(index_path):
+            return send_from_directory(app.static_folder, 'index.html')
+        else:
+            return jsonify({
+                'error': 'Frontend not built',
+                'message': 'Frontend build files not found'
+            }), 503
+    except Exception as ex:
+        logger.error(f"Error serving index.html: {ex}")
+        return jsonify({'error': 'Server error'}), 500
+
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_frontend(path):
@@ -6823,7 +6850,7 @@ def serve_frontend(path):
         abort(404)
 
     try:
-        # Check if requesting a static file
+        # Check if requesting a static file (CSS, JS, images, etc.)
         if path and os.path.exists(os.path.join(app.static_folder, path)):
             return send_from_directory(app.static_folder, path)
 
