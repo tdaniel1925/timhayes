@@ -172,6 +172,12 @@ export default function TenantDetail() {
             >
               Tenants
             </Link>
+            <Link
+              to="/superadmin/revenue"
+              className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300"
+            >
+              Revenue
+            </Link>
           </div>
         </div>
       </nav>

@@ -3348,6 +3348,139 @@ def superadmin_platform_stats():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/superadmin/revenue', methods=['GET'])
+@jwt_required()
+def superadmin_revenue_dashboard():
+    """Get comprehensive revenue and billing analytics (super admin only)"""
+    try:
+        require_super_admin()
+
+        # Define plan pricing (in dollars per month)
+        PLAN_PRICING = {
+            'free': 0,
+            'starter': 29,
+            'professional': 99,
+            'enterprise': 299
+        }
+
+        # Get all active tenants grouped by plan
+        tenants_by_plan = db.session.query(
+            Tenant.plan,
+            db.func.count(Tenant.id).label('count')
+        ).filter(Tenant.status == 'active').group_by(Tenant.plan).all()
+
+        plan_breakdown = []
+        mrr = 0  # Monthly Recurring Revenue
+
+        for plan, count in tenants_by_plan:
+            price = PLAN_PRICING.get(plan, 0)
+            revenue = price * count
+            mrr += revenue
+
+            plan_breakdown.append({
+                'plan': plan,
+                'customers': count,
+                'price_per_customer': price,
+                'monthly_revenue': revenue,
+                'percentage': 0  # Will calculate after
+            })
+
+        # Calculate percentages
+        for item in plan_breakdown:
+            item['percentage'] = round((item['monthly_revenue'] / mrr * 100), 1) if mrr > 0 else 0
+
+        # Calculate ARR (Annual Recurring Revenue)
+        arr = mrr * 12
+
+        # Get growth metrics (compare to last month)
+        last_month = datetime.utcnow().replace(day=1) - timedelta(days=1)
+        last_month_start = last_month.replace(day=1)
+
+        new_tenants_this_month = Tenant.query.filter(
+            Tenant.created_at >= datetime.utcnow().replace(day=1)
+        ).count()
+
+        new_tenants_last_month = Tenant.query.filter(
+            Tenant.created_at >= last_month_start,
+            Tenant.created_at < datetime.utcnow().replace(day=1)
+        ).count()
+
+        # Calculate churn (tenants that became inactive this month)
+        churned_this_month = Tenant.query.filter(
+            Tenant.status != 'active',
+            Tenant.subscription_ends_at >= datetime.utcnow().replace(day=1)
+        ).count()
+
+        # Calculate growth rate
+        total_active = Tenant.query.filter_by(status='active').count()
+        growth_rate = ((new_tenants_this_month - churned_this_month) / total_active * 100) if total_active > 0 else 0
+
+        # Calculate average revenue per customer (ARPU)
+        arpu = mrr / total_active if total_active > 0 else 0
+
+        # Get recent billing transactions
+        recent_transactions = BillingHistory.query.order_by(
+            BillingHistory.created_at.desc()
+        ).limit(10).all()
+
+        transactions_data = [{
+            'id': t.id,
+            'tenant_id': t.tenant_id,
+            'tenant_name': Tenant.query.get(t.tenant_id).company_name if Tenant.query.get(t.tenant_id) else 'Unknown',
+            'amount': float(t.amount),
+            'status': t.payment_status,
+            'invoice_number': t.invoice_number,
+            'created_at': t.created_at.isoformat()
+        } for t in recent_transactions]
+
+        # Calculate lifetime value estimates (simplified: ARPU * 12 months)
+        ltv = arpu * 12
+
+        # Revenue trend (last 6 months) - simplified
+        revenue_trend = []
+        for i in range(6):
+            month_date = datetime.utcnow().replace(day=1) - timedelta(days=30 * i)
+            month_name = month_date.strftime('%b %Y')
+
+            # Count active tenants in that month
+            tenants_that_month = Tenant.query.filter(
+                Tenant.created_at <= month_date,
+                db.or_(
+                    Tenant.status == 'active',
+                    Tenant.subscription_ends_at >= month_date
+                )
+            ).count()
+
+            # Estimate revenue (simplified - assumes current plan distribution)
+            estimated_revenue = tenants_that_month * arpu
+
+            revenue_trend.insert(0, {
+                'month': month_name,
+                'revenue': round(estimated_revenue, 2),
+                'customers': tenants_that_month
+            })
+
+        return jsonify({
+            'mrr': round(mrr, 2),
+            'arr': round(arr, 2),
+            'arpu': round(arpu, 2),
+            'ltv': round(ltv, 2),
+            'growth_rate': round(growth_rate, 1),
+            'churn_rate': round((churned_this_month / total_active * 100), 1) if total_active > 0 else 0,
+            'total_active_customers': total_active,
+            'new_customers_this_month': new_tenants_this_month,
+            'new_customers_last_month': new_tenants_last_month,
+            'churned_this_month': churned_this_month,
+            'plan_breakdown': plan_breakdown,
+            'revenue_trend': revenue_trend,
+            'recent_transactions': transactions_data
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Revenue dashboard error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 # ============================================================================
 # FRONTEND SERVING
 # ============================================================================

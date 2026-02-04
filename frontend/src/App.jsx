@@ -34,6 +34,7 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import TenantList from './pages/TenantList';
 import TenantCreate from './pages/TenantCreate';
 import TenantDetail from './pages/TenantDetail';
+import RevenueDashboard from './pages/RevenueDashboard';
 
 // Protected Route component
 function ProtectedRoute({ children }) {
@@ -182,6 +183,7 @@ function AppRoutes() {
       <Route path="/superadmin/tenants" element={<TenantList />} />
       <Route path="/superadmin/tenants/create" element={<TenantCreate />} />
       <Route path="/superadmin/tenants/:tenantId" element={<TenantDetail />} />
+      <Route path="/superadmin/revenue" element={<RevenueDashboard />} />
 
       {/* 404 - Redirect to home */}
       <Route path="*" element={<Navigate to="/" replace />} />
