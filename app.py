@@ -620,6 +620,143 @@ class SuperAdmin(db.Model):
         return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
 
 
+class CallQualityScore(db.Model):
+    """Call quality scoring results"""
+    __tablename__ = 'call_quality_scores'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cdr_id = db.Column(db.Integer, db.ForeignKey('cdr_records.id'), nullable=False, unique=True)
+
+    overall_score = db.Column(db.Integer)  # 1-100
+    greeting_score = db.Column(db.Integer)
+    professionalism_score = db.Column(db.Integer)
+    closing_score = db.Column(db.Integer)
+    objection_handling_score = db.Column(db.Integer)
+    empathy_score = db.Column(db.Integer)
+
+    strengths = db.Column(db.Text)  # JSON array
+    weaknesses = db.Column(db.Text)  # JSON array
+    recommendations = db.Column(db.Text)  # JSON array
+
+    scored_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class EmotionDetection(db.Model):
+    """Emotion detection results"""
+    __tablename__ = 'emotion_detections'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cdr_id = db.Column(db.Integer, db.ForeignKey('cdr_records.id'), nullable=False, unique=True)
+
+    primary_emotion = db.Column(db.String(50))  # anger, frustration, excitement, confusion, etc.
+    emotion_confidence = db.Column(db.Float)  # 0-1
+
+    emotions_detected = db.Column(db.Text)  # JSON object with all emotions and scores
+    emotional_journey = db.Column(db.Text)  # JSON array tracking emotion changes over time
+
+    detected_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ComplianceAlert(db.Model):
+    """Compliance and keyword monitoring alerts"""
+    __tablename__ = 'compliance_alerts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cdr_id = db.Column(db.Integer, db.ForeignKey('cdr_records.id'), nullable=False)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=False)
+
+    alert_type = db.Column(db.String(50))  # keyword_violation, script_missing, prohibited_language
+    severity = db.Column(db.String(20))  # low, medium, high, critical
+    keyword = db.Column(db.String(200))
+    context = db.Column(db.Text)  # Surrounding text where keyword was found
+    timestamp_in_call = db.Column(db.Integer)  # Seconds into the call
+
+    resolved = db.Column(db.Boolean, default=False)
+    resolved_at = db.Column(db.DateTime)
+    resolved_by = db.Column(db.String(200))
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class TalkTimeMetrics(db.Model):
+    """Talk time and conversation analysis"""
+    __tablename__ = 'talk_time_metrics'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cdr_id = db.Column(db.Integer, db.ForeignKey('cdr_records.id'), nullable=False, unique=True)
+
+    agent_talk_time = db.Column(db.Integer)  # Seconds
+    customer_talk_time = db.Column(db.Integer)  # Seconds
+    silence_time = db.Column(db.Integer)  # Seconds
+    overlap_time = db.Column(db.Integer)  # Seconds (both talking)
+
+    agent_talk_percentage = db.Column(db.Float)  # 0-100
+    customer_talk_percentage = db.Column(db.Float)  # 0-100
+
+    interruptions_by_agent = db.Column(db.Integer)
+    interruptions_by_customer = db.Column(db.Integer)
+
+    longest_silence = db.Column(db.Integer)  # Seconds
+    average_silence_length = db.Column(db.Float)  # Seconds
+
+    analyzed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class DealRiskScore(db.Model):
+    """Deal risk prediction scores"""
+    __tablename__ = 'deal_risk_scores'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cdr_id = db.Column(db.Integer, db.ForeignKey('cdr_records.id'), nullable=False, unique=True)
+
+    risk_score = db.Column(db.Float)  # 0-100 (higher = more risk)
+    risk_level = db.Column(db.String(20))  # low, medium, high
+    close_probability = db.Column(db.Float)  # 0-100
+
+    risk_factors = db.Column(db.Text)  # JSON array of risk indicators
+    positive_signals = db.Column(db.Text)  # JSON array of positive indicators
+    recommendations = db.Column(db.Text)  # JSON array of recommended actions
+
+    predicted_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ChurnPrediction(db.Model):
+    """Customer churn prediction"""
+    __tablename__ = 'churn_predictions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cdr_id = db.Column(db.Integer, db.ForeignKey('cdr_records.id'), nullable=False, unique=True)
+
+    churn_risk_score = db.Column(db.Float)  # 0-100
+    churn_risk_level = db.Column(db.String(20))  # low, medium, high
+    predicted_churn_date = db.Column(db.Date)
+
+    churn_indicators = db.Column(db.Text)  # JSON array
+    retention_recommendations = db.Column(db.Text)  # JSON array
+
+    predicted_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ObjectionAnalysis(db.Model):
+    """Sales objection detection and handling analysis"""
+    __tablename__ = 'objection_analyses'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cdr_id = db.Column(db.Integer, db.ForeignKey('cdr_records.id'), nullable=False, unique=True)
+
+    objections_detected = db.Column(db.Text)  # JSON array of objections
+    objection_types = db.Column(db.Text)  # JSON array (price, timing, competition, need)
+
+    objections_handled_well = db.Column(db.Integer)
+    objections_handled_poorly = db.Column(db.Integer)
+
+    handling_effectiveness_score = db.Column(db.Float)  # 0-100
+    successful_responses = db.Column(db.Text)  # JSON array of good responses
+    improvement_areas = db.Column(db.Text)  # JSON array
+
+    analyzed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class AIFeature(db.Model):
     """AI features that can be enabled per tenant"""
     __tablename__ = 'ai_features'
@@ -969,9 +1106,602 @@ def analyze_sentiment(transcription_text, call_id=None):
         return None
 
 
+# ============================================================================
+# AI FEATURE HELPER FUNCTIONS
+# ============================================================================
+
+def is_feature_enabled(tenant_id, feature_slug):
+    """Check if a specific AI feature is enabled for a tenant"""
+    try:
+        feature = AIFeature.query.filter_by(slug=feature_slug, is_active=True).first()
+        if not feature:
+            return False
+
+        tenant_feature = TenantAIFeature.query.filter_by(
+            tenant_id=tenant_id,
+            ai_feature_id=feature.id,
+            enabled=True
+        ).first()
+
+        return tenant_feature is not None
+    except Exception as e:
+        logger.error(f"Error checking feature {feature_slug} for tenant {tenant_id}: {e}")
+        return False
+
+
+def track_feature_usage(tenant_id, feature_slug):
+    """Increment usage counter for a feature"""
+    try:
+        feature = AIFeature.query.filter_by(slug=feature_slug).first()
+        if not feature:
+            return
+
+        tenant_feature = TenantAIFeature.query.filter_by(
+            tenant_id=tenant_id,
+            ai_feature_id=feature.id
+        ).first()
+
+        if tenant_feature:
+            tenant_feature.usage_count = (tenant_feature.usage_count or 0) + 1
+            tenant_feature.last_used_at = datetime.utcnow()
+            db.session.commit()
+    except Exception as e:
+        logger.error(f"Error tracking usage for {feature_slug}: {e}")
+        db.session.rollback()
+
+
+def get_enabled_features(tenant_id):
+    """Get list of enabled feature slugs for a tenant"""
+    try:
+        enabled_features = db.session.query(AIFeature.slug).join(
+            TenantAIFeature,
+            TenantAIFeature.ai_feature_id == AIFeature.id
+        ).filter(
+            TenantAIFeature.tenant_id == tenant_id,
+            TenantAIFeature.enabled == True,
+            AIFeature.is_active == True
+        ).all()
+
+        return [f[0] for f in enabled_features]
+    except Exception as e:
+        logger.error(f"Error getting enabled features for tenant {tenant_id}: {e}")
+        return []
+
+
+# ============================================================================
+# AI PROCESSING FUNCTIONS
+# ============================================================================
+
+def generate_call_summary(transcription_text, tenant_id, cdr_id):
+    """Generate AI call summary"""
+    if not is_feature_enabled(tenant_id, 'call-summaries'):
+        return None
+
+    if not openai_client or not transcription_text:
+        return None
+
+    try:
+        logger.info(f"Generating call summary for CDR {cdr_id}")
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an AI assistant that creates concise 2-3 sentence summaries of customer service calls. Include key points, outcome, and any important details. Respond in JSON format with: summary, outcome (resolved/escalated/callback/voicemail)."
+                },
+                {
+                    "role": "user",
+                    "content": f"Summarize this call:\n\n{transcription_text[:3000]}"
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.5
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        # Save to database
+        summary = AISummary.query.filter_by(cdr_id=cdr_id).first()
+        if not summary:
+            summary = AISummary(cdr_id=cdr_id)
+            db.session.add(summary)
+
+        summary.summary_text = result.get('summary', '')
+        summary.call_outcome = result.get('outcome', 'unknown')
+        db.session.commit()
+
+        track_feature_usage(tenant_id, 'call-summaries')
+        logger.info(f"✅ Call summary generated for CDR {cdr_id}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Call summary generation failed for CDR {cdr_id}: {e}")
+        db.session.rollback()
+        return None
+
+
+def extract_action_items(transcription_text, tenant_id, cdr_id):
+    """Extract action items from call"""
+    if not is_feature_enabled(tenant_id, 'action-items'):
+        return None
+
+    if not openai_client or not transcription_text:
+        return None
+
+    try:
+        logger.info(f"Extracting action items for CDR {cdr_id}")
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an AI assistant that extracts action items, commitments, and next steps from calls. Respond in JSON format with: action_items (array of strings), follow_up_required (boolean), follow_up_deadline (string or null)."
+                },
+                {
+                    "role": "user",
+                    "content": f"Extract action items from this call:\n\n{transcription_text[:3000]}"
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        # Save to database
+        summary = AISummary.query.filter_by(cdr_id=cdr_id).first()
+        if not summary:
+            summary = AISummary(cdr_id=cdr_id)
+            db.session.add(summary)
+
+        summary.action_items = json.dumps(result.get('action_items', []))
+        db.session.commit()
+
+        track_feature_usage(tenant_id, 'action-items')
+        logger.info(f"✅ Action items extracted for CDR {cdr_id}: {len(result.get('action_items', []))} items")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Action item extraction failed for CDR {cdr_id}: {e}")
+        db.session.rollback()
+        return None
+
+
+def extract_topics(transcription_text, tenant_id, cdr_id):
+    """Extract topics and themes from call"""
+    if not is_feature_enabled(tenant_id, 'topic-extraction'):
+        return None
+
+    if not openai_client or not transcription_text:
+        return None
+
+    try:
+        logger.info(f"Extracting topics for CDR {cdr_id}")
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an AI that identifies main topics discussed in calls. Respond in JSON format with: topics (array of strings), primary_topic (string)."
+                },
+                {
+                    "role": "user",
+                    "content": f"Identify topics in this call:\n\n{transcription_text[:3000]}"
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        # Save to database
+        summary = AISummary.query.filter_by(cdr_id=cdr_id).first()
+        if not summary:
+            summary = AISummary(cdr_id=cdr_id)
+            db.session.add(summary)
+
+        summary.topics = json.dumps(result.get('topics', []))
+        db.session.commit()
+
+        track_feature_usage(tenant_id, 'topic-extraction')
+        logger.info(f"✅ Topics extracted for CDR {cdr_id}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Topic extraction failed for CDR {cdr_id}: {e}")
+        db.session.rollback()
+        return None
+
+
+def detect_intent(transcription_text, tenant_id, cdr_id):
+    """Detect customer intent"""
+    if not is_feature_enabled(tenant_id, 'intent-detection'):
+        return None
+
+    if not openai_client or not transcription_text:
+        return None
+
+    try:
+        logger.info(f"Detecting intent for CDR {cdr_id}")
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an AI that classifies call intent. Categories: sales_inquiry, support_request, billing_question, complaint, cancellation, general_inquiry, other. Respond in JSON format with: intent (string), confidence (0-1), reasoning (string)."
+                },
+                {
+                    "role": "user",
+                    "content": f"Classify the intent of this call:\n\n{transcription_text[:2000]}"
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        # Save to database
+        summary = AISummary.query.filter_by(cdr_id=cdr_id).first()
+        if not summary:
+            summary = AISummary(cdr_id=cdr_id)
+            db.session.add(summary)
+
+        summary.customer_intent = result.get('intent', 'unknown')
+        db.session.commit()
+
+        track_feature_usage(tenant_id, 'intent-detection')
+        logger.info(f"✅ Intent detected for CDR {cdr_id}: {result.get('intent')}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Intent detection failed for CDR {cdr_id}: {e}")
+        db.session.rollback()
+        return None
+
+
+def score_call_quality(transcription_text, tenant_id, cdr_id):
+    """Score call quality across multiple dimensions"""
+    if not is_feature_enabled(tenant_id, 'quality-scoring'):
+        return None
+
+    if not openai_client or not transcription_text:
+        return None
+
+    try:
+        logger.info(f"Scoring call quality for CDR {cdr_id}")
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a call quality analyst. Score calls from 1-100 on: overall_score, greeting_score, professionalism_score, closing_score, objection_handling_score, empathy_score. Also provide strengths (array), weaknesses (array), recommendations (array). Respond in JSON."
+                },
+                {
+                    "role": "user",
+                    "content": f"Score this call:\n\n{transcription_text[:4000]}"
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        # Save to database
+        quality = CallQualityScore.query.filter_by(cdr_id=cdr_id).first()
+        if not quality:
+            quality = CallQualityScore(cdr_id=cdr_id)
+            db.session.add(quality)
+
+        quality.overall_score = result.get('overall_score', 50)
+        quality.greeting_score = result.get('greeting_score', 50)
+        quality.professionalism_score = result.get('professionalism_score', 50)
+        quality.closing_score = result.get('closing_score', 50)
+        quality.objection_handling_score = result.get('objection_handling_score', 50)
+        quality.empathy_score = result.get('empathy_score', 50)
+        quality.strengths = json.dumps(result.get('strengths', []))
+        quality.weaknesses = json.dumps(result.get('weaknesses', []))
+        quality.recommendations = json.dumps(result.get('recommendations', []))
+        db.session.commit()
+
+        track_feature_usage(tenant_id, 'quality-scoring')
+        logger.info(f"✅ Call quality scored for CDR {cdr_id}: {result.get('overall_score')}/100")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Call quality scoring failed for CDR {cdr_id}: {e}")
+        db.session.rollback()
+        return None
+
+
+def detect_emotions(transcription_text, tenant_id, cdr_id):
+    """Detect specific emotions in call"""
+    if not is_feature_enabled(tenant_id, 'emotion-detection'):
+        return None
+
+    if not openai_client or not transcription_text:
+        return None
+
+    try:
+        logger.info(f"Detecting emotions for CDR {cdr_id}")
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an emotion detection AI. Identify emotions: anger, frustration, excitement, confusion, satisfaction, urgency, fear, joy. Respond in JSON with: primary_emotion, emotion_confidence (0-1), emotions_detected (object with emotion:score), emotional_journey (array tracking changes over time)."
+                },
+                {
+                    "role": "user",
+                    "content": f"Detect emotions in this call:\n\n{transcription_text[:3000]}"
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        # Save to database
+        emotion = EmotionDetection.query.filter_by(cdr_id=cdr_id).first()
+        if not emotion:
+            emotion = EmotionDetection(cdr_id=cdr_id)
+            db.session.add(emotion)
+
+        emotion.primary_emotion = result.get('primary_emotion', 'neutral')
+        emotion.emotion_confidence = result.get('emotion_confidence', 0.5)
+        emotion.emotions_detected = json.dumps(result.get('emotions_detected', {}))
+        emotion.emotional_journey = json.dumps(result.get('emotional_journey', []))
+        db.session.commit()
+
+        track_feature_usage(tenant_id, 'emotion-detection')
+        logger.info(f"✅ Emotions detected for CDR {cdr_id}: {result.get('primary_emotion')}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Emotion detection failed for CDR {cdr_id}: {e}")
+        db.session.rollback()
+        return None
+
+
+def predict_churn(transcription_text, tenant_id, cdr_id):
+    """Predict customer churn risk"""
+    if not is_feature_enabled(tenant_id, 'churn-prediction'):
+        return None
+
+    if not openai_client or not transcription_text:
+        return None
+
+    try:
+        logger.info(f"Predicting churn for CDR {cdr_id}")
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a churn prediction AI. Analyze calls for churn risk. Respond in JSON with: churn_risk_score (0-100), churn_risk_level (low/medium/high), churn_indicators (array), retention_recommendations (array)."
+                },
+                {
+                    "role": "user",
+                    "content": f"Analyze churn risk in this call:\n\n{transcription_text[:3000]}"
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        # Save to database
+        churn = ChurnPrediction.query.filter_by(cdr_id=cdr_id).first()
+        if not churn:
+            churn = ChurnPrediction(cdr_id=cdr_id)
+            db.session.add(churn)
+
+        churn.churn_risk_score = result.get('churn_risk_score', 50)
+        churn.churn_risk_level = result.get('churn_risk_level', 'medium')
+        churn.churn_indicators = json.dumps(result.get('churn_indicators', []))
+        churn.retention_recommendations = json.dumps(result.get('retention_recommendations', []))
+        db.session.commit()
+
+        track_feature_usage(tenant_id, 'churn-prediction')
+        logger.info(f"✅ Churn predicted for CDR {cdr_id}: {result.get('churn_risk_level')}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Churn prediction failed for CDR {cdr_id}: {e}")
+        db.session.rollback()
+        return None
+
+
+def analyze_objections(transcription_text, tenant_id, cdr_id):
+    """Analyze sales objections and handling"""
+    if not is_feature_enabled(tenant_id, 'objection-handling'):
+        return None
+
+    if not openai_client or not transcription_text:
+        return None
+
+    try:
+        logger.info(f"Analyzing objections for CDR {cdr_id}")
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a sales objection analyst. Identify objections and how they were handled. Respond in JSON with: objections_detected (array of strings), objection_types (array: price/timing/competition/need), objections_handled_well (number), objections_handled_poorly (number), handling_effectiveness_score (0-100), successful_responses (array), improvement_areas (array)."
+                },
+                {
+                    "role": "user",
+                    "content": f"Analyze objections in this sales call:\n\n{transcription_text[:4000]}"
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        # Save to database
+        objection = ObjectionAnalysis.query.filter_by(cdr_id=cdr_id).first()
+        if not objection:
+            objection = ObjectionAnalysis(cdr_id=cdr_id)
+            db.session.add(objection)
+
+        objection.objections_detected = json.dumps(result.get('objections_detected', []))
+        objection.objection_types = json.dumps(result.get('objection_types', []))
+        objection.objections_handled_well = result.get('objections_handled_well', 0)
+        objection.objections_handled_poorly = result.get('objections_handled_poorly', 0)
+        objection.handling_effectiveness_score = result.get('handling_effectiveness_score', 50)
+        objection.successful_responses = json.dumps(result.get('successful_responses', []))
+        objection.improvement_areas = json.dumps(result.get('improvement_areas', []))
+        db.session.commit()
+
+        track_feature_usage(tenant_id, 'objection-handling')
+        logger.info(f"✅ Objections analyzed for CDR {cdr_id}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Objection analysis failed for CDR {cdr_id}: {e}")
+        db.session.rollback()
+        return None
+
+
+def predict_deal_risk(transcription_text, tenant_id, cdr_id):
+    """Predict deal risk and close probability"""
+    if not is_feature_enabled(tenant_id, 'deal-risk'):
+        return None
+
+    if not openai_client or not transcription_text:
+        return None
+
+    try:
+        logger.info(f"Predicting deal risk for CDR {cdr_id}")
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a deal risk prediction AI. Analyze sales calls for deal health. Respond in JSON with: risk_score (0-100, higher=more risk), risk_level (low/medium/high), close_probability (0-100), risk_factors (array), positive_signals (array), recommendations (array)."
+                },
+                {
+                    "role": "user",
+                    "content": f"Analyze deal risk in this call:\n\n{transcription_text[:3000]}"
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        # Save to database
+        deal = DealRiskScore.query.filter_by(cdr_id=cdr_id).first()
+        if not deal:
+            deal = DealRiskScore(cdr_id=cdr_id)
+            db.session.add(deal)
+
+        deal.risk_score = result.get('risk_score', 50)
+        deal.risk_level = result.get('risk_level', 'medium')
+        deal.close_probability = result.get('close_probability', 50)
+        deal.risk_factors = json.dumps(result.get('risk_factors', []))
+        deal.positive_signals = json.dumps(result.get('positive_signals', []))
+        deal.recommendations = json.dumps(result.get('recommendations', []))
+        db.session.commit()
+
+        track_feature_usage(tenant_id, 'deal-risk')
+        logger.info(f"✅ Deal risk predicted for CDR {cdr_id}: {result.get('risk_level')}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Deal risk prediction failed for CDR {cdr_id}: {e}")
+        db.session.rollback()
+        return None
+
+
+def monitor_compliance(transcription_text, tenant_id, cdr_id):
+    """Monitor for compliance violations and prohibited keywords"""
+    if not is_feature_enabled(tenant_id, 'compliance-monitoring'):
+        return None
+
+    if not transcription_text:
+        return None
+
+    try:
+        logger.info(f"Monitoring compliance for CDR {cdr_id}")
+
+        # Define prohibited keywords/phrases (should be configurable per tenant)
+        prohibited_keywords = [
+            'guarantee', 'guaranteed', 'promise', 'definitely will',
+            'insider information', 'off the record',
+            'don\'t tell anyone', 'between you and me',
+            # Add more compliance-specific keywords
+        ]
+
+        alerts = []
+
+        # Search for prohibited keywords
+        text_lower = transcription_text.lower()
+        for keyword in prohibited_keywords:
+            if keyword.lower() in text_lower:
+                # Find context (50 chars before and after)
+                idx = text_lower.find(keyword.lower())
+                context_start = max(0, idx - 50)
+                context_end = min(len(transcription_text), idx + len(keyword) + 50)
+                context = transcription_text[context_start:context_end]
+
+                alert = ComplianceAlert(
+                    cdr_id=cdr_id,
+                    tenant_id=tenant_id,
+                    alert_type='keyword_violation',
+                    severity='high' if keyword in ['guarantee', 'promise'] else 'medium',
+                    keyword=keyword,
+                    context=context
+                )
+                db.session.add(alert)
+                alerts.append({
+                    'keyword': keyword,
+                    'severity': alert.severity,
+                    'context': context
+                })
+
+        if alerts:
+            db.session.commit()
+            track_feature_usage(tenant_id, 'compliance-monitoring')
+            logger.warning(f"⚠️ {len(alerts)} compliance alerts for CDR {cdr_id}")
+
+        return {'alerts': alerts, 'alert_count': len(alerts)}
+
+    except Exception as e:
+        logger.error(f"Compliance monitoring failed for CDR {cdr_id}: {e}")
+        db.session.rollback()
+        return None
+
+
 def process_call_ai_async(call_id, audio_file_path):
     """
     Process call with AI features in background thread
+    Now checks which features are enabled for the tenant
 
     Args:
         call_id: Database ID of the call
@@ -985,20 +1715,85 @@ def process_call_ai_async(call_id, audio_file_path):
                 logger.error(f"Call {call_id} not found for AI processing")
                 return
 
-            # Step 1: Transcribe audio
-            transcription = transcribe_audio(audio_file_path, call_id)
-            if transcription:
-                call.transcription = transcription
-                db.session.commit()
-                logger.info(f"Transcription saved for call {call_id}")
+            tenant_id = call.tenant_id
 
-                # Step 2: Analyze sentiment from transcription
-                sentiment_result = analyze_sentiment(transcription, call_id)
-                if sentiment_result:
-                    call.sentiment = sentiment_result['sentiment']
-                    call.sentiment_score = sentiment_result['score']
+            # Get enabled features for this tenant
+            enabled_features = get_enabled_features(tenant_id)
+            logger.info(f"Processing call {call_id} with features: {enabled_features}")
+
+            # Step 1: Transcribe audio (required for most features)
+            transcription_text = None
+            if 'multilingual-transcription' in enabled_features or len(enabled_features) > 0:
+                transcription = transcribe_audio(audio_file_path, call_id)
+                if transcription:
+                    # Save transcription to Transcription model
+                    trans_obj = Transcription.query.filter_by(cdr_id=call_id).first()
+                    if not trans_obj:
+                        trans_obj = Transcription(cdr_id=call_id)
+                        db.session.add(trans_obj)
+
+                    trans_obj.transcription_text = transcription.transcription_text
+                    trans_obj.language = transcription.language
                     db.session.commit()
-                    logger.info(f"Sentiment saved for call {call_id}: {sentiment_result['sentiment']}")
+
+                    transcription_text = transcription.transcription_text
+                    logger.info(f"Transcription saved for call {call_id}")
+
+                    track_feature_usage(tenant_id, 'multilingual-transcription')
+
+            if not transcription_text:
+                logger.warning(f"No transcription available for call {call_id}, skipping AI processing")
+                return
+
+            # Step 2: Process with enabled features
+            if 'sentiment-analysis' in enabled_features:
+                sentiment_result = analyze_sentiment(transcription_text, call_id)
+                if sentiment_result:
+                    trans_obj = Transcription.query.filter_by(cdr_id=call_id).first()
+                    if trans_obj:
+                        sent = SentimentAnalysis.query.filter_by(transcription_id=trans_obj.id).first()
+                        if not sent:
+                            sent = SentimentAnalysis(transcription_id=trans_obj.id)
+                            db.session.add(sent)
+
+                        sent.sentiment = sentiment_result['sentiment']
+                        sent.sentiment_score = sentiment_result['score']
+                        db.session.commit()
+
+                    track_feature_usage(tenant_id, 'sentiment-analysis')
+                    logger.info(f"Sentiment saved for call {call_id}")
+
+            if 'call-summaries' in enabled_features:
+                generate_call_summary(transcription_text, tenant_id, call_id)
+
+            if 'action-items' in enabled_features:
+                extract_action_items(transcription_text, tenant_id, call_id)
+
+            if 'topic-extraction' in enabled_features:
+                extract_topics(transcription_text, tenant_id, call_id)
+
+            if 'intent-detection' in enabled_features:
+                detect_intent(transcription_text, tenant_id, call_id)
+
+            if 'quality-scoring' in enabled_features:
+                score_call_quality(transcription_text, tenant_id, call_id)
+
+            if 'emotion-detection' in enabled_features:
+                detect_emotions(transcription_text, tenant_id, call_id)
+
+            if 'churn-prediction' in enabled_features:
+                predict_churn(transcription_text, tenant_id, call_id)
+
+            if 'objection-handling' in enabled_features:
+                analyze_objections(transcription_text, tenant_id, call_id)
+
+            if 'deal-risk' in enabled_features:
+                predict_deal_risk(transcription_text, tenant_id, call_id)
+
+            if 'compliance-monitoring' in enabled_features:
+                monitor_compliance(transcription_text, tenant_id, call_id)
+
+            logger.info(f"✅ AI processing complete for call {call_id}")
 
         except Exception as e:
             logger.error(f"AI processing failed for call {call_id}: {e}", exc_info=True)
@@ -5009,6 +5804,115 @@ def migrate_database():
             """))
             migrations_applied.append("Created tenant_ai_features table with indexes")
             logger.info("✅ Created tenant_ai_features table")
+
+        # Migration 7: Create AI result tables
+        ai_result_tables = {
+            'call_quality_scores': """
+                CREATE TABLE call_quality_scores (
+                    id SERIAL PRIMARY KEY,
+                    cdr_id INTEGER NOT NULL UNIQUE REFERENCES cdr_records(id) ON DELETE CASCADE,
+                    overall_score INTEGER,
+                    greeting_score INTEGER,
+                    professionalism_score INTEGER,
+                    closing_score INTEGER,
+                    objection_handling_score INTEGER,
+                    empathy_score INTEGER,
+                    strengths TEXT,
+                    weaknesses TEXT,
+                    recommendations TEXT,
+                    scored_at TIMESTAMP DEFAULT NOW()
+                )
+            """,
+            'emotion_detections': """
+                CREATE TABLE emotion_detections (
+                    id SERIAL PRIMARY KEY,
+                    cdr_id INTEGER NOT NULL UNIQUE REFERENCES cdr_records(id) ON DELETE CASCADE,
+                    primary_emotion VARCHAR(50),
+                    emotion_confidence FLOAT,
+                    emotions_detected TEXT,
+                    emotional_journey TEXT,
+                    detected_at TIMESTAMP DEFAULT NOW()
+                )
+            """,
+            'compliance_alerts': """
+                CREATE TABLE compliance_alerts (
+                    id SERIAL PRIMARY KEY,
+                    cdr_id INTEGER NOT NULL REFERENCES cdr_records(id) ON DELETE CASCADE,
+                    tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                    alert_type VARCHAR(50),
+                    severity VARCHAR(20),
+                    keyword VARCHAR(200),
+                    context TEXT,
+                    timestamp_in_call INTEGER,
+                    resolved BOOLEAN DEFAULT FALSE,
+                    resolved_at TIMESTAMP,
+                    resolved_by VARCHAR(200),
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """,
+            'talk_time_metrics': """
+                CREATE TABLE talk_time_metrics (
+                    id SERIAL PRIMARY KEY,
+                    cdr_id INTEGER NOT NULL UNIQUE REFERENCES cdr_records(id) ON DELETE CASCADE,
+                    agent_talk_time INTEGER,
+                    customer_talk_time INTEGER,
+                    silence_time INTEGER,
+                    overlap_time INTEGER,
+                    agent_talk_percentage FLOAT,
+                    customer_talk_percentage FLOAT,
+                    interruptions_by_agent INTEGER,
+                    interruptions_by_customer INTEGER,
+                    longest_silence INTEGER,
+                    average_silence_length FLOAT,
+                    analyzed_at TIMESTAMP DEFAULT NOW()
+                )
+            """,
+            'deal_risk_scores': """
+                CREATE TABLE deal_risk_scores (
+                    id SERIAL PRIMARY KEY,
+                    cdr_id INTEGER NOT NULL UNIQUE REFERENCES cdr_records(id) ON DELETE CASCADE,
+                    risk_score FLOAT,
+                    risk_level VARCHAR(20),
+                    close_probability FLOAT,
+                    risk_factors TEXT,
+                    positive_signals TEXT,
+                    recommendations TEXT,
+                    predicted_at TIMESTAMP DEFAULT NOW()
+                )
+            """,
+            'churn_predictions': """
+                CREATE TABLE churn_predictions (
+                    id SERIAL PRIMARY KEY,
+                    cdr_id INTEGER NOT NULL UNIQUE REFERENCES cdr_records(id) ON DELETE CASCADE,
+                    churn_risk_score FLOAT,
+                    churn_risk_level VARCHAR(20),
+                    predicted_churn_date DATE,
+                    churn_indicators TEXT,
+                    retention_recommendations TEXT,
+                    predicted_at TIMESTAMP DEFAULT NOW()
+                )
+            """,
+            'objection_analyses': """
+                CREATE TABLE objection_analyses (
+                    id SERIAL PRIMARY KEY,
+                    cdr_id INTEGER NOT NULL UNIQUE REFERENCES cdr_records(id) ON DELETE CASCADE,
+                    objections_detected TEXT,
+                    objection_types TEXT,
+                    objections_handled_well INTEGER,
+                    objections_handled_poorly INTEGER,
+                    handling_effectiveness_score FLOAT,
+                    successful_responses TEXT,
+                    improvement_areas TEXT,
+                    analyzed_at TIMESTAMP DEFAULT NOW()
+                )
+            """
+        }
+
+        for table_name, create_sql in ai_result_tables.items():
+            if table_name not in tables:
+                db.session.execute(text(create_sql))
+                migrations_applied.append(f"Created {table_name} table")
+                logger.info(f"✅ Created {table_name} table")
 
         db.session.commit()
 

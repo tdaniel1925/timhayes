@@ -158,6 +158,118 @@ def run_migration():
         else:
             print("  ⏭️  tenant_ai_features table already exists")
 
+        # Migration 7: Create AI result tables
+        ai_result_tables = {
+            'call_quality_scores': """
+                CREATE TABLE call_quality_scores (
+                    id SERIAL PRIMARY KEY,
+                    cdr_id INTEGER NOT NULL UNIQUE REFERENCES cdr_records(id) ON DELETE CASCADE,
+                    overall_score INTEGER,
+                    greeting_score INTEGER,
+                    professionalism_score INTEGER,
+                    closing_score INTEGER,
+                    objection_handling_score INTEGER,
+                    empathy_score INTEGER,
+                    strengths TEXT,
+                    weaknesses TEXT,
+                    recommendations TEXT,
+                    scored_at TIMESTAMP DEFAULT NOW()
+                )
+            """,
+            'emotion_detections': """
+                CREATE TABLE emotion_detections (
+                    id SERIAL PRIMARY KEY,
+                    cdr_id INTEGER NOT NULL UNIQUE REFERENCES cdr_records(id) ON DELETE CASCADE,
+                    primary_emotion VARCHAR(50),
+                    emotion_confidence FLOAT,
+                    emotions_detected TEXT,
+                    emotional_journey TEXT,
+                    detected_at TIMESTAMP DEFAULT NOW()
+                )
+            """,
+            'compliance_alerts': """
+                CREATE TABLE compliance_alerts (
+                    id SERIAL PRIMARY KEY,
+                    cdr_id INTEGER NOT NULL REFERENCES cdr_records(id) ON DELETE CASCADE,
+                    tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                    alert_type VARCHAR(50),
+                    severity VARCHAR(20),
+                    keyword VARCHAR(200),
+                    context TEXT,
+                    timestamp_in_call INTEGER,
+                    resolved BOOLEAN DEFAULT FALSE,
+                    resolved_at TIMESTAMP,
+                    resolved_by VARCHAR(200),
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """,
+            'talk_time_metrics': """
+                CREATE TABLE talk_time_metrics (
+                    id SERIAL PRIMARY KEY,
+                    cdr_id INTEGER NOT NULL UNIQUE REFERENCES cdr_records(id) ON DELETE CASCADE,
+                    agent_talk_time INTEGER,
+                    customer_talk_time INTEGER,
+                    silence_time INTEGER,
+                    overlap_time INTEGER,
+                    agent_talk_percentage FLOAT,
+                    customer_talk_percentage FLOAT,
+                    interruptions_by_agent INTEGER,
+                    interruptions_by_customer INTEGER,
+                    longest_silence INTEGER,
+                    average_silence_length FLOAT,
+                    analyzed_at TIMESTAMP DEFAULT NOW()
+                )
+            """,
+            'deal_risk_scores': """
+                CREATE TABLE deal_risk_scores (
+                    id SERIAL PRIMARY KEY,
+                    cdr_id INTEGER NOT NULL UNIQUE REFERENCES cdr_records(id) ON DELETE CASCADE,
+                    risk_score FLOAT,
+                    risk_level VARCHAR(20),
+                    close_probability FLOAT,
+                    risk_factors TEXT,
+                    positive_signals TEXT,
+                    recommendations TEXT,
+                    predicted_at TIMESTAMP DEFAULT NOW()
+                )
+            """,
+            'churn_predictions': """
+                CREATE TABLE churn_predictions (
+                    id SERIAL PRIMARY KEY,
+                    cdr_id INTEGER NOT NULL UNIQUE REFERENCES cdr_records(id) ON DELETE CASCADE,
+                    churn_risk_score FLOAT,
+                    churn_risk_level VARCHAR(20),
+                    predicted_churn_date DATE,
+                    churn_indicators TEXT,
+                    retention_recommendations TEXT,
+                    predicted_at TIMESTAMP DEFAULT NOW()
+                )
+            """,
+            'objection_analyses': """
+                CREATE TABLE objection_analyses (
+                    id SERIAL PRIMARY KEY,
+                    cdr_id INTEGER NOT NULL UNIQUE REFERENCES cdr_records(id) ON DELETE CASCADE,
+                    objections_detected TEXT,
+                    objection_types TEXT,
+                    objections_handled_well INTEGER,
+                    objections_handled_poorly INTEGER,
+                    handling_effectiveness_score FLOAT,
+                    successful_responses TEXT,
+                    improvement_areas TEXT,
+                    analyzed_at TIMESTAMP DEFAULT NOW()
+                )
+            """
+        }
+
+        for table_name, create_sql in ai_result_tables.items():
+            if table_name not in tables:
+                print(f"  ➕ Creating {table_name} table...")
+                conn.execute(text(create_sql))
+                migrations.append(f"Created {table_name} table")
+                print(f"     ✅ {table_name} table created")
+            else:
+                print(f"  ⏭️  {table_name} table already exists")
+
         # Commit all changes
         conn.commit()
 
