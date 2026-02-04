@@ -128,6 +128,8 @@ if OPENAI_API_KEY:
         logger.info("✅ OpenAI client initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize OpenAI client: {e}")
+else:
+    logger.warning("⚠️  OPENAI_API_KEY not set - AI features will be disabled")
 
 # Initialize Supabase Storage for call recordings
 SUPABASE_URL = os.getenv('SUPABASE_URL')
@@ -148,8 +150,6 @@ UCM_IP = os.getenv('UCM_IP', '192.168.1.100')
 UCM_USERNAME = os.getenv('UCM_USERNAME', 'admin')
 UCM_PASSWORD = os.getenv('UCM_PASSWORD', 'password')
 UCM_PORT = int(os.getenv('UCM_PORT', '8089'))
-else:
-    logger.warning("⚠️  OPENAI_API_KEY not set - AI features will be disabled")
 
 # ============================================================================
 # PHONE SYSTEM PRESETS
