@@ -21,7 +21,7 @@ import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import SetupRequest from './pages/SetupRequest';
-import CallDetail from './pages/CallDetail';
+import CallDetail from './pages/CallDetailEnhanced';
 import AdminSetupRequests from './pages/AdminSetupRequests';
 import Notifications from './pages/Notifications';
 import UserManagement from './pages/UserManagement';

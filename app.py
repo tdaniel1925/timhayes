@@ -3653,6 +3653,69 @@ def get_call_detail(call_id):
             'call_outcome': ai_summary.call_outcome
         }
 
+    # Get call quality score if exists
+    quality_score = CallQualityScore.query.filter_by(cdr_id=call_id).first()
+    if quality_score:
+        call_data['quality_score'] = {
+            'overall_score': quality_score.overall_score,
+            'greeting_score': quality_score.greeting_score,
+            'professionalism_score': quality_score.professionalism_score,
+            'problem_resolution_score': quality_score.problem_resolution_score,
+            'closing_score': quality_score.closing_score,
+            'objection_handling_score': quality_score.objection_handling_score,
+            'strengths': json.loads(quality_score.strengths) if quality_score.strengths else [],
+            'areas_for_improvement': json.loads(quality_score.areas_for_improvement) if quality_score.areas_for_improvement else [],
+            'recommendations': json.loads(quality_score.recommendations) if quality_score.recommendations else [],
+            'scored_at': quality_score.scored_at.isoformat() if quality_score.scored_at else None
+        }
+
+    # Get emotion detection if exists
+    emotion = EmotionDetection.query.filter_by(cdr_id=call_id).first()
+    if emotion:
+        call_data['emotion_detection'] = {
+            'primary_emotion': emotion.primary_emotion,
+            'emotion_confidence': emotion.emotion_confidence,
+            'emotions_detected': json.loads(emotion.emotions_detected) if emotion.emotions_detected else {},
+            'emotion_timeline': json.loads(emotion.emotion_timeline) if emotion.emotion_timeline else [],
+            'customer_satisfaction_indicators': json.loads(emotion.customer_satisfaction_indicators) if emotion.customer_satisfaction_indicators else [],
+            'analyzed_at': emotion.analyzed_at.isoformat() if emotion.analyzed_at else None
+        }
+
+    # Get churn prediction if exists
+    churn = ChurnPrediction.query.filter_by(cdr_id=call_id).first()
+    if churn:
+        call_data['churn_prediction'] = {
+            'churn_risk_score': churn.churn_risk_score,
+            'churn_risk_level': churn.churn_risk_level,
+            'risk_factors': json.loads(churn.risk_factors) if churn.risk_factors else [],
+            'retention_recommendations': json.loads(churn.retention_recommendations) if churn.retention_recommendations else [],
+            'predicted_at': churn.predicted_at.isoformat() if churn.predicted_at else None
+        }
+
+    # Get objection analysis if exists
+    objection = ObjectionAnalysis.query.filter_by(cdr_id=call_id).first()
+    if objection:
+        call_data['objection_analysis'] = {
+            'objections_detected': json.loads(objection.objections_detected) if objection.objections_detected else [],
+            'objection_handling_effectiveness': objection.objection_handling_effectiveness,
+            'successful_rebuttals': json.loads(objection.successful_rebuttals) if objection.successful_rebuttals else [],
+            'missed_opportunities': json.loads(objection.missed_opportunities) if objection.missed_opportunities else [],
+            'recommendations': json.loads(objection.recommendations) if objection.recommendations else [],
+            'analyzed_at': objection.analyzed_at.isoformat() if objection.analyzed_at else None
+        }
+
+    # Get deal risk score if exists
+    deal_risk = DealRiskScore.query.filter_by(cdr_id=call_id).first()
+    if deal_risk:
+        call_data['deal_risk'] = {
+            'risk_score': deal_risk.risk_score,
+            'risk_level': deal_risk.risk_level,
+            'risk_factors': json.loads(deal_risk.risk_factors) if deal_risk.risk_factors else [],
+            'positive_indicators': json.loads(deal_risk.positive_indicators) if deal_risk.positive_indicators else [],
+            'recommendations': json.loads(deal_risk.recommendations) if deal_risk.recommendations else [],
+            'predicted_at': deal_risk.predicted_at.isoformat() if deal_risk.predicted_at else None
+        }
+
     return jsonify(call_data), 200
 
 
