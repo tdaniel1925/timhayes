@@ -2528,6 +2528,7 @@ def get_calls():
     """Get paginated calls for current tenant with advanced filtering"""
     claims = get_jwt()
     tenant_id = claims.get('tenant_id')
+    role = claims.get('role', 'user')
 
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 25, type=int)
@@ -2541,7 +2542,13 @@ def get_calls():
     min_duration = request.args.get('min_duration', type=int)
     max_duration = request.args.get('max_duration', type=int)
 
-    query = CDRRecord.query.filter_by(tenant_id=tenant_id)
+    # Superadmins see ALL calls from ALL tenants
+    if role == 'superadmin':
+        query = CDRRecord.query
+        logger.info(f"Superadmin viewing ALL calls across all tenants")
+    else:
+        # Regular users only see their tenant's calls
+        query = CDRRecord.query.filter_by(tenant_id=tenant_id)
 
     # Search filter
     if search:
@@ -2624,16 +2631,22 @@ def get_stats():
     """Get comprehensive statistics"""
     claims = get_jwt()
     tenant_id = claims.get('tenant_id')
+    role = claims.get('role', 'user')
 
-    total_calls = CDRRecord.query.filter_by(tenant_id=tenant_id).count()
-    answered_calls = CDRRecord.query.filter_by(tenant_id=tenant_id, disposition='ANSWERED').count()
-    missed_calls = CDRRecord.query.filter_by(tenant_id=tenant_id, disposition='NO ANSWER').count()
-
-    # Average duration
-    avg_duration = db.session.query(func.avg(CDRRecord.duration)).filter_by(tenant_id=tenant_id).scalar() or 0
-
-    # Transcribed calls
-    transcribed_calls = db.session.query(CDRRecord).join(Transcription).filter(CDRRecord.tenant_id == tenant_id).count()
+    # Superadmins see platform-wide stats
+    if role == 'superadmin':
+        total_calls = CDRRecord.query.count()
+        answered_calls = CDRRecord.query.filter_by(disposition='ANSWERED').count()
+        missed_calls = CDRRecord.query.filter_by(disposition='NO ANSWER').count()
+        avg_duration = db.session.query(func.avg(CDRRecord.duration)).scalar() or 0
+        transcribed_calls = db.session.query(CDRRecord).join(Transcription).count()
+    else:
+        # Regular users see only their tenant's stats
+        total_calls = CDRRecord.query.filter_by(tenant_id=tenant_id).count()
+        answered_calls = CDRRecord.query.filter_by(tenant_id=tenant_id, disposition='ANSWERED').count()
+        missed_calls = CDRRecord.query.filter_by(tenant_id=tenant_id, disposition='NO ANSWER').count()
+        avg_duration = db.session.query(func.avg(CDRRecord.duration)).filter_by(tenant_id=tenant_id).scalar() or 0
+        transcribed_calls = db.session.query(CDRRecord).join(Transcription).filter(CDRRecord.tenant_id == tenant_id).count()
 
     return jsonify({
         'total_calls': total_calls,
@@ -2651,14 +2664,21 @@ def get_call_volume():
     """Get call volume over time"""
     claims = get_jwt()
     tenant_id = claims.get('tenant_id')
+    role = claims.get('role', 'user')
 
     days = request.args.get('days', 30, type=int)
     cutoff_date = datetime.utcnow() - timedelta(days=days)
 
-    calls = CDRRecord.query.filter(
-        CDRRecord.tenant_id == tenant_id,
-        CDRRecord.received_at >= cutoff_date
-    ).all()
+    # Superadmins see ALL calls
+    if role == 'superadmin':
+        calls = CDRRecord.query.filter(
+            CDRRecord.received_at >= cutoff_date
+        ).all()
+    else:
+        calls = CDRRecord.query.filter(
+            CDRRecord.tenant_id == tenant_id,
+            CDRRecord.received_at >= cutoff_date
+        ).all()
 
     # Group by date
     call_volume = defaultdict(int)
@@ -2685,13 +2705,21 @@ def get_sentiment_trends():
     """Get sentiment trends"""
     claims = get_jwt()
     tenant_id = claims.get('tenant_id')
+    role = claims.get('role', 'user')
 
-    sentiments = db.session.query(
-        SentimentAnalysis.sentiment,
-        func.count(SentimentAnalysis.id).label('count')
-    ).join(Transcription).join(CDRRecord).filter(
-        CDRRecord.tenant_id == tenant_id
-    ).group_by(SentimentAnalysis.sentiment).all()
+    # Superadmins see ALL sentiment data
+    if role == 'superadmin':
+        sentiments = db.session.query(
+            SentimentAnalysis.sentiment,
+            func.count(SentimentAnalysis.id).label('count')
+        ).join(Transcription).join(CDRRecord).group_by(SentimentAnalysis.sentiment).all()
+    else:
+        sentiments = db.session.query(
+            SentimentAnalysis.sentiment,
+            func.count(SentimentAnalysis.id).label('count')
+        ).join(Transcription).join(CDRRecord).filter(
+            CDRRecord.tenant_id == tenant_id
+        ).group_by(SentimentAnalysis.sentiment).all()
 
     return jsonify([{
         'sentiment': s[0],
