@@ -4363,7 +4363,7 @@ def health_check():
 
 
 # ============================================================================
-# DATABASE INITIALIZATION
+# DATABASE INITIALIZATION & MIGRATION
 # ============================================================================
 
 def init_db():
@@ -4371,6 +4371,89 @@ def init_db():
     with app.app_context():
         db.create_all()
         logger.info("Database initialized")
+
+
+@app.route('/api/admin/migrate-database', methods=['POST'])
+def migrate_database():
+    """
+    Manual database migration endpoint
+    Adds missing columns to existing tables
+    Only accessible with special migration key
+    """
+    # Require migration key for security
+    migration_key = request.headers.get('X-Migration-Key')
+    expected_key = os.getenv('MIGRATION_KEY', 'change-me-in-production')
+
+    if migration_key != expected_key:
+        return jsonify({'error': 'Unauthorized - Invalid migration key'}), 401
+
+    try:
+        migrations_applied = []
+
+        # Check and add missing columns
+        from sqlalchemy import inspect, text
+        inspector = inspect(db.engine)
+
+        # Helper function to check if column exists
+        def column_exists(table_name, column_name):
+            columns = [col['name'] for col in inspector.get_columns(table_name)]
+            return column_name in columns
+
+        # Migration 1: Add call_date to cdr_records
+        if not column_exists('cdr_records', 'call_date'):
+            db.session.execute(text("""
+                ALTER TABLE cdr_records
+                ADD COLUMN call_date TIMESTAMP DEFAULT NOW()
+            """))
+            db.session.execute(text("""
+                CREATE INDEX idx_cdr_call_date ON cdr_records(call_date)
+            """))
+            migrations_applied.append("Added call_date to cdr_records")
+            logger.info("✅ Added call_date column to cdr_records")
+
+        # Migration 2: Add max_users to tenants
+        if not column_exists('tenants', 'max_users'):
+            db.session.execute(text("""
+                ALTER TABLE tenants
+                ADD COLUMN max_users INTEGER DEFAULT 5
+            """))
+            migrations_applied.append("Added max_users to tenants")
+            logger.info("✅ Added max_users column to tenants")
+
+        # Migration 3: Add max_calls_per_month to tenants
+        if not column_exists('tenants', 'max_calls_per_month'):
+            db.session.execute(text("""
+                ALTER TABLE tenants
+                ADD COLUMN max_calls_per_month INTEGER DEFAULT 1000
+            """))
+            migrations_applied.append("Added max_calls_per_month to tenants")
+            logger.info("✅ Added max_calls_per_month column to tenants")
+
+        # Migration 4: Add subscription_status to tenants
+        if not column_exists('tenants', 'subscription_status'):
+            db.session.execute(text("""
+                ALTER TABLE tenants
+                ADD COLUMN subscription_status VARCHAR(50) DEFAULT 'active'
+            """))
+            migrations_applied.append("Added subscription_status to tenants")
+            logger.info("✅ Added subscription_status column to tenants")
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Database migration completed',
+            'migrations_applied': migrations_applied,
+            'count': len(migrations_applied)
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Migration failed: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 # Initialize database on app startup (before first request)
