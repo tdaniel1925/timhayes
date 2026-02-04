@@ -66,9 +66,16 @@ limiter = Limiter(
 
 # Configuration
 # Fix Railway's postgres:// URL to postgresql:// for SQLAlchemy compatibility
-database_url = os.getenv('DATABASE_URL', 'sqlite:///callinsight.db')
+database_url = os.getenv('DATABASE_URL')
+
+# TEMPORARY: Hardcode Railway database URL until we fix environment variables
+if not database_url:
+    database_url = 'postgresql://postgres:jbleFfJMAiljcizINgmQtYOSaUTuuKSK@postgres.railway.internal:5432/railway'
+    logger.warning("Using hardcoded DATABASE_URL - environment variable not set")
+
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-this')
