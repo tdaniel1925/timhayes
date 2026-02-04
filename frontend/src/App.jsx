@@ -27,6 +27,7 @@ import Notifications from './pages/Notifications';
 import UserManagement from './pages/UserManagement';
 import IntegrationsPanel from './pages/IntegrationsPanel';
 import TenantsPage from './pages/TenantsPage';
+import CreateTenantPage from './pages/CreateTenantPage';
 
 // Super Admin Pages
 import SuperAdminLogin from './pages/SuperAdminLogin';
@@ -173,6 +174,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <TenantsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tenants/create"
+        element={
+          <ProtectedRoute>
+            <CreateTenantPage />
           </ProtectedRoute>
         }
       />

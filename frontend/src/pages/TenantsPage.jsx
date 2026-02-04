@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Building2, Users, Phone, ArrowLeft } from 'lucide-react';
+import { Building2, Users, Phone, ArrowLeft, Plus } from 'lucide-react';
 
 export default function TenantsPage() {
   const { user, logout } = useAuth();
@@ -77,6 +77,21 @@ export default function TenantsPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Action Bar */}
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Overview</h2>
+            <p className="text-sm text-gray-600">Quick stats for all tenant accounts</p>
+          </div>
+          <Button
+            onClick={() => navigate('/tenants/create')}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create New Tenant
+          </Button>
+        </div>
+
         {/* Stats Summary */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
