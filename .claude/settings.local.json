@@ -52,7 +52,11 @@
       "Bash(do echo \"Attempt $i/6...\")",
       "Bash(done)",
       "Bash(for i in {1..3})",
-      "Bash(do echo \"Check $i/3:\")"
+      "Bash(do echo \"Check $i/3:\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc3MDI0OTE3NywianRpIjoiNDEwMGY5ZGYtZTg5Ny00YjIxLTliYmMtYmFjMGUzN2YwYjgxIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6MiwibmJmIjoxNzcwMjQ5MTc3LCJjc3JmIjoiZjc3NjUzOGYtMThkZi00YTk5LTljZDgtYjc0MTViNTFlNWZhIiwiZXhwIjoxNzcwMjUyNzc3LCJ0ZW5hbnRfaWQiOjEsInJvbGUiOiJzdXBlcmFkbWluIn0.5mlnO-jQUoYw8S00g2aq2by8ECivNaGxvMZbp5CFBmQ\")",
+      "Bash(break)",
+      "Bash(do echo \"Check $i/6:\")",
+      "WebFetch(domain:www.grandstream.com)"
     ],
     "deny": [],
     "ask": []

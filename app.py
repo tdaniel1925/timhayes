@@ -2419,6 +2419,35 @@ def verify_email():
 # CDR WEBHOOK ENDPOINT
 # ============================================================================
 
+@app.route('/api/admin/sync-cdrs', methods=['POST'])
+@jwt_required()
+def manual_sync_cdrs():
+    """Manually trigger CDR sync from CloudUCM (admin only)"""
+    try:
+        claims = get_jwt()
+        role = claims.get('role', 'user')
+
+        if role not in ['admin', 'superadmin']:
+            return jsonify({'error': 'Admin access required'}), 403
+
+        # Import and run CDR poller
+        from cdr_poller import poller
+
+        # Run sync in background
+        import threading
+        thread = threading.Thread(target=poller.poll_all_tenants)
+        thread.start()
+
+        return jsonify({
+            'status': 'success',
+            'message': 'CDR sync started in background. Check back in 30 seconds.'
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Manual CDR sync error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/webhook/cdr/<subdomain>', methods=['POST'])
 def receive_cdr(subdomain):
     """Receive CDR webhook - tenant-specific endpoint"""
@@ -7045,6 +7074,14 @@ def serve_frontend(path):
 
 if __name__ == '__main__':
     init_db()
+
+    # Start CDR polling service in background
+    try:
+        from cdr_poller import start_poller_thread
+        start_poller_thread()
+        logger.info("✅ CDR Polling service enabled")
+    except Exception as e:
+        logger.warning(f"⚠️  CDR Polling service failed to start: {e}")
 
     port = int(os.getenv('PORT', 5000))
     logger.info("=" * 60)

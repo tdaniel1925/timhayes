@@ -41,3 +41,6 @@ storage3==0.7.4
 
 # Database driver for PostgreSQL
 psycopg2-binary==2.9.9
+
+# Background task scheduling
+schedule==1.2.0

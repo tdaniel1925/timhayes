@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+"""
+CloudUCM CDR Polling Service
+Fetches CDR records from CloudUCM API every 2 minutes and processes them
+"""
+import requests
+import time
+import logging
+from datetime import datetime, timedelta
+from app import app, db, CDRRecord, Tenant, process_call_ai_async
+import schedule
+import threading
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# CloudUCM API Configuration (from environment variables)
+import os
+UCM_API_BASE = os.getenv('UCM_API_BASE', 'https://071ffb.c.myucm.cloud/api')
+UCM_USERNAME = os.getenv('UCM_API_USERNAME', 'testco_webhook')
+UCM_PASSWORD = os.getenv('UCM_API_PASSWORD', 'TestWebhook123!')
+CDR_POLL_INTERVAL = int(os.getenv('CDR_POLL_INTERVAL', '2'))  # minutes
+
+class CDRPoller:
+    def __init__(self):
+        self.last_sync_time = {}  # Track last sync per tenant
+
+    def fetch_ucm_cdrs(self, since_time=None):
+        """
+        Fetch CDR records from CloudUCM API
+
+        Args:
+            since_time: datetime object - only fetch CDRs after this time
+        """
+        try:
+            # CloudUCM API endpoint for CDR list
+            # Format: GET /api/getCDRList?start_time=YYYY-MM-DD&end_time=YYYY-MM-DD
+
+            if since_time:
+                start_time = since_time.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                # Default: last 1 hour
+                start_time = (datetime.utcnow() - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+
+            end_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+            logger.info(f"Fetching CDRs from {start_time} to {end_time}")
+
+            # Make API request to CloudUCM
+            response = requests.get(
+                f"{UCM_API_BASE}/getCDRList",
+                auth=(UCM_USERNAME, UCM_PASSWORD),
+                params={
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "format": "json"
+                },
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"Fetched {len(data.get('records', []))} CDR records")
+                return data.get('records', [])
+            else:
+                logger.error(f"Failed to fetch CDRs: {response.status_code} - {response.text}")
+                return []
+
+        except Exception as e:
+            logger.error(f"Error fetching CDRs from CloudUCM: {e}", exc_info=True)
+            return []
+
+    def process_cdr_record(self, cdr_data, tenant_id):
+        """
+        Process a single CDR record - save to database and trigger AI
+
+        Args:
+            cdr_data: dict - CDR record from CloudUCM
+            tenant_id: int - Tenant ID to associate with
+        """
+        try:
+            # Check if record already exists
+            uniqueid = cdr_data.get('uniqueid')
+            existing = CDRRecord.query.filter_by(
+                tenant_id=tenant_id,
+                uniqueid=uniqueid
+            ).first()
+
+            if existing:
+                logger.debug(f"CDR {uniqueid} already exists, skipping")
+                return
+
+            # Create new CDR record
+            cdr = CDRRecord(
+                tenant_id=tenant_id,
+                uniqueid=cdr_data.get('uniqueid'),
+                src=cdr_data.get('src'),
+                dst=cdr_data.get('dst'),
+                caller_name=cdr_data.get('caller_name'),
+                clid=cdr_data.get('clid'),
+                channel=cdr_data.get('channel'),
+                dstchannel=cdr_data.get('dstchannel'),
+                start_time=cdr_data.get('start'),
+                answer_time=cdr_data.get('answer'),
+                end_time=cdr_data.get('end'),
+                duration=cdr_data.get('duration'),
+                billsec=cdr_data.get('billsec'),
+                disposition=cdr_data.get('disposition'),
+                recordfiles=cdr_data.get('recordfiles'),
+                src_trunk_name=cdr_data.get('src_trunk_name'),
+                dst_trunk_name=cdr_data.get('dst_trunk_name')
+            )
+
+            db.session.add(cdr)
+            db.session.commit()
+
+            logger.info(f"✅ Saved CDR {uniqueid}: {cdr.src} -> {cdr.dst} ({cdr.duration}s)")
+
+            # Trigger AI processing if recording exists
+            recording_path = cdr_data.get('recordfiles')
+            if recording_path:
+                logger.info(f"🤖 Triggering AI processing for call {cdr.id}")
+                process_call_ai_async(cdr.id, recording_path)
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error processing CDR: {e}", exc_info=True)
+
+    def poll_for_tenant(self, tenant):
+        """
+        Poll CloudUCM for new CDRs for a specific tenant
+
+        Args:
+            tenant: Tenant object
+        """
+        try:
+            # Get last sync time for this tenant
+            last_sync = self.last_sync_time.get(tenant.id)
+
+            if not last_sync:
+                # First sync - get last 2 hours
+                last_sync = datetime.utcnow() - timedelta(hours=2)
+
+            # Fetch new CDRs
+            cdrs = self.fetch_ucm_cdrs(since_time=last_sync)
+
+            # Process each CDR
+            for cdr_data in cdrs:
+                self.process_cdr_record(cdr_data, tenant.id)
+
+            # Update last sync time
+            self.last_sync_time[tenant.id] = datetime.utcnow()
+
+            if cdrs:
+                logger.info(f"✅ Processed {len(cdrs)} new CDRs for tenant {tenant.company_name}")
+
+        except Exception as e:
+            logger.error(f"Error polling for tenant {tenant.id}: {e}", exc_info=True)
+
+    def poll_all_tenants(self):
+        """
+        Poll CloudUCM for all active tenants
+        """
+        with app.app_context():
+            try:
+                # Get all active tenants
+                tenants = Tenant.query.filter_by(is_active=True).all()
+
+                logger.info(f"🔄 Starting CDR poll for {len(tenants)} tenants")
+
+                for tenant in tenants:
+                    self.poll_for_tenant(tenant)
+
+                logger.info("✅ CDR poll completed")
+
+            except Exception as e:
+                logger.error(f"Error in poll_all_tenants: {e}", exc_info=True)
+
+# Global poller instance
+poller = CDRPoller()
+
+def run_poller():
+    """
+    Run the polling scheduler in background thread
+    """
+    # Schedule polling every N minutes (from env var)
+    schedule.every(CDR_POLL_INTERVAL).minutes.do(poller.poll_all_tenants)
+
+    logger.info(f"🚀 CDR Poller started - checking every {CDR_POLL_INTERVAL} minutes")
+
+    # Run first poll immediately
+    poller.poll_all_tenants()
+
+    # Keep running
+    while True:
+        schedule.run_pending()
+        time.sleep(10)
+
+def start_poller_thread():
+    """
+    Start the poller in a background thread
+    """
+    thread = threading.Thread(target=run_poller, daemon=True)
+    thread.start()
+    logger.info("📡 CDR Polling service started in background")
+
+if __name__ == "__main__":
+    # For standalone testing
+    run_poller()
