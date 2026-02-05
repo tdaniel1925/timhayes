@@ -97,6 +97,7 @@ export default function Signup() {
                 placeholder="you@company.com"
                 value={formData.email}
                 onChange={handleChange}
+                autoComplete="email"
                 required
                 disabled={loading}
               />
@@ -111,6 +112,7 @@ export default function Signup() {
                 placeholder="Create a strong password"
                 value={formData.password}
                 onChange={handleChange}
+                autoComplete="new-password"
                 required
                 disabled={loading}
                 minLength={8}
