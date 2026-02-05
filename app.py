@@ -55,6 +55,10 @@ from supabase_storage import init_storage_manager, get_storage_manager
 # Import UCM Recording Downloader
 from ucm_downloader import download_and_upload_recording, get_recording_for_transcription
 
+# Import comprehensive default prompts registry
+from default_prompts import DEFAULT_PROMPTS
+from prompt_scenarios import get_scenarios_for_feature, get_scenario_by_id, get_all_scenarios
+
 # Initialize Flask app
 app = Flask(__name__, static_folder='frontend/dist', static_url_path='')
 CORS(app, resources={r"/api/*": {"origins": "*", "allow_headers": ["Content-Type", "Authorization"]}}, supports_credentials=True)
@@ -132,6 +136,90 @@ if OPENAI_API_KEY:
         logger.error(f"Failed to initialize OpenAI client: {e}")
 else:
     logger.warning("⚠️  OPENAI_API_KEY not set - AI features will be disabled")
+
+# ============================================================================
+# PROMPT RETRIEVAL SYSTEM
+# ============================================================================
+
+def get_prompt_for_feature(tenant_id, feature_slug, industry=None):
+    """
+    Retrieve the appropriate prompt for an AI feature.
+
+    Priority order:
+    1. Active custom prompt for tenant (from PromptCustomization table)
+    2. Industry-specific default (if industry provided)
+    3. Generic default
+    4. None (with error logging)
+
+    Args:
+        tenant_id (int): The tenant ID
+        feature_slug (str): Feature identifier (e.g., 'sentiment-analysis')
+        industry (str, optional): Industry slug (e.g., 'b2b_sales', 'healthcare')
+
+    Returns:
+        tuple: (prompt_text, prompt_source)
+            prompt_text (str): The actual prompt to use
+            prompt_source (str): One of 'custom', 'industry', 'default', 'none'
+    """
+    try:
+        # STEP 1: Check for active custom prompt
+        # Note: PromptCustomization model will be available after models are defined below
+        # This function should be called after app initialization
+        if 'PromptCustomization' in globals():
+            custom_prompt = PromptCustomization.query.filter_by(
+                tenant_id=tenant_id,
+                ai_feature_slug=feature_slug,
+                is_active=True
+            ).first()
+
+            if custom_prompt and custom_prompt.custom_prompt:
+                logger.info(f"✅ Using CUSTOM prompt for {feature_slug} (tenant {tenant_id}, version {custom_prompt.version})")
+                return (custom_prompt.custom_prompt, 'custom')
+
+        # STEP 2: Get default prompts for this feature
+        default_prompts = DEFAULT_PROMPTS.get(feature_slug)
+        if not default_prompts:
+            logger.error(f"❌ No default prompts defined for feature: {feature_slug}")
+            return (None, 'none')
+
+        # STEP 3: Try industry-specific default if industry provided
+        if industry and industry in default_prompts:
+            logger.info(f"✅ Using INDUSTRY default for {feature_slug} (industry: {industry})")
+            core = default_prompts.get('core_instructions', '')
+            industry_prompt = default_prompts[industry]
+            return (f"{core}\n\n{industry_prompt}", 'industry')
+
+        # STEP 4: Fall back to generic default
+        logger.info(f"✅ Using GENERIC default for {feature_slug}")
+        core = default_prompts.get('core_instructions', '')
+        generic = default_prompts.get('generic', '')
+        return (f"{core}\n\n{generic}", 'default')
+
+    except Exception as e:
+        logger.error(f"❌ Error retrieving prompt for {feature_slug}: {str(e)}")
+        return (None, 'none')
+
+
+def get_tenant_industry(tenant_id):
+    """
+    Get the industry setting for a tenant.
+
+    Args:
+        tenant_id (int): The tenant ID
+
+    Returns:
+        str or None: Industry slug if set, None otherwise
+    """
+    try:
+        # Note: Tenant model will be available after models are defined below
+        if 'Tenant' in globals():
+            tenant = Tenant.query.get(tenant_id)
+            if tenant and hasattr(tenant, 'industry'):
+                return tenant.industry
+        return None
+    except Exception as e:
+        logger.error(f"❌ Error retrieving tenant industry: {str(e)}")
+        return None
 
 # Initialize Supabase Storage for call recordings
 SUPABASE_URL = os.getenv('SUPABASE_URL')
@@ -1418,16 +1506,17 @@ def transcribe_audio(storage_path, call_id=None, tenant_id=None):
                 logger.warning(f"Failed to clean up temp file: {cleanup_error}")
 
 
-def analyze_sentiment(transcription_text, call_id=None):
+def analyze_sentiment(transcription_text, tenant_id, call_id=None):
     """
-    Analyze sentiment of call transcription using OpenAI GPT
+    Analyze sentiment of call transcription using OpenAI GPT with dynamic prompts
 
     Args:
         transcription_text: The transcribed call text
+        tenant_id: The tenant ID for retrieving custom/industry prompts
         call_id: Optional call ID for logging
 
     Returns:
-        dict: {'sentiment': 'POSITIVE/NEGATIVE/NEUTRAL', 'score': 0.0-1.0, 'reasoning': str}
+        dict: {'sentiment': 'POSITIVE/NEGATIVE/NEUTRAL', 'score': 0.0-1.0, 'reasoning': str, ...}
               or None if analysis fails
     """
     if not openai_client or not SENTIMENT_ENABLED:
@@ -1439,7 +1528,17 @@ def analyze_sentiment(transcription_text, call_id=None):
         return None
 
     try:
-        logger.info(f"Analyzing sentiment for call {call_id}")
+        logger.info(f"Analyzing sentiment for call {call_id} (tenant {tenant_id})")
+
+        # Get industry-aware prompt for this tenant
+        industry = get_tenant_industry(tenant_id)
+        system_prompt, prompt_source = get_prompt_for_feature(tenant_id, 'sentiment-analysis', industry)
+
+        if not system_prompt:
+            logger.error(f"No prompt available for sentiment-analysis, using basic fallback")
+            system_prompt = "You are a sentiment analysis assistant. Analyze sentiment and respond in JSON format with: sentiment (POSITIVE, NEGATIVE, or NEUTRAL), score (0.0 to 1.0), and reasoning."
+
+        logger.debug(f"Using {prompt_source} prompt for sentiment-analysis (industry: {industry})")
 
         # Use GPT to analyze sentiment
         response = openai_client.chat.completions.create(
@@ -1447,11 +1546,11 @@ def analyze_sentiment(transcription_text, call_id=None):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a sentiment analysis assistant for customer service calls. Analyze the overall sentiment and customer satisfaction. Respond in JSON format with: sentiment (POSITIVE, NEGATIVE, or NEUTRAL), score (0.0 to 1.0 where 1.0 is most positive), and brief reasoning."
+                    "content": system_prompt
                 },
                 {
                     "role": "user",
-                    "content": f"Analyze the sentiment of this call transcription:\n\n{transcription_text[:2000]}"  # Limit to first 2000 chars for cost
+                    "content": f"Analyze the sentiment of this call transcription:\n\n{transcription_text[:3000]}"  # Increased limit for better analysis
                 }
             ],
             response_format={"type": "json_object"},
@@ -1472,12 +1571,13 @@ def analyze_sentiment(transcription_text, call_id=None):
         # Clamp score to 0-1 range
         score = max(0.0, min(1.0, score))
 
-        logger.info(f"✅ Sentiment analysis complete for call {call_id}: {sentiment} ({score:.2f})")
+        logger.info(f"✅ Sentiment analysis complete for call {call_id}: {sentiment} ({score:.2f}) using {prompt_source} prompt")
 
         return {
             'sentiment': sentiment,
             'score': score,
-            'reasoning': reasoning
+            'reasoning': reasoning,
+            'prompt_source': prompt_source  # Track which prompt was used
         }
 
     except Exception as e:
@@ -1552,7 +1652,7 @@ def get_enabled_features(tenant_id):
 # ============================================================================
 
 def generate_call_summary(transcription_text, tenant_id, cdr_id):
-    """Generate AI call summary"""
+    """Generate AI call summary using dynamic prompts"""
     if not is_feature_enabled(tenant_id, 'call-summaries'):
         return None
 
@@ -1560,18 +1660,27 @@ def generate_call_summary(transcription_text, tenant_id, cdr_id):
         return None
 
     try:
-        logger.info(f"Generating call summary for CDR {cdr_id}")
+        logger.info(f"Generating call summary for CDR {cdr_id} (tenant {tenant_id})")
+
+        # Get industry-aware prompt
+        industry = get_tenant_industry(tenant_id)
+        system_prompt, prompt_source = get_prompt_for_feature(tenant_id, 'call-summaries', industry)
+
+        if not system_prompt:
+            system_prompt = "You are an AI assistant that creates concise 2-3 sentence summaries of customer service calls. Include key points, outcome, and any important details. Respond in JSON format with: summary, outcome (resolved/escalated/callback/voicemail)."
+
+        logger.debug(f"Using {prompt_source} prompt for call-summaries (industry: {industry})")
 
         response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an AI assistant that creates concise 2-3 sentence summaries of customer service calls. Include key points, outcome, and any important details. Respond in JSON format with: summary, outcome (resolved/escalated/callback/voicemail)."
+                    "content": system_prompt
                 },
                 {
                     "role": "user",
-                    "content": f"Summarize this call:\n\n{transcription_text[:3000]}"
+                    "content": f"Summarize this call:\n\n{transcription_text[:4000]}"
                 }
             ],
             response_format={"type": "json_object"},
@@ -1602,7 +1711,7 @@ def generate_call_summary(transcription_text, tenant_id, cdr_id):
 
 
 def extract_action_items(transcription_text, tenant_id, cdr_id):
-    """Extract action items from call"""
+    """Extract action items from call using dynamic prompts"""
     if not is_feature_enabled(tenant_id, 'action-items'):
         return None
 
@@ -1610,18 +1719,27 @@ def extract_action_items(transcription_text, tenant_id, cdr_id):
         return None
 
     try:
-        logger.info(f"Extracting action items for CDR {cdr_id}")
+        logger.info(f"Extracting action items for CDR {cdr_id} (tenant {tenant_id})")
+
+        # Get industry-aware prompt
+        industry = get_tenant_industry(tenant_id)
+        system_prompt, prompt_source = get_prompt_for_feature(tenant_id, 'action-items', industry)
+
+        if not system_prompt:
+            system_prompt = "You are an AI assistant that extracts action items, commitments, and next steps from calls. Respond in JSON format with: action_items (array of strings), follow_up_required (boolean), follow_up_deadline (string or null)."
+
+        logger.debug(f"Using {prompt_source} prompt for action-items (industry: {industry})")
 
         response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an AI assistant that extracts action items, commitments, and next steps from calls. Respond in JSON format with: action_items (array of strings), follow_up_required (boolean), follow_up_deadline (string or null)."
+                    "content": system_prompt
                 },
                 {
                     "role": "user",
-                    "content": f"Extract action items from this call:\n\n{transcription_text[:3000]}"
+                    "content": f"Extract action items from this call:\n\n{transcription_text[:4000]}"
                 }
             ],
             response_format={"type": "json_object"},
@@ -1666,11 +1784,11 @@ def extract_topics(transcription_text, tenant_id, cdr_id):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an AI that identifies main topics discussed in calls. Respond in JSON format with: topics (array of strings), primary_topic (string)."
+                    "content": get_prompt_for_feature(tenant_id, 'topic-extraction', get_tenant_industry(tenant_id))[0] or "You are an AI that identifies main topics discussed in calls. Respond in JSON format with: topics (array of strings), primary_topic (string)."
                 },
                 {
                     "role": "user",
-                    "content": f"Identify topics in this call:\n\n{transcription_text[:3000]}"
+                    "content": f"Identify topics in this call:\n\n{transcription_text[:4000]}"
                 }
             ],
             response_format={"type": "json_object"},
@@ -1700,7 +1818,7 @@ def extract_topics(transcription_text, tenant_id, cdr_id):
 
 
 def detect_intent(transcription_text, tenant_id, cdr_id):
-    """Detect customer intent"""
+    """Detect customer intent using dynamic prompts"""
     if not is_feature_enabled(tenant_id, 'intent-detection'):
         return None
 
@@ -1710,16 +1828,25 @@ def detect_intent(transcription_text, tenant_id, cdr_id):
     try:
         logger.info(f"Detecting intent for CDR {cdr_id}")
 
+        # Get industry-aware prompt for this tenant
+        industry = get_tenant_industry(tenant_id)
+        system_prompt, prompt_source = get_prompt_for_feature(tenant_id, 'intent-detection', industry)
+
+        if not system_prompt:
+            system_prompt = "You are an AI that classifies call intent. Categories: sales_inquiry, support_request, billing_question, complaint, cancellation, general_inquiry, other. Respond in JSON format with: intent (string), confidence (0-1), reasoning (string)."
+
+        logger.debug(f"Using {prompt_source} prompt for intent-detection (industry: {industry})")
+
         response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an AI that classifies call intent. Categories: sales_inquiry, support_request, billing_question, complaint, cancellation, general_inquiry, other. Respond in JSON format with: intent (string), confidence (0-1), reasoning (string)."
+                    "content": system_prompt
                 },
                 {
                     "role": "user",
-                    "content": f"Classify the intent of this call:\n\n{transcription_text[:2000]}"
+                    "content": f"Classify the intent of this call:\n\n{transcription_text[:4000]}"
                 }
             ],
             response_format={"type": "json_object"},
@@ -1749,7 +1876,7 @@ def detect_intent(transcription_text, tenant_id, cdr_id):
 
 
 def score_call_quality(transcription_text, tenant_id, cdr_id):
-    """Score call quality across multiple dimensions"""
+    """Score call quality across multiple dimensions using dynamic prompts"""
     if not is_feature_enabled(tenant_id, 'quality-scoring'):
         return None
 
@@ -1757,18 +1884,28 @@ def score_call_quality(transcription_text, tenant_id, cdr_id):
         return None
 
     try:
-        logger.info(f"Scoring call quality for CDR {cdr_id}")
+        logger.info(f"Scoring call quality for CDR {cdr_id} (tenant {tenant_id})")
+
+        # Get industry-aware prompt
+        industry = get_tenant_industry(tenant_id)
+        system_prompt, prompt_source = get_prompt_for_feature(tenant_id, 'quality-scoring', industry)
+
+        if not system_prompt:
+            logger.error(f"No prompt available for quality-scoring, using basic fallback")
+            system_prompt = "You are a call quality analyst. Score calls from 1-100 on: overall_score, greeting_score, professionalism_score, closing_score, objection_handling_score, empathy_score. Also provide strengths (array), weaknesses (array), recommendations (array). Respond in JSON."
+
+        logger.debug(f"Using {prompt_source} prompt for quality-scoring (industry: {industry})")
 
         response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a call quality analyst. Score calls from 1-100 on: overall_score, greeting_score, professionalism_score, closing_score, objection_handling_score, empathy_score. Also provide strengths (array), weaknesses (array), recommendations (array). Respond in JSON."
+                    "content": system_prompt
                 },
                 {
                     "role": "user",
-                    "content": f"Score this call:\n\n{transcription_text[:4000]}"
+                    "content": f"Score this call:\n\n{transcription_text[:5000]}"
                 }
             ],
             response_format={"type": "json_object"},
@@ -1806,7 +1943,7 @@ def score_call_quality(transcription_text, tenant_id, cdr_id):
 
 
 def detect_emotions(transcription_text, tenant_id, cdr_id):
-    """Detect specific emotions in call"""
+    """Detect specific emotions in call using dynamic prompts"""
     if not is_feature_enabled(tenant_id, 'emotion-detection'):
         return None
 
@@ -1816,16 +1953,25 @@ def detect_emotions(transcription_text, tenant_id, cdr_id):
     try:
         logger.info(f"Detecting emotions for CDR {cdr_id}")
 
+        # Get industry-aware prompt for this tenant
+        industry = get_tenant_industry(tenant_id)
+        system_prompt, prompt_source = get_prompt_for_feature(tenant_id, 'emotion-detection', industry)
+
+        if not system_prompt:
+            system_prompt = "You are an emotion detection AI. Identify emotions: anger, frustration, excitement, confusion, satisfaction, urgency, fear, joy. Respond in JSON with: primary_emotion, emotion_confidence (0-1), emotions_detected (object with emotion:score), emotional_journey (array tracking changes over time)."
+
+        logger.debug(f"Using {prompt_source} prompt for emotion-detection (industry: {industry})")
+
         response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an emotion detection AI. Identify emotions: anger, frustration, excitement, confusion, satisfaction, urgency, fear, joy. Respond in JSON with: primary_emotion, emotion_confidence (0-1), emotions_detected (object with emotion:score), emotional_journey (array tracking changes over time)."
+                    "content": system_prompt
                 },
                 {
                     "role": "user",
-                    "content": f"Detect emotions in this call:\n\n{transcription_text[:3000]}"
+                    "content": f"Detect emotions in this call:\n\n{transcription_text[:4000]}"
                 }
             ],
             response_format={"type": "json_object"},
@@ -1858,7 +2004,7 @@ def detect_emotions(transcription_text, tenant_id, cdr_id):
 
 
 def predict_churn(transcription_text, tenant_id, cdr_id):
-    """Predict customer churn risk"""
+    """Predict customer churn risk using dynamic prompts"""
     if not is_feature_enabled(tenant_id, 'churn-prediction'):
         return None
 
@@ -1868,16 +2014,25 @@ def predict_churn(transcription_text, tenant_id, cdr_id):
     try:
         logger.info(f"Predicting churn for CDR {cdr_id}")
 
+        # Get industry-aware prompt for this tenant
+        industry = get_tenant_industry(tenant_id)
+        system_prompt, prompt_source = get_prompt_for_feature(tenant_id, 'churn-prediction', industry)
+
+        if not system_prompt:
+            system_prompt = "You are a churn prediction AI. Analyze calls for churn risk. Respond in JSON with: churn_risk_score (0-100), churn_risk_level (low/medium/high), churn_indicators (array), retention_recommendations (array)."
+
+        logger.debug(f"Using {prompt_source} prompt for churn-prediction (industry: {industry})")
+
         response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a churn prediction AI. Analyze calls for churn risk. Respond in JSON with: churn_risk_score (0-100), churn_risk_level (low/medium/high), churn_indicators (array), retention_recommendations (array)."
+                    "content": system_prompt
                 },
                 {
                     "role": "user",
-                    "content": f"Analyze churn risk in this call:\n\n{transcription_text[:3000]}"
+                    "content": f"Analyze churn risk in this call:\n\n{transcription_text[:4000]}"
                 }
             ],
             response_format={"type": "json_object"},
@@ -1910,7 +2065,7 @@ def predict_churn(transcription_text, tenant_id, cdr_id):
 
 
 def analyze_objections(transcription_text, tenant_id, cdr_id):
-    """Analyze sales objections and handling"""
+    """Analyze sales objections and handling using dynamic prompts"""
     if not is_feature_enabled(tenant_id, 'objection-handling'):
         return None
 
@@ -1918,18 +2073,27 @@ def analyze_objections(transcription_text, tenant_id, cdr_id):
         return None
 
     try:
-        logger.info(f"Analyzing objections for CDR {cdr_id}")
+        logger.info(f"Analyzing objections for CDR {cdr_id} (tenant {tenant_id})")
+
+        # Get industry-aware prompt
+        industry = get_tenant_industry(tenant_id)
+        system_prompt, prompt_source = get_prompt_for_feature(tenant_id, 'objection-analysis', industry)
+
+        if not system_prompt:
+            system_prompt = "You are a sales objection analyst. Identify objections and how they were handled. Respond in JSON with: objections_detected (array of strings), objection_types (array: price/timing/competition/need), objections_handled_well (number), objections_handled_poorly (number), handling_effectiveness_score (0-100), successful_responses (array), improvement_areas (array)."
+
+        logger.debug(f"Using {prompt_source} prompt for objection-analysis (industry: {industry})")
 
         response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a sales objection analyst. Identify objections and how they were handled. Respond in JSON with: objections_detected (array of strings), objection_types (array: price/timing/competition/need), objections_handled_well (number), objections_handled_poorly (number), handling_effectiveness_score (0-100), successful_responses (array), improvement_areas (array)."
+                    "content": system_prompt
                 },
                 {
                     "role": "user",
-                    "content": f"Analyze objections in this sales call:\n\n{transcription_text[:4000]}"
+                    "content": f"Analyze objections in this sales call:\n\n{transcription_text[:5000]}"
                 }
             ],
             response_format={"type": "json_object"},
@@ -1965,7 +2129,7 @@ def analyze_objections(transcription_text, tenant_id, cdr_id):
 
 
 def predict_deal_risk(transcription_text, tenant_id, cdr_id):
-    """Predict deal risk and close probability"""
+    """Predict deal risk and close probability using dynamic prompts"""
     if not is_feature_enabled(tenant_id, 'deal-risk'):
         return None
 
@@ -1975,16 +2139,25 @@ def predict_deal_risk(transcription_text, tenant_id, cdr_id):
     try:
         logger.info(f"Predicting deal risk for CDR {cdr_id}")
 
+        # Get industry-aware prompt for this tenant
+        industry = get_tenant_industry(tenant_id)
+        system_prompt, prompt_source = get_prompt_for_feature(tenant_id, 'deal-risk', industry)
+
+        if not system_prompt:
+            system_prompt = "You are a deal risk prediction AI. Analyze sales calls for deal health. Respond in JSON with: risk_score (0-100, higher=more risk), risk_level (low/medium/high), close_probability (0-100), risk_factors (array), positive_signals (array), recommendations (array)."
+
+        logger.debug(f"Using {prompt_source} prompt for deal-risk (industry: {industry})")
+
         response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a deal risk prediction AI. Analyze sales calls for deal health. Respond in JSON with: risk_score (0-100, higher=more risk), risk_level (low/medium/high), close_probability (0-100), risk_factors (array), positive_signals (array), recommendations (array)."
+                    "content": system_prompt
                 },
                 {
                     "role": "user",
-                    "content": f"Analyze deal risk in this call:\n\n{transcription_text[:3000]}"
+                    "content": f"Analyze deal risk in this call:\n\n{transcription_text[:4000]}"
                 }
             ],
             response_format={"type": "json_object"},
@@ -2019,7 +2192,7 @@ def predict_deal_risk(transcription_text, tenant_id, cdr_id):
 
 
 def monitor_compliance(transcription_text, tenant_id, cdr_id):
-    """Monitor for compliance violations and prohibited keywords"""
+    """Monitor for compliance violations using AI analysis and keyword detection"""
     if not is_feature_enabled(tenant_id, 'compliance-monitoring'):
         return None
 
@@ -2029,47 +2202,86 @@ def monitor_compliance(transcription_text, tenant_id, cdr_id):
     try:
         logger.info(f"Monitoring compliance for CDR {cdr_id}")
 
-        # Define prohibited keywords/phrases (should be configurable per tenant)
+        # PART 1: AI-powered compliance analysis using dynamic prompts
+        ai_result = None
+        if openai_client:
+            # Get industry-aware prompt for this tenant
+            industry = get_tenant_industry(tenant_id)
+            system_prompt, prompt_source = get_prompt_for_feature(tenant_id, 'compliance-monitoring', industry)
+
+            if not system_prompt:
+                system_prompt = "You are a compliance monitoring AI. Analyze calls for regulatory violations, inappropriate language, or prohibited claims. Respond in JSON with: compliance_score (0-100, higher=better), violations (array of {type, severity, description, quote}), risk_level (low/medium/high/critical), recommendations (array)."
+
+            logger.debug(f"Using {prompt_source} prompt for compliance-monitoring (industry: {industry})")
+
+            response = openai_client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": system_prompt
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Monitor compliance in this call:\n\n{transcription_text[:5000]}"
+                    }
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.3
+            )
+
+            ai_result = json.loads(response.choices[0].message.content)
+
+        # PART 2: Keyword-based detection (legacy system, kept as backup)
         prohibited_keywords = [
             'guarantee', 'guaranteed', 'promise', 'definitely will',
             'insider information', 'off the record',
             'don\'t tell anyone', 'between you and me',
-            # Add more compliance-specific keywords
         ]
 
-        alerts = []
-
-        # Search for prohibited keywords
+        keyword_alerts = []
         text_lower = transcription_text.lower()
         for keyword in prohibited_keywords:
             if keyword.lower() in text_lower:
-                # Find context (50 chars before and after)
                 idx = text_lower.find(keyword.lower())
                 context_start = max(0, idx - 50)
                 context_end = min(len(transcription_text), idx + len(keyword) + 50)
                 context = transcription_text[context_start:context_end]
 
-                alert = ComplianceAlert(
-                    cdr_id=cdr_id,
-                    tenant_id=tenant_id,
-                    alert_type='keyword_violation',
-                    severity='high' if keyword in ['guarantee', 'promise'] else 'medium',
-                    keyword=keyword,
-                    context=context
-                )
-                db.session.add(alert)
-                alerts.append({
+                keyword_alerts.append({
                     'keyword': keyword,
-                    'severity': alert.severity,
+                    'severity': 'high' if keyword in ['guarantee', 'promise'] else 'medium',
                     'context': context
                 })
 
-        if alerts:
+        # Combine AI and keyword results
+        all_violations = (ai_result.get('violations', []) if ai_result else []) + keyword_alerts
+
+        # Save to database if violations found
+        if all_violations:
+            for violation in all_violations[:10]:  # Limit to 10 most important
+                alert = ComplianceAlert(
+                    cdr_id=cdr_id,
+                    tenant_id=tenant_id,
+                    alert_type=violation.get('type', 'keyword_violation'),
+                    severity=violation.get('severity', 'medium'),
+                    keyword=violation.get('keyword', violation.get('description', 'Unknown')),
+                    context=violation.get('context', violation.get('quote', ''))[:500]
+                )
+                db.session.add(alert)
+
             db.session.commit()
             track_feature_usage(tenant_id, 'compliance-monitoring')
-            logger.warning(f"⚠️ {len(alerts)} compliance alerts for CDR {cdr_id}")
+            logger.warning(f"⚠️ {len(all_violations)} compliance violations for CDR {cdr_id}")
 
-        return {'alerts': alerts, 'alert_count': len(alerts)}
+        # Return comprehensive result
+        return {
+            'compliance_score': ai_result.get('compliance_score', 100) if ai_result else (0 if keyword_alerts else 100),
+            'risk_level': ai_result.get('risk_level', 'low') if ai_result else ('high' if keyword_alerts else 'low'),
+            'violations': all_violations,
+            'violation_count': len(all_violations),
+            'recommendations': ai_result.get('recommendations', []) if ai_result else []
+        }
 
     except Exception as e:
         logger.error(f"Compliance monitoring failed for CDR {cdr_id}: {e}")
@@ -3455,6 +3667,1124 @@ def update_settings():
     db.session.commit()
 
     return jsonify({'message': 'Settings updated successfully'}), 200
+
+
+# ============================================================================
+# PROMPT MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@app.route('/api/prompts/defaults', methods=['GET'])
+@jwt_required()
+def get_default_prompt():
+    """Get default prompt for a specific AI feature and industry"""
+    feature_slug = request.args.get('feature')
+    industry = request.args.get('industry', 'generic')
+
+    if not feature_slug:
+        return jsonify({'error': 'feature parameter is required'}), 400
+
+    # Check if feature exists in DEFAULT_PROMPTS
+    if feature_slug not in DEFAULT_PROMPTS:
+        return jsonify({'error': f'Unknown feature: {feature_slug}'}), 404
+
+    feature_prompts = DEFAULT_PROMPTS[feature_slug]
+
+    # Get the requested prompt variant
+    if industry != 'generic' and industry in feature_prompts:
+        prompt_text = feature_prompts.get('core_instructions', '') + '\n\n' + feature_prompts[industry]
+        variant = industry
+    else:
+        prompt_text = feature_prompts.get('core_instructions', '') + '\n\n' + feature_prompts.get('generic', '')
+        variant = 'generic'
+
+    return jsonify({
+        'feature_slug': feature_slug,
+        'industry': variant,
+        'prompt': prompt_text,
+        'core_instructions': feature_prompts.get('core_instructions', ''),
+        'available_industries': [k for k in feature_prompts.keys() if k != 'core_instructions']
+    }), 200
+
+
+@app.route('/api/prompts/features', methods=['GET'])
+@jwt_required()
+def list_ai_features():
+    """List all available AI features with their metadata"""
+    features = []
+
+    for slug, prompts in DEFAULT_PROMPTS.items():
+        features.append({
+            'slug': slug,
+            'name': slug.replace('-', ' ').title(),
+            'has_custom_prompts': True,
+            'available_industries': [k for k in prompts.keys() if k != 'core_instructions'],
+            'industry_count': len([k for k in prompts.keys() if k != 'core_instructions'])
+        })
+
+    return jsonify({
+        'features': features,
+        'total_count': len(features)
+    }), 200
+
+
+@app.route('/api/prompts/industries', methods=['GET'])
+@jwt_required()
+def list_industries():
+    """List all available industry variations"""
+    # Get industries from the first feature (all features have the same industries)
+    first_feature = next(iter(DEFAULT_PROMPTS.values()))
+    industries = [
+        {
+            'slug': k,
+            'name': k.replace('_', ' ').title(),
+            'description': f'Optimized prompts for {k.replace("_", " ")} industry'
+        }
+        for k in first_feature.keys()
+        if k != 'core_instructions'
+    ]
+
+    return jsonify({
+        'industries': industries,
+        'total_count': len(industries)
+    }), 200
+
+
+@app.route('/api/prompts/copilot/refine', methods=['POST'])
+@jwt_required()
+def copilot_refine_prompt():
+    """
+    Outcome-based copilot refinement API.
+    Users describe what they want in natural language, AI refines the prompt accordingly.
+    """
+    claims = get_jwt_identity()
+    tenant_id = claims['tenant_id']
+
+    data = request.get_json()
+    feature_slug = data.get('feature_slug')
+    user_request = data.get('user_request')  # Natural language: "I want sentiment to be more sensitive to frustration"
+    current_prompt = data.get('current_prompt')  # Optional: if refining existing custom prompt
+    conversation_history = data.get('conversation_history', [])  # For iterative refinement
+
+    if not feature_slug or not user_request:
+        return jsonify({'error': 'feature_slug and user_request are required'}), 400
+
+    if not openai_client:
+        return jsonify({'error': 'AI service not available'}), 503
+
+    try:
+        # Get the current prompt (custom or default)
+        if not current_prompt:
+            industry = get_tenant_industry(tenant_id)
+            current_prompt, _ = get_prompt_for_feature(tenant_id, feature_slug, industry)
+
+        if not current_prompt:
+            return jsonify({'error': 'Could not retrieve current prompt'}), 500
+
+        # Build copilot system prompt
+        copilot_system_prompt = """You are an AI Prompt Refinement Copilot. Your job is to help users refine AI analysis prompts based on their desired OUTCOMES, not direct prompt editing.
+
+Users will describe what they want to achieve in natural language. You will:
+1. Understand their desired outcome
+2. Analyze the current prompt
+3. Generate a refined prompt that achieves the outcome
+4. Explain what changed and why
+
+CRITICAL RULES:
+- Keep the JSON output format requirements intact
+- Preserve core analysis methodology
+- Make surgical changes that address the user's request
+- Don't over-optimize - only change what's necessary
+- Maintain professional, clear language
+- Ensure prompts remain comprehensive and detailed
+
+Respond in JSON format with:
+{
+  "refined_prompt": "The updated prompt text",
+  "changes_summary": "Brief summary of what changed (2-3 sentences)",
+  "explanation": "Detailed explanation of changes and reasoning",
+  "confidence": 0.0-1.0 (how confident you are this addresses the user's request),
+  "suggestions": ["Optional array of follow-up suggestions"]
+}"""
+
+        # Build conversation context
+        messages = [{"role": "system", "content": copilot_system_prompt}]
+
+        # Add conversation history for iterative refinement
+        for msg in conversation_history:
+            messages.append({"role": msg['role'], "content": msg['content']})
+
+        # Add current refinement request
+        user_message = f"""Feature: {feature_slug}
+
+Current Prompt:
+{current_prompt}
+
+User Request: {user_request}
+
+Please refine this prompt to achieve the user's desired outcome."""
+
+        messages.append({"role": "user", "content": user_message})
+
+        # Call GPT-4 for intelligent prompt refinement
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=messages,
+            response_format={"type": "json_object"},
+            temperature=0.7,
+            max_tokens=2000
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        # Track copilot usage
+        track_feature_usage(tenant_id, 'prompt-copilot')
+
+        # Return refined prompt and metadata
+        return jsonify({
+            'success': True,
+            'refined_prompt': result.get('refined_prompt'),
+            'changes_summary': result.get('changes_summary'),
+            'explanation': result.get('explanation'),
+            'confidence': result.get('confidence', 0.8),
+            'suggestions': result.get('suggestions', []),
+            'feature_slug': feature_slug,
+            'conversation_id': len(conversation_history) + 1  # Simple conversation tracking
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Copilot refinement failed: {e}")
+        return jsonify({'error': 'Failed to refine prompt', 'details': str(e)}), 500
+
+
+@app.route('/api/prompts/copilot/apply', methods=['POST'])
+@jwt_required()
+def copilot_apply_refinement():
+    """
+    Apply a copilot-refined prompt as the active custom prompt for this tenant.
+    """
+    claims = get_jwt_identity()
+    tenant_id = claims['tenant_id']
+    user_id = claims['sub']
+
+    data = request.get_json()
+    feature_slug = data.get('feature_slug')
+    refined_prompt = data.get('refined_prompt')
+    changes_summary = data.get('changes_summary', '')
+
+    if not feature_slug or not refined_prompt:
+        return jsonify({'error': 'feature_slug and refined_prompt are required'}), 400
+
+    try:
+        # Check if custom prompt already exists
+        custom = PromptCustomization.query.filter_by(
+            tenant_id=tenant_id,
+            ai_feature_slug=feature_slug
+        ).first()
+
+        if custom:
+            # Update existing
+            custom.custom_prompt = refined_prompt
+            custom.is_active = True
+            custom.updated_at = datetime.utcnow()
+        else:
+            # Create new
+            custom = PromptCustomization(
+                tenant_id=tenant_id,
+                ai_feature_slug=feature_slug,
+                custom_prompt=refined_prompt,
+                is_active=True,
+                created_by=user_id
+            )
+            db.session.add(custom)
+
+        db.session.commit()
+
+        logger.info(f"✅ Copilot-refined prompt applied for {feature_slug} by tenant {tenant_id}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Refined prompt applied successfully',
+            'feature_slug': feature_slug,
+            'changes_summary': changes_summary
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Failed to apply copilot refinement: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to apply refinement', 'details': str(e)}), 500
+
+
+@app.route('/api/prompts/scenarios', methods=['GET'])
+@jwt_required()
+def list_all_scenarios():
+    """List all pre-built prompt refinement scenarios"""
+    feature_slug = request.args.get('feature')
+
+    if feature_slug:
+        # Get scenarios for specific feature
+        scenarios = get_scenarios_for_feature(feature_slug)
+        return jsonify({
+            'feature_slug': feature_slug,
+            'scenarios': scenarios,
+            'count': len(scenarios)
+        }), 200
+    else:
+        # Get all scenarios organized by feature
+        all_scenarios = get_all_scenarios()
+        total_count = sum(len(scenarios) for scenarios in all_scenarios.values())
+        return jsonify({
+            'scenarios_by_feature': all_scenarios,
+            'total_count': total_count,
+            'feature_count': len(all_scenarios)
+        }), 200
+
+
+@app.route('/api/prompts/scenarios/<scenario_id>/apply', methods=['POST'])
+@jwt_required()
+def apply_scenario(scenario_id):
+    """
+    Apply a pre-built scenario by using the copilot to refine the prompt.
+    This is a convenience endpoint that combines scenario lookup + copilot refinement.
+    """
+    claims = get_jwt_identity()
+    tenant_id = claims['tenant_id']
+
+    # Get the scenario
+    scenario = get_scenario_by_id(scenario_id)
+    if not scenario:
+        return jsonify({'error': f'Scenario not found: {scenario_id}'}), 404
+
+    feature_slug = scenario['feature_slug']
+    user_request = scenario['request']
+
+    # Get current prompt
+    industry = get_tenant_industry(tenant_id)
+    current_prompt, _ = get_prompt_for_feature(tenant_id, feature_slug, industry)
+
+    if not current_prompt:
+        return jsonify({'error': 'Could not retrieve current prompt'}), 500
+
+    if not openai_client:
+        return jsonify({'error': 'AI service not available'}), 503
+
+    try:
+        # Use the copilot to apply the scenario
+        copilot_system_prompt = """You are an AI Prompt Refinement Copilot. Apply the requested scenario refinement to the prompt.
+
+CRITICAL RULES:
+- Keep the JSON output format requirements intact
+- Preserve core analysis methodology
+- Make surgical changes that address the scenario request
+- Maintain professional, clear language
+
+Respond in JSON format with:
+{
+  "refined_prompt": "The updated prompt text",
+  "changes_summary": "Brief summary of what changed",
+  "explanation": "Detailed explanation of changes",
+  "confidence": 0.0-1.0
+}"""
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": copilot_system_prompt},
+                {
+                    "role": "user",
+                    "content": f"""Feature: {feature_slug}
+Scenario: {scenario['title']}
+
+Current Prompt:
+{current_prompt}
+
+Scenario Request: {user_request}
+
+Please refine this prompt to apply the scenario."""
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7,
+            max_tokens=2000
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        track_feature_usage(tenant_id, 'prompt-scenarios')
+
+        return jsonify({
+            'success': True,
+            'scenario': scenario,
+            'refined_prompt': result.get('refined_prompt'),
+            'changes_summary': result.get('changes_summary'),
+            'explanation': result.get('explanation'),
+            'confidence': result.get('confidence', 0.8)
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Scenario application failed: {e}")
+        return jsonify({'error': 'Failed to apply scenario', 'details': str(e)}), 500
+
+
+@app.route('/api/prompts/analyze-and-suggest', methods=['POST'])
+@jwt_required()
+def analyze_prompt_and_suggest():
+    """
+    Smart suggestions analyzer: Analyze current prompt and provide intelligent suggestions.
+    Helps users discover improvement opportunities they might not think of themselves.
+    """
+    claims = get_jwt_identity()
+    tenant_id = claims['tenant_id']
+
+    data = request.get_json()
+    feature_slug = data.get('feature_slug')
+    current_prompt = data.get('current_prompt')
+
+    if not feature_slug:
+        return jsonify({'error': 'feature_slug is required'}), 400
+
+    # Get current prompt if not provided
+    if not current_prompt:
+        industry = get_tenant_industry(tenant_id)
+        current_prompt, _ = get_prompt_for_feature(tenant_id, feature_slug, industry)
+
+    if not current_prompt:
+        return jsonify({'error': 'Could not retrieve prompt to analyze'}), 500
+
+    if not openai_client:
+        return jsonify({'error': 'AI service not available'}), 503
+
+    try:
+        # Get relevant scenarios for this feature
+        relevant_scenarios = get_scenarios_for_feature(feature_slug)
+        scenario_summary = "\n".join([
+            f"- {s['title']}: {s['description']}"
+            for s in relevant_scenarios[:5]  # Top 5 most relevant
+        ])
+
+        # Smart analysis system prompt
+        analyzer_prompt = f"""You are an AI Prompt Analysis Expert. Analyze the provided prompt and suggest intelligent improvements.
+
+Your analysis should identify:
+1. **Strengths**: What's working well in this prompt
+2. **Gaps**: Important areas that could be enhanced or are missing
+3. **Improvement Opportunities**: Specific, actionable ways to make this prompt better
+4. **Calibration Issues**: Whether the prompt might be too strict, too lenient, or well-calibrated
+5. **Industry Best Practices**: How well it aligns with best practices for this type of analysis
+
+Available pre-built scenarios for this feature:
+{scenario_summary}
+
+Respond in JSON format with:
+{{
+  "overall_quality_score": 0-100 (how good is this prompt currently),
+  "strengths": ["array of specific strengths"],
+  "gaps": ["array of identified gaps or missing elements"],
+  "suggestions": [
+    {{
+      "priority": "high|medium|low",
+      "title": "Brief suggestion title",
+      "description": "Detailed description of the suggestion",
+      "impact": "Expected impact if implemented",
+      "related_scenario_id": "ID of pre-built scenario if applicable (or null)"
+    }}
+  ],
+  "calibration": {{
+    "assessment": "well-calibrated|too-strict|too-lenient|unclear",
+    "explanation": "Why you made this assessment"
+  }},
+  "quick_wins": ["Array of 2-3 easy improvements with high impact"]
+}}"""
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": analyzer_prompt},
+                {
+                    "role": "user",
+                    "content": f"""Feature: {feature_slug}
+
+Current Prompt to Analyze:
+{current_prompt}
+
+Please provide a comprehensive analysis with actionable suggestions for improvement."""
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7,
+            max_tokens=2000
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        # Enrich suggestions with scenario details
+        enriched_suggestions = []
+        for suggestion in result.get('suggestions', []):
+            scenario_id = suggestion.get('related_scenario_id')
+            if scenario_id:
+                scenario = get_scenario_by_id(scenario_id)
+                if scenario:
+                    suggestion['scenario'] = scenario
+
+            enriched_suggestions.append(suggestion)
+
+        result['suggestions'] = enriched_suggestions
+
+        track_feature_usage(tenant_id, 'prompt-analysis')
+
+        return jsonify({
+            'success': True,
+            'feature_slug': feature_slug,
+            'analysis': result
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Prompt analysis failed: {e}")
+        return jsonify({'error': 'Failed to analyze prompt', 'details': str(e)}), 500
+
+
+@app.route('/api/prompts/validate', methods=['POST'])
+@jwt_required()
+def validate_prompt():
+    """
+    Validate a prompt before saving to ensure it meets quality and safety standards.
+    Checks for: format requirements, security issues, best practices, appropriate length.
+    """
+    data = request.get_json()
+    feature_slug = data.get('feature_slug')
+    prompt_text = data.get('prompt')
+
+    if not feature_slug or not prompt_text:
+        return jsonify({'error': 'feature_slug and prompt are required'}), 400
+
+    validation_result = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': [],
+        'suggestions': []
+    }
+
+    # VALIDATION 1: Length check
+    prompt_length = len(prompt_text)
+    if prompt_length < 100:
+        validation_result['errors'].append({
+            'type': 'too_short',
+            'message': f'Prompt is too short ({prompt_length} chars). Comprehensive prompts should be at least 100 characters.',
+            'severity': 'high'
+        })
+        validation_result['is_valid'] = False
+    elif prompt_length < 300:
+        validation_result['warnings'].append({
+            'type': 'short',
+            'message': f'Prompt is quite short ({prompt_length} chars). Consider adding more detail for better results.',
+            'severity': 'medium'
+        })
+
+    if prompt_length > 10000:
+        validation_result['errors'].append({
+            'type': 'too_long',
+            'message': f'Prompt is too long ({prompt_length} chars). Keep prompts under 10,000 characters for optimal performance.',
+            'severity': 'high'
+        })
+        validation_result['is_valid'] = False
+
+    # VALIDATION 2: JSON format requirement check
+    json_keywords = ['json', 'JSON', 'response_format', 'format']
+    has_json_mention = any(keyword in prompt_text for keyword in json_keywords)
+
+    if not has_json_mention:
+        validation_result['warnings'].append({
+            'type': 'missing_format_instruction',
+            'message': 'Prompt does not mention JSON output format. Consider explicitly requesting JSON response format.',
+            'severity': 'medium'
+        })
+
+    # VALIDATION 3: Security check - Prompt injection patterns
+    dangerous_patterns = [
+        'ignore previous',
+        'ignore all previous',
+        'disregard',
+        'forget everything',
+        'new instructions',
+        'system:',
+        'admin mode',
+        '<script>',
+        'javascript:'
+    ]
+
+    for pattern in dangerous_patterns:
+        if pattern.lower() in prompt_text.lower():
+            validation_result['errors'].append({
+                'type': 'security_risk',
+                'message': f'Potential security risk detected: "{pattern}". This could indicate prompt injection attempt.',
+                'severity': 'critical'
+            })
+            validation_result['is_valid'] = False
+
+    # VALIDATION 4: Best practices check
+    best_practices = {
+        'specific_role': ['you are', 'your role', 'as a', 'as an'],
+        'clear_task': ['analyze', 'evaluate', 'detect', 'identify', 'assess'],
+        'output_structure': ['respond with', 'output', 'format', 'structure']
+    }
+
+    missing_practices = []
+    for practice, keywords in best_practices.items():
+        if not any(keyword in prompt_text.lower() for keyword in keywords):
+            missing_practices.append(practice)
+
+    if missing_practices:
+        validation_result['suggestions'].append({
+            'type': 'best_practices',
+            'message': f'Consider adding: {", ".join(missing_practices)}',
+            'details': 'Strong prompts typically include role definition, clear task description, and output structure.'
+        })
+
+    # VALIDATION 5: Feature-specific validation
+    feature_keywords = {
+        'sentiment-analysis': ['sentiment', 'positive', 'negative', 'neutral'],
+        'quality-scoring': ['quality', 'score', 'rating', 'evaluation'],
+        'compliance-monitoring': ['compliance', 'violation', 'policy', 'regulation'],
+        'churn-prediction': ['churn', 'risk', 'retention', 'cancellation'],
+        'deal-risk': ['deal', 'risk', 'close', 'probability']
+    }
+
+    if feature_slug in feature_keywords:
+        expected_keywords = feature_keywords[feature_slug]
+        found_keywords = [kw for kw in expected_keywords if kw in prompt_text.lower()]
+
+        if len(found_keywords) < 2:
+            validation_result['warnings'].append({
+                'type': 'feature_alignment',
+                'message': f'Prompt may not be well-aligned with {feature_slug}. Expected keywords like: {", ".join(expected_keywords)}',
+                'severity': 'medium'
+            })
+
+    # VALIDATION 6: AI-powered comprehensive validation (if OpenAI available)
+    if openai_client:
+        try:
+            ai_validation_prompt = """You are a prompt validation expert. Analyze this AI prompt for quality and safety.
+
+Check for:
+- Clarity and specificity
+- Potential security issues
+- Consistency in instructions
+- Appropriate tone and language
+- Realistic expectations
+
+Respond in JSON with:
+{
+  "quality_score": 0-100,
+  "critical_issues": ["array of critical problems"],
+  "recommendations": ["array of improvement recommendations"]
+}"""
+
+            response = openai_client.chat.completions.create(
+                model="gpt-4o-mini",  # Use faster model for validation
+                messages=[
+                    {"role": "system", "content": ai_validation_prompt},
+                    {"role": "user", "content": f"Validate this {feature_slug} prompt:\n\n{prompt_text[:2000]}"}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.3,
+                max_tokens=500
+            )
+
+            ai_result = json.loads(response.choices[0].message.content)
+
+            validation_result['ai_quality_score'] = ai_result.get('quality_score', 0)
+
+            for issue in ai_result.get('critical_issues', []):
+                validation_result['errors'].append({
+                    'type': 'ai_detected_issue',
+                    'message': issue,
+                    'severity': 'high'
+                })
+                validation_result['is_valid'] = False
+
+            for rec in ai_result.get('recommendations', []):
+                validation_result['suggestions'].append({
+                    'type': 'ai_recommendation',
+                    'message': rec
+                })
+
+        except Exception as e:
+            logger.warning(f"AI validation failed: {e}")
+            # Non-critical, continue with other validations
+
+    # Final validation status
+    if validation_result['errors']:
+        validation_result['is_valid'] = False
+
+    validation_result['summary'] = {
+        'total_errors': len(validation_result['errors']),
+        'total_warnings': len(validation_result['warnings']),
+        'total_suggestions': len(validation_result['suggestions']),
+        'character_count': prompt_length
+    }
+
+    return jsonify(validation_result), 200
+
+
+# ============================================================================
+# PROMPT PERFORMANCE MONITORING
+# ============================================================================
+
+@app.route('/api/prompts/performance/overview', methods=['GET'])
+@jwt_required()
+def get_prompt_performance_overview():
+    """
+    Get performance overview for all AI features.
+    Shows which features are being used, custom prompt adoption, etc.
+    """
+    claims = get_jwt_identity()
+    tenant_id = claims['tenant_id']
+
+    try:
+        # Get all custom prompts for this tenant
+        custom_prompts = PromptCustomization.query.filter_by(tenant_id=tenant_id).all()
+
+        # Get feature usage statistics
+        usage_stats = db.session.query(
+            AIFeatureUsage.feature_slug,
+            db.func.count(AIFeatureUsage.id).label('usage_count'),
+            db.func.max(AIFeatureUsage.used_at).label('last_used')
+        ).filter_by(
+            tenant_id=tenant_id
+        ).group_by(
+            AIFeatureUsage.feature_slug
+        ).all()
+
+        # Build performance overview
+        features_performance = []
+
+        for feature_slug in DEFAULT_PROMPTS.keys():
+            # Get usage for this feature
+            feature_usage = next((u for u in usage_stats if u.feature_slug == feature_slug), None)
+
+            # Get custom prompt if exists
+            custom = next((p for p in custom_prompts if p.ai_feature_slug == feature_slug), None)
+
+            features_performance.append({
+                'feature_slug': feature_slug,
+                'feature_name': feature_slug.replace('-', ' ').title(),
+                'usage_count': feature_usage.usage_count if feature_usage else 0,
+                'last_used': feature_usage.last_used.isoformat() if feature_usage and feature_usage.last_used else None,
+                'has_custom_prompt': custom is not None,
+                'custom_prompt_active': custom.is_active if custom else False,
+                'prompt_source': 'custom' if (custom and custom.is_active) else 'default'
+            })
+
+        # Overall statistics
+        total_usage = sum(f['usage_count'] for f in features_performance)
+        custom_prompt_count = sum(1 for f in features_performance if f['has_custom_prompt'])
+        active_custom_count = sum(1 for f in features_performance if f['custom_prompt_active'])
+
+        return jsonify({
+            'overview': {
+                'total_features': len(DEFAULT_PROMPTS),
+                'total_usage': total_usage,
+                'custom_prompts_created': custom_prompt_count,
+                'custom_prompts_active': active_custom_count,
+                'default_prompts_in_use': len(DEFAULT_PROMPTS) - active_custom_count
+            },
+            'features': sorted(features_performance, key=lambda x: x['usage_count'], reverse=True)
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Failed to get performance overview: {e}")
+        return jsonify({'error': 'Failed to retrieve performance data'}), 500
+
+
+@app.route('/api/prompts/performance/feature/<feature_slug>', methods=['GET'])
+@jwt_required()
+def get_feature_performance(feature_slug):
+    """
+    Get detailed performance metrics for a specific AI feature.
+    Includes usage trends, prompt history, and effectiveness metrics.
+    """
+    claims = get_jwt_identity()
+    tenant_id = claims['tenant_id']
+
+    try:
+        # Get custom prompt history for this feature
+        prompt_history = PromptCustomization.query.filter_by(
+            tenant_id=tenant_id,
+            ai_feature_slug=feature_slug
+        ).order_by(PromptCustomization.updated_at.desc()).all()
+
+        # Get recent usage
+        recent_usage = AIFeatureUsage.query.filter_by(
+            tenant_id=tenant_id,
+            feature_slug=feature_slug
+        ).order_by(AIFeatureUsage.used_at.desc()).limit(100).all()
+
+        # Calculate usage trends (last 30 days)
+        from datetime import datetime, timedelta
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+
+        usage_by_day = db.session.query(
+            db.func.date(AIFeatureUsage.used_at).label('date'),
+            db.func.count(AIFeatureUsage.id).label('count')
+        ).filter(
+            AIFeatureUsage.tenant_id == tenant_id,
+            AIFeatureUsage.feature_slug == feature_slug,
+            AIFeatureUsage.used_at >= thirty_days_ago
+        ).group_by(
+            db.func.date(AIFeatureUsage.used_at)
+        ).all()
+
+        usage_trend = [
+            {'date': day.date.isoformat(), 'count': day.count}
+            for day in usage_by_day
+        ]
+
+        # Get current prompt
+        current_prompt = next((p for p in prompt_history if p.is_active), None) if prompt_history else None
+
+        return jsonify({
+            'feature_slug': feature_slug,
+            'feature_name': feature_slug.replace('-', ' ').title(),
+            'current_prompt': {
+                'source': 'custom' if current_prompt else 'default',
+                'last_updated': current_prompt.updated_at.isoformat() if current_prompt else None,
+                'created_by': current_prompt.created_by if current_prompt else None
+            },
+            'usage_statistics': {
+                'total_usage': len(recent_usage),
+                'last_30_days': len(usage_trend),
+                'trend': usage_trend
+            },
+            'prompt_history': [
+                {
+                    'id': p.id,
+                    'created_at': p.created_at.isoformat() if p.created_at else None,
+                    'updated_at': p.updated_at.isoformat(),
+                    'is_active': p.is_active,
+                    'created_by': p.created_by
+                }
+                for p in prompt_history
+            ]
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Failed to get feature performance: {e}")
+        return jsonify({'error': 'Failed to retrieve feature performance'}), 500
+
+
+@app.route('/api/prompts/performance/compare', methods=['POST'])
+@jwt_required()
+def compare_prompt_performance():
+    """
+    Compare performance between default and custom prompts.
+    Useful for A/B testing and measuring the impact of customizations.
+    """
+    claims = get_jwt_identity()
+    tenant_id = claims['tenant_id']
+
+    data = request.get_json()
+    feature_slug = data.get('feature_slug')
+    date_from = data.get('date_from')  # ISO format
+    date_to = data.get('date_to')
+
+    if not feature_slug:
+        return jsonify({'error': 'feature_slug is required'}), 400
+
+    try:
+        # Get usage during periods with default vs custom prompts
+        # This is a simplified version - in production you'd track outcomes per prompt version
+
+        # Get custom prompt activation history
+        custom_prompts = PromptCustomization.query.filter_by(
+            tenant_id=tenant_id,
+            ai_feature_slug=feature_slug
+        ).all()
+
+        # Get usage statistics
+        total_usage = AIFeatureUsage.query.filter_by(
+            tenant_id=tenant_id,
+            feature_slug=feature_slug
+        ).count()
+
+        current_prompt = next((p for p in custom_prompts if p.is_active), None) if custom_prompts else None
+
+        comparison = {
+            'feature_slug': feature_slug,
+            'total_usage': total_usage,
+            'current_prompt_source': 'custom' if current_prompt else 'default',
+            'custom_prompts_tested': len(custom_prompts),
+            'recommendation': 'Continue monitoring. More usage data needed for comprehensive comparison.'
+        }
+
+        # If we have custom prompt history, analyze switches
+        if len(custom_prompts) > 1:
+            comparison['prompt_iterations'] = len(custom_prompts)
+            comparison['recommendation'] = 'Multiple prompt iterations detected. Consider standardizing on the best performing version.'
+
+        return jsonify(comparison), 200
+
+    except Exception as e:
+        logger.error(f"Failed to compare performance: {e}")
+        return jsonify({'error': 'Failed to compare prompt performance'}), 500
+
+
+@app.route('/api/prompts/auto-optimize/analyze', methods=['POST'])
+@jwt_required()
+def analyze_optimization_opportunities():
+    """
+    Auto-optimization: Analyze all prompts and identify optimization opportunities.
+    Uses AI to detect patterns, issues, and improvement potential.
+    """
+    claims = get_jwt_identity()
+    tenant_id = claims['tenant_id']
+
+    data = request.get_json()
+    feature_slug = data.get('feature_slug')  # Optional: analyze specific feature or all
+
+    if not openai_client:
+        return jsonify({'error': 'AI service not available'}), 503
+
+    try:
+        features_to_analyze = [feature_slug] if feature_slug else list(DEFAULT_PROMPTS.keys())
+
+        optimization_opportunities = []
+
+        for slug in features_to_analyze:
+            # Get current prompt and usage stats
+            industry = get_tenant_industry(tenant_id)
+            current_prompt, prompt_source = get_prompt_for_feature(tenant_id, slug, industry)
+
+            usage_count = AIFeatureUsage.query.filter_by(
+                tenant_id=tenant_id,
+                feature_slug=slug
+            ).count()
+
+            # Skip features with very low usage
+            if usage_count < 5:
+                continue
+
+            # Use AI to analyze optimization potential
+            optimization_prompt = """You are an AI prompt optimization expert. Analyze this prompt for optimization opportunities.
+
+Consider:
+1. Is the prompt performing well based on its purpose?
+2. Could it be more specific or better calibrated?
+3. Are there common patterns in similar prompts that work better?
+4. Should this prompt be updated based on usage patterns?
+
+Respond in JSON with:
+{
+  "needs_optimization": true/false,
+  "confidence": 0.0-1.0,
+  "priority": "low|medium|high|critical",
+  "reason": "Why optimization is recommended",
+  "suggested_improvements": ["Array of specific improvements"],
+  "estimated_impact": "Expected improvement if optimized"
+}"""
+
+            response = openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": optimization_prompt},
+                    {
+                        "role": "user",
+                        "content": f"""Feature: {slug}
+Prompt Source: {prompt_source}
+Usage Count: {usage_count}
+Industry: {industry or 'generic'}
+
+Current Prompt:
+{current_prompt[:1500]}
+
+Analyze for optimization opportunities."""
+                    }
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.7,
+                max_tokens=800
+            )
+
+            result = json.loads(response.choices[0].message.content)
+
+            if result.get('needs_optimization'):
+                optimization_opportunities.append({
+                    'feature_slug': slug,
+                    'feature_name': slug.replace('-', ' ').title(),
+                    'current_source': prompt_source,
+                    'usage_count': usage_count,
+                    **result
+                })
+
+        # Sort by priority and confidence
+        priority_order = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
+        optimization_opportunities.sort(
+            key=lambda x: (priority_order.get(x['priority'], 0), x['confidence']),
+            reverse=True
+        )
+
+        return jsonify({
+            'analyzed_features': len(features_to_analyze),
+            'opportunities_found': len(optimization_opportunities),
+            'recommendations': optimization_opportunities,
+            'summary': {
+                'critical': sum(1 for o in optimization_opportunities if o['priority'] == 'critical'),
+                'high': sum(1 for o in optimization_opportunities if o['priority'] == 'high'),
+                'medium': sum(1 for o in optimization_opportunities if o['priority'] == 'medium'),
+                'low': sum(1 for o in optimization_opportunities if o['priority'] == 'low')
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Auto-optimization analysis failed: {e}")
+        return jsonify({'error': 'Failed to analyze optimization opportunities'}), 500
+
+
+@app.route('/api/prompts/auto-optimize/apply', methods=['POST'])
+@jwt_required()
+def apply_auto_optimization():
+    """
+    Auto-apply optimizations to prompts.
+    Generates optimized version and optionally applies it.
+    """
+    claims = get_jwt_identity()
+    tenant_id = claims['tenant_id']
+    user_id = claims['sub']
+
+    data = request.get_json()
+    feature_slug = data.get('feature_slug')
+    auto_apply = data.get('auto_apply', False)  # If True, automatically activate the optimized prompt
+
+    if not feature_slug:
+        return jsonify({'error': 'feature_slug is required'}), 400
+
+    if not openai_client:
+        return jsonify({'error': 'AI service not available'}), 503
+
+    try:
+        # Get current prompt
+        industry = get_tenant_industry(tenant_id)
+        current_prompt, prompt_source = get_prompt_for_feature(tenant_id, feature_slug, industry)
+
+        if not current_prompt:
+            return jsonify({'error': 'Could not retrieve current prompt'}), 500
+
+        # Get usage data for context
+        usage_count = AIFeatureUsage.query.filter_by(
+            tenant_id=tenant_id,
+            feature_slug=feature_slug
+        ).count()
+
+        # Generate optimized prompt
+        optimization_prompt = """You are an elite AI prompt optimizer. Generate an optimized version of this prompt.
+
+Your optimization should:
+1. Preserve core functionality and JSON output requirements
+2. Improve clarity and specificity
+3. Add best practices from successful similar prompts
+4. Calibrate scoring/analysis appropriately
+5. Make the prompt more comprehensive yet focused
+
+Respond in JSON with:
+{
+  "optimized_prompt": "The fully optimized prompt text",
+  "changes_made": ["List of specific improvements made"],
+  "optimization_summary": "Brief summary of the optimization",
+  "expected_improvements": "What should improve with this optimization",
+  "confidence": 0.0-1.0
+}"""
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": optimization_prompt},
+                {
+                    "role": "user",
+                    "content": f"""Feature: {feature_slug}
+Current Source: {prompt_source}
+Industry: {industry or 'generic'}
+Usage Count: {usage_count}
+
+Current Prompt to Optimize:
+{current_prompt}
+
+Generate an optimized version."""
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7,
+            max_tokens=2500
+        )
+
+        result = json.loads(response.choices[0].message.content)
+        optimized_prompt = result.get('optimized_prompt')
+
+        # Apply optimization if requested
+        if auto_apply and optimized_prompt:
+            # Check if custom prompt exists
+            custom = PromptCustomization.query.filter_by(
+                tenant_id=tenant_id,
+                ai_feature_slug=feature_slug
+            ).first()
+
+            if custom:
+                custom.custom_prompt = optimized_prompt
+                custom.is_active = True
+                custom.updated_at = datetime.utcnow()
+            else:
+                custom = PromptCustomization(
+                    tenant_id=tenant_id,
+                    ai_feature_slug=feature_slug,
+                    custom_prompt=optimized_prompt,
+                    is_active=True,
+                    created_by=user_id
+                )
+                db.session.add(custom)
+
+            db.session.commit()
+            logger.info(f"🤖 Auto-optimization applied for {feature_slug} by tenant {tenant_id}")
+
+        track_feature_usage(tenant_id, 'auto-optimization')
+
+        return jsonify({
+            'success': True,
+            'feature_slug': feature_slug,
+            'optimized_prompt': optimized_prompt,
+            'changes_made': result.get('changes_made', []),
+            'optimization_summary': result.get('optimization_summary'),
+            'expected_improvements': result.get('expected_improvements'),
+            'confidence': result.get('confidence', 0.8),
+            'applied': auto_apply
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Auto-optimization failed: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to apply auto-optimization'}), 500
+
+
+@app.route('/api/prompts/auto-optimize/schedule', methods=['POST'])
+@jwt_required()
+def schedule_auto_optimization():
+    """
+    Schedule automatic optimization checks.
+    In production, this would set up periodic optimization analysis.
+    """
+    claims = get_jwt_identity()
+    tenant_id = claims['tenant_id']
+
+    data = request.get_json()
+    enabled = data.get('enabled', True)
+    frequency = data.get('frequency', 'weekly')  # daily, weekly, monthly
+
+    # In a real implementation, this would configure a background job
+    # For now, we'll return a success message
+
+    return jsonify({
+        'success': True,
+        'message': f'Auto-optimization {"enabled" if enabled else "disabled"}',
+        'frequency': frequency,
+        'tenant_id': tenant_id,
+        'note': 'In production, this would schedule background optimization jobs'
+    }), 200
 
 
 # ============================================================================

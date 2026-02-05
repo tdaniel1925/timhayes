@@ -37,6 +37,10 @@ import AdvancedReporting from './pages/AdvancedReporting';
 import ComplianceDashboard from './pages/ComplianceDashboard';
 import TeamManagementEnhanced from './pages/TeamManagementEnhanced';
 import PromptCustomization from './pages/PromptCustomization';
+import PromptCopilot from './pages/PromptCopilot';
+import PromptScenarios from './pages/PromptScenarios';
+import PromptPerformance from './pages/PromptPerformance';
+import PromptSettings from './pages/PromptSettings';
 
 // Super Admin Pages
 import SuperAdminLogin from './pages/SuperAdminLogin';
@@ -269,6 +273,38 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <PromptCustomization />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/prompts/copilot"
+        element={
+          <ProtectedRoute>
+            <PromptCopilot />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/prompts/scenarios"
+        element={
+          <ProtectedRoute>
+            <PromptScenarios />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/prompts/performance"
+        element={
+          <ProtectedRoute>
+            <PromptPerformance />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/prompts/settings"
+        element={
+          <ProtectedRoute>
+            <PromptSettings />
           </ProtectedRoute>
         }
       />
