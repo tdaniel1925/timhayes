@@ -2463,16 +2463,21 @@ def receive_cdr(subdomain):
             logger.warning(f"Unknown tenant subdomain: {subdomain}")
             return jsonify({'error': 'Unknown tenant'}), 404
 
-        # Safely get webhook credentials (handle None from decryption failure)
+        # Optional authentication - CloudUCM may not send auth headers for IP-based webhooks
         webhook_user = tenant.webhook_username or ""
         webhook_pass = tenant.webhook_password or ""
 
         auth = request.authorization
         logger.info(f"[WEBHOOK DEBUG] Auth present: {auth is not None}, Username: {auth.username if auth else 'None'}")
 
-        if not auth or auth.username != webhook_user or auth.password != webhook_pass:
-            logger.warning(f"Invalid credentials for tenant: {subdomain}")
-            return jsonify({'error': 'Unauthorized'}), 401
+        # If both auth and credentials are provided, validate them
+        if auth and webhook_user and webhook_pass:
+            if auth.username != webhook_user or auth.password != webhook_pass:
+                logger.warning(f"Invalid credentials for tenant: {subdomain}")
+                return jsonify({'error': 'Unauthorized'}), 401
+            logger.info(f"[WEBHOOK] Authentication validated for tenant {subdomain}")
+        else:
+            logger.info(f"[WEBHOOK] Accepting webhook without authentication for tenant {subdomain}")
 
         # Safely parse CDR data (handle JSON errors)
         try:
