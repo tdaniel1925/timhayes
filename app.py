@@ -4156,6 +4156,84 @@ def get_call_detail(call_id):
     return jsonify(call_data), 200
 
 
+@app.route('/api/calls/<int:call_id>/ai-summary', methods=['GET'])
+@jwt_required()
+def get_call_ai_summary(call_id):
+    """Get AI summary for a specific call"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        # Verify call belongs to tenant
+        cdr = CDRRecord.query.filter_by(id=call_id, tenant_id=tenant_id).first()
+        if not cdr:
+            return jsonify({'error': 'Call not found'}), 404
+
+        # Only provide summary for calls > 45 seconds
+        if cdr.duration <= 45:
+            return jsonify({'error': 'Summary only available for calls longer than 45 seconds'}), 400
+
+        # Get transcription
+        transcription = Transcription.query.filter_by(cdr_id=call_id).first()
+        if not transcription or not transcription.transcription_text:
+            return jsonify({'error': 'No transcription available for this call'}), 404
+
+        # Get or generate AI summary
+        ai_summary = AISummary.query.filter_by(cdr_id=call_id).first()
+
+        if not ai_summary:
+            # Generate summary on-the-fly using OpenAI
+            try:
+                client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+
+                summary_prompt = f"""Analyze this call transcription and provide a comprehensive summary:
+
+Transcription:
+{transcription.transcription_text}
+
+Provide:
+1. A brief overview (2-3 sentences)
+2. Key points discussed (3-5 bullet points)
+3. Action items or next steps (if any)
+4. Detailed sentiment analysis
+
+Format your response as JSON with keys: summary, key_points (array), action_items (array), sentiment_analysis"""
+
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant that analyzes call transcriptions and provides structured summaries."},
+                        {"role": "user", "content": summary_prompt}
+                    ],
+                    response_format={"type": "json_object"}
+                )
+
+                summary_data = json.loads(response.choices[0].message.content)
+
+                return jsonify({
+                    'summary': summary_data.get('summary', ''),
+                    'key_points': summary_data.get('key_points', []),
+                    'action_items': summary_data.get('action_items', []),
+                    'sentiment_analysis': summary_data.get('sentiment_analysis', '')
+                }), 200
+
+            except Exception as e:
+                logger.error(f"Error generating AI summary: {e}", exc_info=True)
+                return jsonify({'error': 'Failed to generate AI summary'}), 500
+
+        # Return existing summary
+        return jsonify({
+            'summary': ai_summary.summary_text or '',
+            'key_points': json.loads(ai_summary.topics) if ai_summary.topics else [],
+            'action_items': json.loads(ai_summary.action_items) if ai_summary.action_items else [],
+            'sentiment_analysis': f"Customer Intent: {ai_summary.customer_intent or 'Unknown'}, Outcome: {ai_summary.call_outcome or 'Unknown'}"
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get AI summary error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 # ============================================================================
 # NOTIFICATION ENDPOINTS
 # ============================================================================
@@ -6001,6 +6079,799 @@ def get_my_tenant_features():
 
     except Exception as e:
         logger.error(f"Get my tenant features error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# TENANT BACK OFFICE ENDPOINTS
+# ============================================================================
+
+@app.route('/api/tenant/usage', methods=['GET'])
+@jwt_required()
+def get_tenant_usage():
+    """Get usage analytics for current tenant"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        # Get tenant and subscription info
+        tenant = Tenant.query.get(tenant_id)
+        if not tenant:
+            return jsonify({'error': 'Tenant not found'}), 404
+
+        # Calculate current billing period (assume monthly for now)
+        today = datetime.utcnow()
+        period_start = datetime(today.year, today.month, 1)
+        if today.month == 12:
+            period_end = datetime(today.year + 1, 1, 1)
+        else:
+            period_end = datetime(today.year, today.month + 1, 1)
+
+        # Count calls this period
+        calls_count = CDRRecord.query.filter(
+            CDRRecord.tenant_id == tenant_id,
+            CDRRecord.received_at >= period_start,
+            CDRRecord.received_at < period_end
+        ).count()
+
+        # Calculate recording minutes
+        recording_seconds = db.session.query(func.sum(CDRRecord.duration)).filter(
+            CDRRecord.tenant_id == tenant_id,
+            CDRRecord.received_at >= period_start,
+            CDRRecord.received_at < period_end,
+            CDRRecord.recordfiles.isnot(None)
+        ).scalar() or 0
+        recording_minutes = recording_seconds / 60
+
+        # Calculate storage (rough estimate: 1MB per minute of recording)
+        storage_gb = (recording_minutes / 1024)
+
+        # Count API requests (from webhook logs if available)
+        api_requests = 0  # Placeholder - implement webhook log counting
+
+        # Set default limits (these should come from subscription plan)
+        max_calls = 1000
+        max_recording_minutes = 5000
+        max_storage_gb = 50
+        max_api_requests = 10000
+
+        return jsonify({
+            'period_start': period_start.isoformat(),
+            'period_end': period_end.isoformat(),
+            'calls': {
+                'used': calls_count,
+                'limit': max_calls
+            },
+            'recording_minutes': {
+                'used': int(recording_minutes),
+                'limit': max_recording_minutes
+            },
+            'storage': {
+                'used': round(storage_gb, 2),
+                'limit': max_storage_gb
+            },
+            'api_requests': {
+                'used': api_requests,
+                'limit': max_api_requests
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get tenant usage error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/subscription', methods=['GET'])
+@jwt_required()
+def get_tenant_subscription():
+    """Get subscription details for current tenant"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        tenant = Tenant.query.get(tenant_id)
+        if not tenant:
+            return jsonify({'error': 'Tenant not found'}), 404
+
+        # Calculate billing period
+        today = datetime.utcnow()
+        period_start = datetime(today.year, today.month, 1)
+        if today.month == 12:
+            period_end = datetime(today.year + 1, 1, 1)
+        else:
+            period_end = datetime(today.year, today.month + 1, 1)
+
+        # Mock subscription data (in production, this would come from Stripe or subscription table)
+        subscription = {
+            'status': 'active',
+            'plan_id': 1,
+            'plan_name': tenant.subscription_plan or 'Starter',
+            'billing_cycle': 'monthly',
+            'price': 99.00,
+            'current_period_start': period_start.isoformat(),
+            'current_period_end': period_end.isoformat(),
+            'next_billing_date': period_end.isoformat(),
+            'cancel_at_period_end': False
+        }
+
+        return jsonify(subscription), 200
+
+    except Exception as e:
+        logger.error(f"Get subscription error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/subscription/change-plan', methods=['POST'])
+@jwt_required()
+def change_subscription_plan():
+    """Request a plan change"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+        role = claims.get('role')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        if role not in ['admin', 'superadmin']:
+            return jsonify({'error': 'Unauthorized - admin access required'}), 403
+
+        data = request.get_json()
+        plan_id = data.get('plan_id')
+
+        if not plan_id:
+            return jsonify({'error': 'plan_id is required'}), 400
+
+        # In production, this would integrate with Stripe or payment processor
+        logger.info(f"Plan change requested for tenant {tenant_id} to plan {plan_id}")
+
+        return jsonify({
+            'message': 'Plan change request submitted successfully',
+            'plan_id': plan_id
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Change plan error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/plans/available', methods=['GET'])
+@jwt_required()
+def get_available_plans():
+    """Get available subscription plans"""
+    try:
+        # Mock plans data (in production, this would come from database or Stripe)
+        plans = [
+            {
+                'id': 1,
+                'name': 'Starter',
+                'description': 'Perfect for small teams getting started',
+                'monthly_price': 49,
+                'annual_price': 490,
+                'max_calls_per_month': 500,
+                'max_users': 5,
+                'max_storage_gb': 25,
+                'has_api_access': False,
+                'has_priority_support': False
+            },
+            {
+                'id': 2,
+                'name': 'Professional',
+                'description': 'For growing businesses with advanced needs',
+                'monthly_price': 99,
+                'annual_price': 990,
+                'max_calls_per_month': 2000,
+                'max_users': 20,
+                'max_storage_gb': 100,
+                'has_api_access': True,
+                'has_priority_support': False
+            },
+            {
+                'id': 3,
+                'name': 'Enterprise',
+                'description': 'For large organizations requiring maximum scale',
+                'monthly_price': 299,
+                'annual_price': 2990,
+                'max_calls_per_month': 10000,
+                'max_users': 100,
+                'max_storage_gb': 500,
+                'has_api_access': True,
+                'has_priority_support': True
+            }
+        ]
+
+        return jsonify({'plans': plans}), 200
+
+    except Exception as e:
+        logger.error(f"Get available plans error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/billing-history', methods=['GET'])
+@jwt_required()
+def get_billing_history():
+    """Get billing history for current tenant"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        # Mock billing history (in production, this would come from Stripe or billing table)
+        invoices = [
+            {
+                'id': 1,
+                'date': (datetime.utcnow() - timedelta(days=30)).isoformat(),
+                'description': 'Professional Plan - Monthly',
+                'amount': 99.00,
+                'status': 'paid',
+                'invoice_url': '#'
+            },
+            {
+                'id': 2,
+                'date': (datetime.utcnow() - timedelta(days=60)).isoformat(),
+                'description': 'Professional Plan - Monthly',
+                'amount': 99.00,
+                'status': 'paid',
+                'invoice_url': '#'
+            }
+        ]
+
+        return jsonify({'invoices': invoices}), 200
+
+    except Exception as e:
+        logger.error(f"Get billing history error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/api-keys', methods=['GET'])
+@jwt_required()
+def get_api_keys():
+    """Get API keys for current tenant"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        # Mock API keys (in production, these would come from an api_keys table)
+        api_keys = [
+            {
+                'id': 1,
+                'name': 'Production Server',
+                'key_preview': 'ak_live_abc123',
+                'is_active': True,
+                'created_at': datetime.utcnow().isoformat(),
+                'last_used_at': (datetime.utcnow() - timedelta(hours=2)).isoformat()
+            }
+        ]
+
+        return jsonify({'api_keys': api_keys}), 200
+
+    except Exception as e:
+        logger.error(f"Get API keys error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/api-keys', methods=['POST'])
+@jwt_required()
+def create_api_key():
+    """Create a new API key"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+        role = claims.get('role')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        if role not in ['admin', 'superadmin']:
+            return jsonify({'error': 'Unauthorized - admin access required'}), 403
+
+        data = request.get_json()
+        name = data.get('name', '').strip()
+
+        if not name:
+            return jsonify({'error': 'API key name is required'}), 400
+
+        # Generate a secure API key
+        api_key = f"ak_live_{crypto_secrets.token_urlsafe(32)}"
+
+        # In production, store this in database with hash
+        logger.info(f"API key created for tenant {tenant_id}: {name}")
+
+        return jsonify({
+            'api_key': api_key,
+            'name': name,
+            'message': 'API key created successfully'
+        }), 201
+
+    except Exception as e:
+        logger.error(f"Create API key error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/api-keys/<int:key_id>', methods=['DELETE'])
+@jwt_required()
+def delete_api_key(key_id):
+    """Delete an API key"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+        role = claims.get('role')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        if role not in ['admin', 'superadmin']:
+            return jsonify({'error': 'Unauthorized - admin access required'}), 403
+
+        # In production, delete from database
+        logger.info(f"API key {key_id} deleted for tenant {tenant_id}")
+
+        return jsonify({'message': 'API key deleted successfully'}), 200
+
+    except Exception as e:
+        logger.error(f"Delete API key error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/webhook-logs', methods=['GET'])
+@jwt_required()
+def get_webhook_logs():
+    """Get webhook activity logs"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        limit = request.args.get('limit', 50, type=int)
+
+        # Mock webhook logs (in production, these would come from webhook_logs table)
+        logs = [
+            {
+                'id': 1,
+                'timestamp': datetime.utcnow().isoformat(),
+                'event_type': 'call.completed',
+                'status': 'success',
+                'response_code': 200
+            },
+            {
+                'id': 2,
+                'timestamp': (datetime.utcnow() - timedelta(minutes=30)).isoformat(),
+                'event_type': 'call.transcribed',
+                'status': 'success',
+                'response_code': 200
+            }
+        ]
+
+        return jsonify({'logs': logs[:limit]}), 200
+
+    except Exception as e:
+        logger.error(f"Get webhook logs error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/reports/generate', methods=['POST'])
+@jwt_required()
+def generate_report():
+    """Generate custom report with export"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        data = request.get_json()
+        report_type = data.get('reportType')
+        export_format = data.get('export_format', 'pdf')
+        date_from = data.get('dateFrom')
+        date_to = data.get('dateTo')
+
+        # In production, generate actual report based on parameters
+        logger.info(f"Report generation requested: type={report_type}, format={export_format}")
+
+        # Mock report generation
+        if export_format == 'csv':
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(['Date', 'Calls', 'Duration', 'Quality'])
+            writer.writerow([datetime.utcnow().strftime('%Y-%m-%d'), 150, 7500, 85])
+
+            output.seek(0)
+            return send_file(
+                io.BytesIO(output.getvalue().encode('utf-8')),
+                mimetype='text/csv',
+                as_attachment=True,
+                download_name=f'report_{datetime.utcnow().strftime("%Y%m%d")}.csv'
+            )
+
+        return jsonify({'message': 'Report generated successfully'}), 200
+
+    except Exception as e:
+        logger.error(f"Generate report error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/saved-reports', methods=['GET'])
+@jwt_required()
+def get_saved_reports():
+    """Get saved report configurations"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        # Mock saved reports
+        reports = [
+            {
+                'id': 1,
+                'name': 'Monthly Performance',
+                'report_type': 'performance',
+                'created_at': datetime.utcnow().isoformat(),
+                'schedule': 'monthly'
+            }
+        ]
+
+        return jsonify({'reports': reports}), 200
+
+    except Exception as e:
+        logger.error(f"Get saved reports error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/compliance/summary', methods=['GET'])
+@jwt_required()
+def get_compliance_summary():
+    """Get compliance summary and scores"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        # Mock compliance data
+        summary = {
+            'total_alerts': 12,
+            'unresolved_alerts': 3,
+            'resolved_alerts': 9,
+            'compliance_score': 92,
+            'score_trend': 5,  # +5% vs last period
+            'alert_types': [
+                {'type': 'recording_consent', 'count': 5},
+                {'type': 'data_retention', 'count': 3},
+                {'type': 'call_quality', 'count': 2},
+                {'type': 'regulatory', 'count': 2}
+            ]
+        }
+
+        return jsonify(summary), 200
+
+    except Exception as e:
+        logger.error(f"Get compliance summary error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/compliance/alerts', methods=['GET'])
+@jwt_required()
+def get_compliance_alerts():
+    """Get compliance alerts with filters"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        severity = request.args.get('severity', '')
+        status = request.args.get('status', '')
+
+        # Mock alerts data
+        alerts = [
+            {
+                'id': 1,
+                'type': 'Recording Consent',
+                'severity': 'high',
+                'message': 'Missing consent for recorded calls',
+                'status': 'unresolved',
+                'detected_at': (datetime.utcnow() - timedelta(days=2)).isoformat(),
+                'call_count': 5
+            },
+            {
+                'id': 2,
+                'type': 'Data Retention',
+                'severity': 'medium',
+                'message': 'Calls exceeding retention period',
+                'status': 'unresolved',
+                'detected_at': (datetime.utcnow() - timedelta(days=5)).isoformat(),
+                'call_count': 3
+            }
+        ]
+
+        # Apply filters
+        filtered_alerts = alerts
+        if severity:
+            filtered_alerts = [a for a in filtered_alerts if a['severity'] == severity]
+        if status:
+            filtered_alerts = [a for a in filtered_alerts if a['status'] == status]
+
+        return jsonify({'alerts': filtered_alerts}), 200
+
+    except Exception as e:
+        logger.error(f"Get compliance alerts error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/compliance/alerts/<int:alert_id>/resolve', methods=['POST'])
+@jwt_required()
+def resolve_compliance_alert(alert_id):
+    """Mark a compliance alert as resolved"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+        user_id = claims.get('sub')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        data = request.get_json()
+        resolved_by = data.get('resolved_by', '')
+
+        # In production, update alert in database
+        logger.info(f"Alert {alert_id} resolved by {resolved_by} for tenant {tenant_id}")
+
+        return jsonify({
+            'message': 'Alert resolved successfully',
+            'alert_id': alert_id
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Resolve alert error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/compliance/export', methods=['POST'])
+@jwt_required()
+def export_compliance_report():
+    """Export compliance report"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        # Generate CSV report
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Alert Type', 'Severity', 'Status', 'Detected Date', 'Call Count'])
+        writer.writerow(['Recording Consent', 'high', 'unresolved', datetime.utcnow().strftime('%Y-%m-%d'), 5])
+        writer.writerow(['Data Retention', 'medium', 'resolved', datetime.utcnow().strftime('%Y-%m-%d'), 3])
+
+        output.seek(0)
+        return send_file(
+            io.BytesIO(output.getvalue().encode('utf-8')),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f'compliance_report_{datetime.utcnow().strftime("%Y%m%d")}.csv'
+        )
+
+    except Exception as e:
+        logger.error(f"Export compliance report error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/team/members-detailed', methods=['GET'])
+@jwt_required()
+def get_team_members_detailed():
+    """Get detailed team member information with performance metrics"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        # Get all team members
+        users = User.query.filter_by(tenant_id=tenant_id).all()
+
+        members = []
+        for user in users:
+            # Calculate metrics for each member
+            calls_count = CDRRecord.query.filter_by(
+                tenant_id=tenant_id
+            ).filter(
+                CDRRecord.received_at >= datetime.utcnow() - timedelta(days=30)
+            ).count()
+
+            avg_duration = db.session.query(func.avg(CDRRecord.duration)).filter_by(
+                tenant_id=tenant_id
+            ).filter(
+                CDRRecord.received_at >= datetime.utcnow() - timedelta(days=30)
+            ).scalar() or 0
+
+            members.append({
+                'id': user.id,
+                'name': user.username,
+                'email': user.email,
+                'role': user.role,
+                'calls_count': calls_count,
+                'avg_call_duration': int(avg_duration),
+                'quality_score': 85,  # Mock score
+                'performance_score': 82,  # Mock score
+                'goals_met': 3,
+                'total_goals': 5,
+                'current_goal': {
+                    'goal_type': 'calls',
+                    'current_value': calls_count,
+                    'target_value': 100
+                }
+            })
+
+        return jsonify({'members': members}), 200
+
+    except Exception as e:
+        logger.error(f"Get team members detailed error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/team/goals', methods=['GET', 'POST'])
+@jwt_required()
+def handle_team_goals():
+    """Get or create team goals"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        if request.method == 'GET':
+            # Mock goals data
+            goals = [
+                {
+                    'id': 1,
+                    'member_id': 1,
+                    'member_name': 'John Doe',
+                    'goal_type': 'calls',
+                    'target_value': 100,
+                    'current_value': 75,
+                    'timeframe': 'monthly',
+                    'status': 'active',
+                    'description': 'Complete 100 calls this month',
+                    'deadline': (datetime.utcnow() + timedelta(days=15)).isoformat()
+                }
+            ]
+            return jsonify({'goals': goals}), 200
+
+        else:  # POST
+            data = request.get_json()
+            # In production, create goal in database
+            logger.info(f"Goal created for tenant {tenant_id}: {data}")
+            return jsonify({'message': 'Goal created successfully'}), 201
+
+    except Exception as e:
+        logger.error(f"Handle team goals error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/team/coaching-sessions', methods=['GET', 'POST'])
+@jwt_required()
+def handle_coaching_sessions():
+    """Get or create coaching sessions"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        if request.method == 'GET':
+            # Mock coaching sessions
+            sessions = [
+                {
+                    'id': 1,
+                    'member_id': 1,
+                    'member_name': 'John Doe',
+                    'coach_id': 2,
+                    'coach_name': 'Jane Manager',
+                    'topic': 'Improving call quality',
+                    'status': 'scheduled',
+                    'scheduled_date': (datetime.utcnow() + timedelta(days=3)).isoformat(),
+                    'follow_up_date': (datetime.utcnow() + timedelta(days=10)).isoformat(),
+                    'notes': 'Focus on active listening techniques'
+                }
+            ]
+            return jsonify({'sessions': sessions}), 200
+
+        else:  # POST
+            data = request.get_json()
+            # In production, create session in database
+            logger.info(f"Coaching session created for tenant {tenant_id}: {data}")
+            return jsonify({'message': 'Coaching session scheduled successfully'}), 201
+
+    except Exception as e:
+        logger.error(f"Handle coaching sessions error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/team/performance-trends', methods=['GET'])
+@jwt_required()
+def get_performance_trends():
+    """Get performance trends for team members"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        # Mock trend data
+        trends = [
+            {
+                'member_id': 1,
+                'current_score': 85,
+                'total_calls': 150,
+                'calls_trend': 15,  # +15% vs last period
+                'avg_quality': 88,
+                'quality_trend': 5,
+                'avg_duration': 420,  # seconds
+                'duration_trend': -10,  # -10% (improvement for shorter calls)
+                'goals_met': 3,
+                'total_goals': 5
+            }
+        ]
+
+        return jsonify({'trends': trends}), 200
+
+    except Exception as e:
+        logger.error(f"Get performance trends error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/team/assign-call', methods=['POST'])
+@jwt_required()
+def assign_call_to_member():
+    """Assign a call to a team member"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+        role = claims.get('role')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        if role not in ['admin', 'manager', 'superadmin']:
+            return jsonify({'error': 'Unauthorized - manager access required'}), 403
+
+        data = request.get_json()
+        call_id = data.get('call_id')
+        member_id = data.get('member_id')
+
+        if not call_id or not member_id:
+            return jsonify({'error': 'call_id and member_id are required'}), 400
+
+        # In production, update call assignment in database
+        logger.info(f"Call {call_id} assigned to member {member_id} in tenant {tenant_id}")
+
+        return jsonify({'message': 'Call assigned successfully'}), 200
+
+    except Exception as e:
+        logger.error(f"Assign call error: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 

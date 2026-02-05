@@ -174,6 +174,15 @@ export const api = {
     return response.json();
   },
 
+  // AI Summary
+  getAISummary: async (callId) => {
+    const response = await fetchWithAuth(`/calls/${callId}/ai-summary`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch AI summary');
+    }
+    return response.json();
+  },
+
   // Notifications
   getNotifications: async (page = 1, unreadOnly = false) => {
     const response = await fetchWithAuth(`/notifications?page=${page}&unread=${unreadOnly}`);

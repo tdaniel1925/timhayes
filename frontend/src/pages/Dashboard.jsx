@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import {
   Phone, TrendingUp, MessageSquare, BarChart3, Download,
-  ChevronLeft, ChevronRight, Search, Settings, Filter, X, FileText, Mail, Play, Pause
+  ChevronLeft, ChevronRight, Search, Settings, Filter, X, FileText, Mail, Play, Pause,
+  ChevronDown, ChevronUp, Sparkles
 } from 'lucide-react';
 import {
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area,
@@ -50,6 +51,10 @@ export default function Dashboard() {
   const [playingCallId, setPlayingCallId] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
   const audioRef = React.useRef(null);
+
+  // Accordion state for AI summary
+  const [expandedCallId, setExpandedCallId] = useState(null);
+  const [aiSummaries, setAiSummaries] = useState({});
 
   useEffect(() => {
     loadData();
@@ -215,6 +220,38 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Failed to load recording:', error);
       alert('Recording not available');
+    }
+  };
+
+  const handleToggleExpand = async (e, call) => {
+    e.stopPropagation();
+
+    // Only allow expansion for calls > 45 seconds
+    if (call.duration <= 45) {
+      return;
+    }
+
+    if (expandedCallId === call.id) {
+      setExpandedCallId(null);
+    } else {
+      setExpandedCallId(call.id);
+
+      // Fetch AI summary if not already loaded
+      if (!aiSummaries[call.id]) {
+        try {
+          const summary = await api.getAISummary(call.id);
+          setAiSummaries(prev => ({
+            ...prev,
+            [call.id]: summary
+          }));
+        } catch (error) {
+          console.error('Failed to load AI summary:', error);
+          setAiSummaries(prev => ({
+            ...prev,
+            [call.id]: { error: 'Failed to load AI summary' }
+          }));
+        }
+      }
     }
   };
 
@@ -697,6 +734,7 @@ export default function Dashboard() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-10"></TableHead>
                         <TableHead>Date & Time</TableHead>
                         <TableHead>From</TableHead>
                         <TableHead>To</TableHead>
@@ -709,11 +747,31 @@ export default function Dashboard() {
                     </TableHeader>
                     <TableBody>
                       {calls.map((call) => (
-                        <TableRow
-                          key={call.id}
-                          className="cursor-pointer hover:bg-gray-50"
-                          onClick={() => navigate(`/call/${call.id}`)}
-                        >
+                        <React.Fragment key={call.id}>
+                          <TableRow
+                            className="cursor-pointer hover:bg-gray-50"
+                            onClick={() => navigate(`/call/${call.id}`)}
+                          >
+                          <TableCell
+                            className="p-0"
+                            onClick={(e) => handleToggleExpand(e, call)}
+                          >
+                            {call.duration > 45 ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                              >
+                                {expandedCallId === call.id ? (
+                                  <ChevronUp className="h-4 w-4" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4" />
+                                )}
+                              </Button>
+                            ) : (
+                              <div className="h-8 w-8"></div>
+                            )}
+                          </TableCell>
                           <TableCell className="font-medium text-sm">
                             {formatDateTime(call.call_date || call.start_time)}
                           </TableCell>
@@ -788,6 +846,76 @@ export default function Dashboard() {
                             )}
                           </TableCell>
                         </TableRow>
+
+                        {/* AI Summary Accordion Row */}
+                        {expandedCallId === call.id && call.duration > 45 && (
+                          <TableRow>
+                            <TableCell colSpan={9} className="bg-blue-50 p-4">
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2 text-blue-900 font-semibold">
+                                  <Sparkles className="h-5 w-5" />
+                                  <span>AI Summary</span>
+                                </div>
+
+                                {aiSummaries[call.id] ? (
+                                  aiSummaries[call.id].error ? (
+                                    <div className="text-red-600 text-sm">
+                                      {aiSummaries[call.id].error}
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-3">
+                                      {/* Overview */}
+                                      {aiSummaries[call.id].summary && (
+                                        <div className="bg-white p-3 rounded-md border border-blue-200">
+                                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Overview</h4>
+                                          <p className="text-sm text-gray-600">{aiSummaries[call.id].summary}</p>
+                                        </div>
+                                      )}
+
+                                      {/* Key Points */}
+                                      {aiSummaries[call.id].key_points && aiSummaries[call.id].key_points.length > 0 && (
+                                        <div className="bg-white p-3 rounded-md border border-blue-200">
+                                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Key Points</h4>
+                                          <ul className="list-disc list-inside space-y-1">
+                                            {aiSummaries[call.id].key_points.map((point, idx) => (
+                                              <li key={idx} className="text-sm text-gray-600">{point}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+
+                                      {/* Action Items */}
+                                      {aiSummaries[call.id].action_items && aiSummaries[call.id].action_items.length > 0 && (
+                                        <div className="bg-white p-3 rounded-md border border-blue-200">
+                                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Action Items</h4>
+                                          <ul className="list-disc list-inside space-y-1">
+                                            {aiSummaries[call.id].action_items.map((item, idx) => (
+                                              <li key={idx} className="text-sm text-gray-600">{item}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+
+                                      {/* Sentiment Details */}
+                                      {aiSummaries[call.id].sentiment_analysis && (
+                                        <div className="bg-white p-3 rounded-md border border-blue-200">
+                                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Sentiment Analysis</h4>
+                                          <p className="text-sm text-gray-600">{aiSummaries[call.id].sentiment_analysis}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                ) : (
+                                  <div className="flex items-center gap-2 text-sm text-blue-700">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                    <span>Loading AI summary...</span>
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
                       ))}
                     </TableBody>
                   </Table>

@@ -30,6 +30,12 @@ import TenantsPage from './pages/TenantsPage';
 import CreateTenantPage from './pages/CreateTenantPage';
 import TeamPerformance from './pages/TeamPerformance';
 import OnboardingWizard from './pages/OnboardingWizard';
+import UsageAnalytics from './pages/UsageAnalytics';
+import SubscriptionManagement from './pages/SubscriptionManagement';
+import APIManagement from './pages/APIManagement';
+import AdvancedReporting from './pages/AdvancedReporting';
+import ComplianceDashboard from './pages/ComplianceDashboard';
+import TeamManagementEnhanced from './pages/TeamManagementEnhanced';
 
 // Super Admin Pages
 import SuperAdminLogin from './pages/SuperAdminLogin';
@@ -206,6 +212,54 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <OnboardingWizard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/usage-analytics"
+        element={
+          <ProtectedRoute>
+            <UsageAnalytics />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/subscription"
+        element={
+          <ProtectedRoute>
+            <SubscriptionManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/api-management"
+        element={
+          <ProtectedRoute>
+            <APIManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/advanced-reporting"
+        element={
+          <ProtectedRoute>
+            <AdvancedReporting />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/compliance"
+        element={
+          <ProtectedRoute>
+            <ComplianceDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/team-management"
+        element={
+          <ProtectedRoute>
+            <TeamManagementEnhanced />
           </ProtectedRoute>
         }
       />
