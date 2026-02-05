@@ -35,11 +35,11 @@ class CDRPoller:
         Returns session cookie on success, None on failure
         """
         try:
-            # Step 1: Request challenge
+            # Step 1: Request challenge (using GET request)
             logger.info("Requesting authentication challenge from CloudUCM...")
-            challenge_response = requests.post(
+            challenge_response = requests.get(
                 f"{UCM_API_BASE}/api",
-                json={"action": "challenge", "user": UCM_USERNAME},
+                params={"action": "challenge", "user": UCM_USERNAME},
                 timeout=30,
                 verify=False  # CloudUCM may use self-signed cert
             )
@@ -64,10 +64,10 @@ class CDRPoller:
             token = hashlib.md5(f"{challenge}{UCM_PASSWORD}".encode()).hexdigest()
             logger.info(f"Created authentication token: {token[:20]}...")
 
-            # Step 3: Login with username and token
-            login_response = requests.post(
+            # Step 3: Login with username and token (using GET request)
+            login_response = requests.get(
                 f"{UCM_API_BASE}/api",
-                json={"action": "login", "user": UCM_USERNAME, "token": token},
+                params={"action": "login", "user": UCM_USERNAME, "token": token},
                 timeout=30,
                 verify=False
             )
@@ -132,10 +132,10 @@ class CDRPoller:
 
             logger.info(f"Fetching CDRs from {start_time} to {end_time}")
 
-            # Make API request to CloudUCM with session cookie
-            response = requests.post(
+            # Make API request to CloudUCM with session cookie (using GET request)
+            response = requests.get(
                 f"{UCM_API_BASE}/api",
-                json={
+                params={
                     "action": "cdrapi",
                     "format": "json",
                     "startdate": start_time,
