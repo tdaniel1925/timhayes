@@ -5,11 +5,13 @@ Add these to Render environment variables:
 ## Required:
 
 ```
-UCM_API_BASE=https://071ffb.c.myucm.cloud/api
+UCM_API_BASE=https://071ffb.c.myucm.cloud:8443
 UCM_API_USERNAME=testco_webhook
 UCM_API_PASSWORD=TestWebhook123!
 CDR_POLL_INTERVAL=2
 ```
+
+**Note:** Port 8443 is the HTTPS API port for CloudUCM. The authentication uses challenge/response protocol with MD5 hashing.
 
 ## Optional:
 

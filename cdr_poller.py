@@ -6,6 +6,8 @@ Fetches CDR records from CloudUCM API every 2 minutes and processes them
 import requests
 import time
 import logging
+import hashlib
+import json
 from datetime import datetime, timedelta
 from app import app, db, CDRRecord, Tenant, process_call_ai_async
 import schedule
@@ -16,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # CloudUCM API Configuration (from environment variables)
 import os
-UCM_API_BASE = os.getenv('UCM_API_BASE', 'https://071ffb.c.myucm.cloud/api')
+UCM_API_BASE = os.getenv('UCM_API_BASE', 'https://071ffb.c.myucm.cloud:8443')
 UCM_USERNAME = os.getenv('UCM_API_USERNAME', 'testco_webhook')
 UCM_PASSWORD = os.getenv('UCM_API_PASSWORD', 'TestWebhook123!')
 CDR_POLL_INTERVAL = int(os.getenv('CDR_POLL_INTERVAL', '2'))  # minutes
@@ -24,6 +26,87 @@ CDR_POLL_INTERVAL = int(os.getenv('CDR_POLL_INTERVAL', '2'))  # minutes
 class CDRPoller:
     def __init__(self):
         self.last_sync_time = {}  # Track last sync per tenant
+        self.session_cookie = None  # Store session cookie
+        self.session_expiry = None  # Track when session expires
+
+    def authenticate(self):
+        """
+        Authenticate with CloudUCM using challenge/response protocol
+        Returns session cookie on success, None on failure
+        """
+        try:
+            # Step 1: Request challenge
+            logger.info("Requesting authentication challenge from CloudUCM...")
+            challenge_response = requests.post(
+                f"{UCM_API_BASE}/api",
+                json={"action": "challenge", "user": UCM_USERNAME},
+                timeout=30,
+                verify=False  # CloudUCM may use self-signed cert
+            )
+
+            if challenge_response.status_code != 200:
+                logger.error(f"Challenge request failed: {challenge_response.status_code} - {challenge_response.text}")
+                return None
+
+            challenge_data = challenge_response.json()
+            if challenge_data.get('status') != 0:
+                logger.error(f"Challenge failed: {challenge_data}")
+                return None
+
+            challenge = challenge_data.get('response', {}).get('challenge')
+            if not challenge:
+                logger.error("No challenge received from CloudUCM")
+                return None
+
+            logger.info(f"Received challenge: {challenge[:20]}...")
+
+            # Step 2: Create MD5 hash of challenge + password
+            token = hashlib.md5(f"{challenge}{UCM_PASSWORD}".encode()).hexdigest()
+            logger.info(f"Created authentication token: {token[:20]}...")
+
+            # Step 3: Login with username and token
+            login_response = requests.post(
+                f"{UCM_API_BASE}/api",
+                json={"action": "login", "user": UCM_USERNAME, "token": token},
+                timeout=30,
+                verify=False
+            )
+
+            if login_response.status_code != 200:
+                logger.error(f"Login request failed: {login_response.status_code} - {login_response.text}")
+                return None
+
+            login_data = login_response.json()
+            if login_data.get('status') != 0:
+                logger.error(f"Login failed: {login_data}")
+                return None
+
+            # Extract session cookie
+            session_cookie = login_response.cookies.get('session')
+            if not session_cookie:
+                logger.error("No session cookie received from CloudUCM")
+                return None
+
+            logger.info(f"✅ Authentication successful! Session: {session_cookie[:20]}...")
+            self.session_cookie = session_cookie
+            self.session_expiry = datetime.utcnow() + timedelta(minutes=30)  # Sessions typically last 30 min
+            return session_cookie
+
+        except Exception as e:
+            logger.error(f"Authentication error: {e}", exc_info=True)
+            return None
+
+    def ensure_authenticated(self):
+        """
+        Ensure we have a valid session, re-authenticate if needed
+        """
+        # Check if session is still valid
+        if self.session_cookie and self.session_expiry and datetime.utcnow() < self.session_expiry:
+            return True
+
+        # Need to authenticate
+        logger.info("Session expired or not authenticated, logging in...")
+        return self.authenticate() is not None
 
     def fetch_ucm_cdrs(self, since_time=None):
         """
@@ -33,9 +116,12 @@ class CDRPoller:
             since_time: datetime object - only fetch CDRs after this time
         """
         try:
-            # CloudUCM API endpoint for CDR list
-            # Format: GET /api/getCDRList?start_time=YYYY-MM-DD&end_time=YYYY-MM-DD
+            # Ensure we're authenticated
+            if not self.ensure_authenticated():
+                logger.error("Failed to authenticate with CloudUCM")
+                return []
 
+            # Calculate time range
             if since_time:
                 start_time = since_time.strftime("%Y-%m-%d %H:%M:%S")
             else:
@@ -46,25 +132,33 @@ class CDRPoller:
 
             logger.info(f"Fetching CDRs from {start_time} to {end_time}")
 
-            # Make API request to CloudUCM
-            response = requests.get(
-                f"{UCM_API_BASE}/getCDRList",
-                auth=(UCM_USERNAME, UCM_PASSWORD),
-                params={
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "format": "json"
+            # Make API request to CloudUCM with session cookie
+            response = requests.post(
+                f"{UCM_API_BASE}/api",
+                json={
+                    "action": "cdrapi",
+                    "format": "json",
+                    "startdate": start_time,
+                    "enddate": end_time
                 },
-                timeout=30
+                cookies={"session": self.session_cookie},
+                timeout=30,
+                verify=False
             )
 
-            if response.status_code == 200:
-                data = response.json()
-                logger.info(f"Fetched {len(data.get('records', []))} CDR records")
-                return data.get('records', [])
-            else:
+            if response.status_code != 200:
                 logger.error(f"Failed to fetch CDRs: {response.status_code} - {response.text}")
                 return []
+
+            data = response.json()
+
+            if data.get('status') != 0:
+                logger.error(f"CDR API returned error: {data}")
+                return []
+
+            records = data.get('response', {}).get('cdr', [])
+            logger.info(f"Fetched {len(records)} CDR records")
+            return records
 
         except Exception as e:
             logger.error(f"Error fetching CDRs from CloudUCM: {e}", exc_info=True)

@@ -36,24 +36,48 @@ Or in the Dashboard (coming soon):
 
 **Endpoint:**
 ```
-GET https://071ffb.c.myucm.cloud/api/getCDRList
+POST https://071ffb.c.myucm.cloud:8443/api
 ```
 
-**Authentication:**
+**Authentication:** Challenge/Response Protocol
 ```
 Username: testco_webhook
 Password: TestWebhook123!
 ```
 
-**Parameters:**
-- `start_time`: YYYY-MM-DD HH:MM:SS
-- `end_time`: YYYY-MM-DD HH:MM:SS
-- `format`: json
+**Authentication Flow:**
+1. Request challenge: `POST {"action": "challenge", "user": "testco_webhook"}`
+2. Create MD5 token: `md5(challenge + password)`
+3. Login: `POST {"action": "login", "user": "testco_webhook", "token": "<md5_hash>"}`
+4. Use session cookie for subsequent requests
+
+**CDR Query Parameters:**
+- `action`: "cdrapi"
+- `format`: "json"
+- `startdate`: YYYY-MM-DD HH:MM:SS
+- `enddate`: YYYY-MM-DD HH:MM:SS
 
 **Example:**
 ```bash
-curl -u "testco_webhook:TestWebhook123!" \
-  "https://071ffb.c.myucm.cloud/api/getCDRList?start_time=2026-02-04%2000:00:00&end_time=2026-02-04%2023:59:59&format=json"
+# Step 1: Get challenge
+CHALLENGE=$(curl -s -k -X POST https://071ffb.c.myucm.cloud:8443/api \
+  -H "Content-Type: application/json" \
+  -d '{"action":"challenge","user":"testco_webhook"}' | jq -r '.response.challenge')
+
+# Step 2: Create MD5 token
+TOKEN=$(echo -n "${CHALLENGE}TestWebhook123!" | md5sum | cut -d' ' -f1)
+
+# Step 3: Login and get session cookie
+curl -s -k -X POST https://071ffb.c.myucm.cloud:8443/api \
+  -H "Content-Type: application/json" \
+  -d '{"action":"login","user":"testco_webhook","token":"'$TOKEN'"}' \
+  -c cookies.txt
+
+# Step 4: Query CDRs
+curl -s -k -X POST https://071ffb.c.myucm.cloud:8443/api \
+  -H "Content-Type: application/json" \
+  -d '{"action":"cdrapi","format":"json","startdate":"2026-02-04 00:00:00","enddate":"2026-02-04 23:59:59"}' \
+  -b cookies.txt
 ```
 
 ---
