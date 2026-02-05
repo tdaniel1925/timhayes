@@ -2487,6 +2487,11 @@ def receive_cdr(subdomain):
 
         # Safely parse CDR data (handle JSON errors)
         try:
+            # Check if request has data
+            if not request.data or len(request.data) == 0:
+                logger.warning(f"[WEBHOOK] Empty request body received for tenant {subdomain}")
+                return jsonify({'status': 'ok', 'message': 'Empty request received - possibly a test ping'}), 200
+
             if request.is_json:
                 cdr_data = request.get_json()
             else:
