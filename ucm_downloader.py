@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import quote, urlencode
 import tempfile
-import urllib3
+import warnings
 
 # Disable SSL warnings for self-signed certificates
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
 logger = logging.getLogger(__name__)
 
