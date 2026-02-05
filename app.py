@@ -2448,10 +2448,16 @@ def manual_sync_cdrs():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/webhook/cdr/<subdomain>', methods=['POST'])
+@app.route('/api/webhook/cdr/<subdomain>', methods=['GET', 'POST'])
 def receive_cdr(subdomain):
     """Receive CDR webhook - tenant-specific endpoint"""
     try:
+        # Handle GET requests (CloudUCM may send GET to verify endpoint)
+        if request.method == 'GET':
+            logger.info(f"[WEBHOOK] GET request received for tenant: {subdomain}")
+            return jsonify({'status': 'ok', 'message': 'Webhook endpoint is ready'}), 200
+
+        # Handle POST requests with CDR data
         # DEBUG: Log raw request details
         logger.info(f"[WEBHOOK DEBUG] Subdomain: {subdomain}")
         logger.info(f"[WEBHOOK DEBUG] Content-Type: {request.content_type}")
