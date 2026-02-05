@@ -3137,6 +3137,94 @@ def receive_cdr(subdomain):
         return jsonify({'error': f'CDR processing failed: {str(e)}'}), 500
 
 
+@app.route('/api/admin/ucm-diagnostics', methods=['GET', 'POST'])
+@jwt_required()
+def ucm_diagnostics():
+    """Diagnostic endpoint to check UCM configuration and test recording downloads"""
+    claims = get_jwt()
+    role = claims.get('role')
+
+    # Only admins can access
+    if role not in ['admin', 'superadmin']:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    try:
+        # Show current UCM configuration
+        config = {
+            'UCM_IP': UCM_IP,
+            'UCM_USERNAME': UCM_USERNAME,
+            'UCM_PASSWORD': '***' + UCM_PASSWORD[-3:] if UCM_PASSWORD and len(UCM_PASSWORD) > 3 else '***',
+            'UCM_PORT': UCM_PORT,
+            'TRANSCRIPTION_ENABLED': TRANSCRIPTION_ENABLED,
+            'SENTIMENT_ENABLED': SENTIMENT_ENABLED,
+            'STORAGE_CONFIGURED': get_storage_manager() is not None
+        }
+
+        # If POST, test downloading a specific recording
+        if request.method == 'POST':
+            data = request.get_json()
+            call_id = data.get('call_id')
+
+            if not call_id:
+                return jsonify({'error': 'call_id required'}), 400
+
+            call = CDRRecord.query.get(call_id)
+            if not call:
+                return jsonify({'error': 'Call not found'}), 404
+
+            if not call.recordfiles:
+                return jsonify({'error': 'Call has no recording path'}), 400
+
+            # Try to download the recording
+            logger.info(f"🔍 Diagnostic: Testing download for call {call_id}")
+            logger.info(f"   Recording path: {call.recordfiles}")
+
+            from ucm_downloader import download_and_upload_recording
+            storage_manager = get_storage_manager()
+
+            result = download_and_upload_recording(
+                UCM_IP,
+                UCM_USERNAME,
+                UCM_PASSWORD,
+                call.recordfiles,
+                call.tenant_id,
+                call.uniqueid,
+                storage_manager
+            )
+
+            if result:
+                # Update the call record
+                call.recordfiles = result
+                call.recording_downloaded = True
+                call.recording_local_path = result
+                db.session.commit()
+
+                return jsonify({
+                    'status': 'success',
+                    'message': 'Recording downloaded successfully',
+                    'storage_path': result,
+                    'config': config
+                }), 200
+            else:
+                return jsonify({
+                    'status': 'failed',
+                    'message': 'Recording download failed. Check server logs for details.',
+                    'config': config
+                }), 500
+
+        # GET request - just show configuration
+        return jsonify({
+            'status': 'info',
+            'message': 'UCM Configuration',
+            'config': config,
+            'instructions': 'POST with {"call_id": <id>} to test downloading a specific recording'
+        }), 200
+
+    except Exception as e:
+        logger.error(f"UCM diagnostics error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 # ============================================================================
 # ENHANCED DASHBOARD API ENDPOINTS
 # ============================================================================
