@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ArrowLeft, Save, Server, Webhook, Sliders } from 'lucide-react';
+import ImpersonationBanner from '@/components/ImpersonationBanner';
 
 export default function Settings() {
   const { user, logout } = useAuth();
@@ -97,6 +98,8 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <ImpersonationBanner />
+
       {/* Header */}
       <header className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">

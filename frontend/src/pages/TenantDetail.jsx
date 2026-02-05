@@ -176,8 +176,9 @@ export default function TenantDetail() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      localStorage.setItem('token', response.data.access_token);
+      localStorage.setItem('access_token', response.data.access_token);
       localStorage.setItem('impersonating', 'true');
+      localStorage.setItem('impersonated_tenant_name', response.data.user.tenant.company_name);
       window.location.href = '/dashboard';
     } catch (err) {
       console.error('Error impersonating tenant:', err);

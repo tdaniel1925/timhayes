@@ -800,6 +800,44 @@ class ObjectionAnalysis(db.Model):
     analyzed_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class PromptCustomization(db.Model):
+    """Custom prompts per tenant for AI features"""
+    __tablename__ = 'prompt_customizations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=False)
+    ai_feature_slug = db.Column(db.String(100), nullable=False)  # which AI feature this is for
+
+    # Prompt data
+    custom_prompt = db.Column(db.Text, nullable=False)
+    default_prompt = db.Column(db.Text)  # Snapshot of default at time of customization
+
+    # Wizard configuration that generated this prompt
+    wizard_config = db.Column(db.Text)  # JSON: {industry, goals, tone, keywords, etc.}
+
+    # Version control
+    version = db.Column(db.Integer, default=1)
+    is_active = db.Column(db.Boolean, default=True)
+    parent_version_id = db.Column(db.Integer, db.ForeignKey('prompt_customizations.id'))
+
+    # Digital signature
+    signature_name = db.Column(db.String(200), nullable=False)
+    signature_ip = db.Column(db.String(50))
+    signature_timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Metadata
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Test results snapshot (JSON)
+    test_results = db.Column(db.Text)  # Results from testing before activation
+
+    __table_args__ = (
+        db.Index('idx_tenant_feature_active', 'tenant_id', 'ai_feature_slug', 'is_active'),
+    )
+
+
 class AIFeature(db.Model):
     """AI features that can be enabled per tenant"""
     __tablename__ = 'ai_features'
@@ -6872,6 +6910,416 @@ def assign_call_to_member():
 
     except Exception as e:
         logger.error(f"Assign call error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# PROMPT CUSTOMIZATION ENDPOINTS
+# ============================================================================
+
+@app.route('/api/tenant/prompt-customizations', methods=['GET'])
+@jwt_required()
+def get_prompt_customizations():
+    """Get all active prompt customizations for tenant"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        # Get all active customizations
+        customizations = PromptCustomization.query.filter_by(
+            tenant_id=tenant_id,
+            is_active=True
+        ).all()
+
+        return jsonify({
+            'customizations': [{
+                'id': c.id,
+                'ai_feature_slug': c.ai_feature_slug,
+                'custom_prompt': c.custom_prompt,
+                'version': c.version,
+                'signature_name': c.signature_name,
+                'signature_timestamp': c.signature_timestamp.isoformat() if c.signature_timestamp else None,
+                'created_at': c.created_at.isoformat() if c.created_at else None
+            } for c in customizations]
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get prompt customizations error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/prompts/generate', methods=['POST'])
+@jwt_required()
+def generate_prompt_from_wizard():
+    """Generate a custom prompt based on wizard answers"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        data = request.get_json()
+        feature_slug = data.get('feature_slug')
+        wizard_data = data.get('wizard_data', {})
+
+        if not feature_slug:
+            return jsonify({'error': 'feature_slug is required'}), 400
+
+        # Build prompt based on wizard data
+        industry = wizard_data.get('industry', '')
+        goals = wizard_data.get('goals', [])
+        tone = wizard_data.get('tone', 'professional')
+        keywords = wizard_data.get('keywords', [])
+
+        # Get industry-specific context
+        industry_contexts = {
+            'sales_b2b': 'B2B sales calls focused on enterprise solutions',
+            'sales_b2c': 'consumer-focused sales conversations',
+            'customer_support': 'customer service and technical support calls',
+            'healthcare': 'HIPAA-compliant healthcare communications',
+            'financial': 'financial services and advisory calls',
+            'real_estate': 'property sales and client consultations',
+            'insurance': 'insurance policy discussions and claims',
+            'ecommerce': 'e-commerce customer inquiries',
+            'saas': 'SaaS product demos and support',
+            'manufacturing': 'manufacturing and B2B logistics'
+        }
+
+        tone_styles = {
+            'professional': 'professional and business-appropriate',
+            'friendly': 'warm and conversational',
+            'technical': 'precise and technical'
+        }
+
+        # Generate custom prompt using GPT-4
+        client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+
+        prompt_generation_request = f"""Create a custom AI prompt for the "{feature_slug}" feature.
+
+Context:
+- Industry: {industry_contexts.get(industry, 'general business')}
+- Goals: {', '.join(goals) if goals else 'general analysis'}
+- Tone: {tone_styles.get(tone, 'professional')}
+- Key terms to focus on: {', '.join(keywords) if keywords else 'none specified'}
+
+Generate a detailed, effective prompt that:
+1. Addresses the specific industry context
+2. Focuses on achieving the stated goals
+3. Uses the appropriate tone
+4. Incorporates the key terms when relevant
+5. Is optimized for the {feature_slug} AI feature
+
+Return only the prompt text, no explanations."""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are an AI prompt engineer specializing in call analysis systems."},
+                {"role": "user", "content": prompt_generation_request}
+            ]
+        )
+
+        generated_prompt = response.choices[0].message.content
+
+        return jsonify({
+            'prompt': generated_prompt,
+            'feature_slug': feature_slug
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Generate prompt error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/prompts/refine', methods=['POST'])
+@jwt_required()
+def refine_prompt_with_ai():
+    """Refine a prompt using AI chat"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        data = request.get_json()
+        feature_slug = data.get('feature_slug')
+        current_prompt = data.get('current_prompt')
+        user_instruction = data.get('user_instruction')
+        chat_history = data.get('chat_history', [])
+
+        if not all([feature_slug, current_prompt, user_instruction]):
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # Use GPT-4 to refine the prompt
+        client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+
+        messages = [
+            {"role": "system", "content": f"You are an AI assistant helping refine a prompt for the '{feature_slug}' feature. When the user asks for changes, modify the prompt and explain what you changed and why."}
+        ]
+
+        # Add chat history
+        for msg in chat_history[-5:]:  # Last 5 messages for context
+            messages.append(msg)
+
+        # Add current request
+        messages.append({
+            "role": "user",
+            "content": f"Current prompt:\n{current_prompt}\n\nUser request: {user_instruction}\n\nPlease refine the prompt according to the request and explain your changes."
+        })
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages
+        )
+
+        ai_response = response.choices[0].message.content
+
+        # Extract refined prompt (assume it's in the response)
+        # For simplicity, we'll use the whole response as explanation
+        # and regenerate the prompt with the instruction applied
+
+        refine_request = f"""Refine this prompt: {current_prompt}
+
+User's instruction: {user_instruction}
+
+Return ONLY the refined prompt, no explanations."""
+
+        refine_response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You refine AI prompts based on user instructions. Return only the refined prompt."},
+                {"role": "user", "content": refine_request}
+            ]
+        )
+
+        refined_prompt = refine_response.choices[0].message.content
+
+        return jsonify({
+            'refined_prompt': refined_prompt,
+            'explanation': ai_response
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Refine prompt error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/prompts/test', methods=['POST'])
+@jwt_required()
+def test_custom_prompt():
+    """Test a custom prompt on recent calls"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        data = request.get_json()
+        feature_slug = data.get('feature_slug')
+        custom_prompt = data.get('custom_prompt')
+
+        if not all([feature_slug, custom_prompt]):
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # Get 3 recent calls with transcriptions
+        recent_calls = CDRRecord.query.filter_by(tenant_id=tenant_id).join(
+            Transcription
+        ).order_by(
+            CDRRecord.received_at.desc()
+        ).limit(3).all()
+
+        if not recent_calls:
+            return jsonify({'error': 'No transcribed calls available for testing'}), 400
+
+        # Test the custom prompt on each call
+        client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        sample_results = []
+
+        for call in recent_calls:
+            if call.transcription and call.transcription.transcription_text:
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": custom_prompt},
+                            {"role": "user", "content": f"Analyze this call:\n{call.transcription.transcription_text}"}
+                        ]
+                    )
+
+                    sample_results.append({
+                        'call_id': call.id,
+                        'call_date': call.received_at.isoformat() if call.received_at else None,
+                        'output': response.choices[0].message.content
+                    })
+                except Exception as e:
+                    logger.error(f"Error testing on call {call.id}: {e}")
+                    continue
+
+        return jsonify({
+            'test_results': {
+                'calls_tested': len(sample_results),
+                'sample_results': sample_results
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Test prompt error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/prompts/save', methods=['POST'])
+@jwt_required()
+def save_custom_prompt():
+    """Save and activate a custom prompt with digital signature"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+        user_id = claims.get('sub')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        data = request.get_json()
+        feature_slug = data.get('feature_slug')
+        custom_prompt = data.get('custom_prompt')
+        signature_name = data.get('signature_name')
+        wizard_data = data.get('wizard_data', {})
+
+        if not all([feature_slug, custom_prompt, signature_name]):
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # Deactivate any existing active customization for this feature
+        PromptCustomization.query.filter_by(
+            tenant_id=tenant_id,
+            ai_feature_slug=feature_slug,
+            is_active=True
+        ).update({'is_active': False})
+
+        # Get the latest version number
+        latest_version = db.session.query(func.max(PromptCustomization.version)).filter_by(
+            tenant_id=tenant_id,
+            ai_feature_slug=feature_slug
+        ).scalar() or 0
+
+        # Create new customization
+        customization = PromptCustomization(
+            tenant_id=tenant_id,
+            ai_feature_slug=feature_slug,
+            custom_prompt=custom_prompt,
+            wizard_config=json.dumps(wizard_data) if wizard_data else None,
+            version=latest_version + 1,
+            is_active=True,
+            signature_name=signature_name,
+            signature_ip=request.remote_addr,
+            created_by=user_id
+        )
+
+        db.session.add(customization)
+        db.session.commit()
+
+        # Log audit trail
+        log_audit('prompt_customization_created', 'prompt_customization', customization.id, {
+            'feature_slug': feature_slug,
+            'version': customization.version,
+            'signature_name': signature_name
+        })
+
+        return jsonify({
+            'message': 'Prompt customization saved and activated successfully',
+            'customization_id': customization.id,
+            'version': customization.version
+        }), 201
+
+    except Exception as e:
+        logger.error(f"Save prompt error: {e}", exc_info=True)
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/prompts/history/<feature_slug>', methods=['GET'])
+@jwt_required()
+def get_prompt_history(feature_slug):
+    """Get version history for a feature's prompts"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        history = PromptCustomization.query.filter_by(
+            tenant_id=tenant_id,
+            ai_feature_slug=feature_slug
+        ).order_by(PromptCustomization.version.desc()).all()
+
+        return jsonify({
+            'history': [{
+                'id': h.id,
+                'version': h.version,
+                'is_active': h.is_active,
+                'signature_name': h.signature_name,
+                'created_at': h.created_at.isoformat() if h.created_at else None,
+                'prompt_preview': h.custom_prompt[:200] + '...' if len(h.custom_prompt) > 200 else h.custom_prompt
+            } for h in history]
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get prompt history error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tenant/prompts/restore/<int:version_id>', methods=['POST'])
+@jwt_required()
+def restore_prompt_version(version_id):
+    """Restore a previous prompt version"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+        user_id = claims.get('sub')
+
+        if not tenant_id:
+            return jsonify({'error': 'No tenant associated with user'}), 400
+
+        # Get the version to restore
+        version_to_restore = PromptCustomization.query.filter_by(
+            id=version_id,
+            tenant_id=tenant_id
+        ).first()
+
+        if not version_to_restore:
+            return jsonify({'error': 'Version not found'}), 404
+
+        # Deactivate current active version
+        PromptCustomization.query.filter_by(
+            tenant_id=tenant_id,
+            ai_feature_slug=version_to_restore.ai_feature_slug,
+            is_active=True
+        ).update({'is_active': False})
+
+        # Activate the restored version
+        version_to_restore.is_active = True
+        db.session.commit()
+
+        # Log audit trail
+        log_audit('prompt_version_restored', 'prompt_customization', version_id, {
+            'feature_slug': version_to_restore.ai_feature_slug,
+            'version': version_to_restore.version
+        })
+
+        return jsonify({
+            'message': 'Version restored successfully',
+            'version': version_to_restore.version
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Restore version error: {e}", exc_info=True)
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 

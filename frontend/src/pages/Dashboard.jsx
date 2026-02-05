@@ -18,6 +18,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import NotificationBell from '@/components/NotificationBell';
+import ImpersonationBanner from '@/components/ImpersonationBanner';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -295,6 +296,8 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <ImpersonationBanner />
+
       {/* Hidden audio player for streaming recordings */}
       <audio
         ref={audioRef}
@@ -352,6 +355,14 @@ export default function Dashboard() {
                 </Button>
               </>
             )}
+            <Button
+              variant="outline"
+              onClick={() => navigate('/prompt-customization')}
+              className="flex items-center gap-2"
+            >
+              <Sparkles className="h-4 w-4" />
+              AI Customization
+            </Button>
             <Button
               variant="outline"
               onClick={() => navigate('/settings')}

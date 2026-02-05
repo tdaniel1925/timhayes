@@ -36,6 +36,7 @@ import APIManagement from './pages/APIManagement';
 import AdvancedReporting from './pages/AdvancedReporting';
 import ComplianceDashboard from './pages/ComplianceDashboard';
 import TeamManagementEnhanced from './pages/TeamManagementEnhanced';
+import PromptCustomization from './pages/PromptCustomization';
 
 // Super Admin Pages
 import SuperAdminLogin from './pages/SuperAdminLogin';
@@ -260,6 +261,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <TeamManagementEnhanced />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/prompt-customization"
+        element={
+          <ProtectedRoute>
+            <PromptCustomization />
           </ProtectedRoute>
         }
       />
