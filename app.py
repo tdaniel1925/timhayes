@@ -1771,9 +1771,10 @@ def process_call_ai_async(call_id, ucm_recording_path):
         ucm_recording_path: Path to recording file on UCM server
     """
     def ai_worker():
-        try:
-            # Get call from database
-            call = CDRRecord.query.get(call_id)
+        with app.app_context():
+            try:
+                # Get call from database
+                call = CDRRecord.query.get(call_id)
             if not call:
                 logger.error(f"Call {call_id} not found for AI processing")
                 return
@@ -1884,11 +1885,11 @@ def process_call_ai_async(call_id, ucm_recording_path):
             if 'compliance-monitoring' in enabled_features:
                 monitor_compliance(transcription_text, tenant_id, call_id)
 
-            logger.info(f"✅ AI processing complete for call {call_id}")
+                logger.info(f"✅ AI processing complete for call {call_id}")
 
-        except Exception as e:
-            logger.error(f"AI processing failed for call {call_id}: {e}", exc_info=True)
-            db.session.rollback()
+            except Exception as e:
+                logger.error(f"AI processing failed for call {call_id}: {e}", exc_info=True)
+                db.session.rollback()
 
     # Run in background thread
     thread = threading.Thread(target=ai_worker, daemon=True)
