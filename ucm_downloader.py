@@ -89,6 +89,19 @@ class UCMRecordingDownloader:
             logger.info(f"Recording already exists: {local_path}")
             return local_path
 
+        # Clean recording path - UCM sometimes appends @ to indicate server/partition
+        # Remove it before attempting download
+        original_path = recording_path
+        recording_path = recording_path.rstrip('@').rstrip()
+
+        if original_path != recording_path:
+            logger.info(f"Cleaned recording path: '{original_path}' -> '{recording_path}'")
+
+        # Ensure recording path starts with /
+        if not recording_path.startswith('/'):
+            recording_path = '/' + recording_path
+            logger.info(f"Added leading slash to recording path: {recording_path}")
+
         # Try direct HTTPS download (UCM may expose recordings via web interface)
         try:
             # Common UCM recording paths

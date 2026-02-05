@@ -56,7 +56,19 @@
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc3MDI0OTE3NywianRpIjoiNDEwMGY5ZGYtZTg5Ny00YjIxLTliYmMtYmFjMGUzN2YwYjgxIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6MiwibmJmIjoxNzcwMjQ5MTc3LCJjc3JmIjoiZjc3NjUzOGYtMThkZi00YTk5LTljZDgtYjc0MTViNTFlNWZhIiwiZXhwIjoxNzcwMjUyNzc3LCJ0ZW5hbnRfaWQiOjEsInJvbGUiOiJzdXBlcmFkbWluIn0.5mlnO-jQUoYw8S00g2aq2by8ECivNaGxvMZbp5CFBmQ\")",
       "Bash(break)",
       "Bash(do echo \"Check $i/6:\")",
-      "WebFetch(domain:www.grandstream.com)"
+      "WebFetch(domain:www.grandstream.com)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc3MDI1NTY1OCwianRpIjoiYTBjNjNjZmItMWE3MC00N2VhLWEzMDctMDlhM2UyNDFmYmUzIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6MiwibmJmIjoxNzcwMjU1NjU4LCJjc3JmIjoiMmNlNjFlMWItNTlmMi00Y2RhLTkzYWEtMTAyZDhiOWQxNTFkIiwiZXhwIjoxNzcwMjU5MjU4LCJ0ZW5hbnRfaWQiOjEsInJvbGUiOiJzdXBlcmFkbWluIn0.VcRy4E9jfbaRGTIWuLF7_R6JC9Ab5y6S6qtvBry_X8I\")",
+      "Bash(do echo \"=== Check $i/6 ===\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc3MDI1NjgyMCwianRpIjoiOWRkZWVmNzQtYTFhNS00OTlhLWJlZjEtMmQzNTJiOTc3ZTQzIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6MiwibmJmIjoxNzcwMjU2ODIwLCJjc3JmIjoiNDg3OWQyNGMtMTM2YS00ZjBkLTg0NjktNWQ5OGViZjZhYzUwIiwiZXhwIjoxNzcwMjYwNDIwLCJ0ZW5hbnRfaWQiOjEsInJvbGUiOiJzdXBlcmFkbWluIn0.yV-4MQax0B7kb49LSRNYMr-NcIheVmAZO_UBVqaG9ZI\")",
+      "Bash(//c/tmp/challenge.txt)",
+      "Bash(do sleep 20)",
+      "Bash(for:*)",
+      "Bash(do sleep 25)",
+      "Bash(git checkout:*)",
+      "Bash(timeout /t 5)",
+      "Bash(git rm:*)",
+      "Bash(cmd /c ipconfig /flushdns)",
+      "Bash(netstat:*)"
     ],
     "deny": [],
     "ask": []
