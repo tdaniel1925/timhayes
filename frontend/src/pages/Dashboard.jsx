@@ -17,8 +17,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import NotificationBell from '@/components/NotificationBell';
-import ImpersonationBanner from '@/components/ImpersonationBanner';
+import DashboardLayout from '@/components/DashboardLayout';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -295,9 +294,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <ImpersonationBanner />
-
+    <DashboardLayout title="Dashboard" subtitle="Overview of your call analytics">
       {/* Hidden audio player for streaming recordings */}
       <audio
         ref={audioRef}
@@ -306,80 +303,7 @@ export default function Dashboard() {
         style={{ display: 'none' }}
       />
 
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold">AudiaPro</h1>
-            <p className="text-sm text-muted-foreground">{user?.tenant?.company_name}</p>
-          </div>
-          <div className="flex items-center gap-4">
-            {user?.role === 'superadmin' && (
-              <Button
-                variant="ghost"
-                onClick={() => navigate('/tenants')}
-                className="text-sm font-semibold"
-              >
-                🏢 All Tenants
-              </Button>
-            )}
-            {user?.role === 'admin' && (
-              <>
-                <Button
-                  variant="ghost"
-                  onClick={() => navigate('/admin/setup-requests')}
-                  className="text-sm"
-                >
-                  Setup Requests
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => navigate('/users')}
-                  className="text-sm"
-                >
-                  Users
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => navigate('/integrations')}
-                  className="text-sm"
-                >
-                  Integrations
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => navigate('/team-performance')}
-                  className="text-sm font-semibold text-blue-600"
-                >
-                  📊 Team Performance
-                </Button>
-              </>
-            )}
-            <Button
-              variant="outline"
-              onClick={() => navigate('/prompt-customization')}
-              className="flex items-center gap-2"
-            >
-              <Sparkles className="h-4 w-4" />
-              AI Customization
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate('/settings')}
-              className="flex items-center gap-2"
-            >
-              <Settings className="h-4 w-4" />
-              Settings
-            </Button>
-            <NotificationBell />
-            <span className="text-sm text-muted-foreground">{user?.email}</span>
-            <Button variant="outline" onClick={logout}>Logout</Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="px-8 py-8">
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card>
@@ -987,7 +911,7 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

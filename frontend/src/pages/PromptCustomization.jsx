@@ -24,7 +24,7 @@ import {
   ChevronRight,
   ChevronLeft
 } from 'lucide-react';
-import ImpersonationBanner from '@/components/ImpersonationBanner';
+import DashboardLayout from '@/components/DashboardLayout';
 
 const INDUSTRIES = [
   { id: 'sales_b2b', name: 'B2B Sales', icon: '💼' },
@@ -292,40 +292,12 @@ export default function PromptCustomization() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <ImpersonationBanner />
-
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                  <Wand2 className="h-6 w-6 text-purple-600" />
-                  AI Customization Studio
-                </h1>
-                <p className="text-sm text-muted-foreground">Customize AI prompts for your business needs</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">{user?.email}</span>
-              <Button variant="outline" onClick={logout}>Logout</Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <>
+      <DashboardLayout
+        title={<div className="flex items-center gap-2"><Wand2 className="h-6 w-6 text-purple-600" />AI Customization Studio</div>}
+        subtitle="Customize AI prompts for your business needs"
+      >
+        <div className="max-w-7xl mx-auto px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Feature Selection Sidebar */}
           <Card className="lg:col-span-1">
@@ -770,7 +742,7 @@ export default function PromptCustomization() {
             )}
           </div>
         </div>
-      </main>
+      </DashboardLayout>
 
       {/* Digital Signature Modal */}
       {showSignatureModal && (
@@ -847,6 +819,6 @@ export default function PromptCustomization() {
           </Card>
         </div>
       )}
-    </div>
+    </>
   );
 }

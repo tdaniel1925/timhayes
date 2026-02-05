@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ArrowLeft, Save, Server, Webhook, Sliders } from 'lucide-react';
-import ImpersonationBanner from '@/components/ImpersonationBanner';
+import DashboardLayout from '@/components/DashboardLayout';
 
 export default function Settings() {
   const { user, logout } = useAuth();
@@ -97,30 +97,8 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <ImpersonationBanner />
-
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate('/dashboard')} size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">Settings</h1>
-              <p className="text-sm text-muted-foreground">{user?.tenant?.company_name}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{user?.email}</span>
-            <Button variant="outline" onClick={logout}>Logout</Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <DashboardLayout title="Settings" subtitle="Configure your account and integrations">
+      <div className="max-w-4xl mx-auto px-8 py-8">
         <div className="space-y-6">
           {/* Account Information */}
           <Card>
@@ -364,7 +342,7 @@ export default function Settings() {
             </Button>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }
