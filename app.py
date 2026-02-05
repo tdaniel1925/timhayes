@@ -2417,6 +2417,12 @@ def verify_email():
 def receive_cdr(subdomain):
     """Receive CDR webhook - tenant-specific endpoint"""
     try:
+        # DEBUG: Log raw request details
+        logger.info(f"[WEBHOOK DEBUG] Subdomain: {subdomain}")
+        logger.info(f"[WEBHOOK DEBUG] Content-Type: {request.content_type}")
+        logger.info(f"[WEBHOOK DEBUG] Headers: {dict(request.headers)}")
+        logger.info(f"[WEBHOOK DEBUG] Raw data (first 500 chars): {request.data[:500]}")
+
         tenant = Tenant.query.filter_by(subdomain=subdomain).first()
         if not tenant:
             logger.warning(f"Unknown tenant subdomain: {subdomain}")
@@ -2427,6 +2433,8 @@ def receive_cdr(subdomain):
         webhook_pass = tenant.webhook_password or ""
 
         auth = request.authorization
+        logger.info(f"[WEBHOOK DEBUG] Auth present: {auth is not None}, Username: {auth.username if auth else 'None'}")
+
         if not auth or auth.username != webhook_user or auth.password != webhook_pass:
             logger.warning(f"Invalid credentials for tenant: {subdomain}")
             return jsonify({'error': 'Unauthorized'}), 401
@@ -2515,7 +2523,9 @@ def receive_cdr(subdomain):
     except Exception as e:
         db.session.rollback()  # Critical: Prevent cascading failures
         logger.error(f"Error processing CDR: {e}", exc_info=True)
-        return jsonify({'error': 'CDR processing failed'}), 500
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Request data: {request.data[:1000] if request.data else 'None'}")
+        return jsonify({'error': f'CDR processing failed: {str(e)}'}), 500
 
 
 # ============================================================================
