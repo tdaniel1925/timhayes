@@ -38,6 +38,12 @@ import TenantList from './pages/TenantList';
 import TenantCreate from './pages/TenantCreate';
 import TenantDetail from './pages/TenantDetail';
 import RevenueDashboard from './pages/RevenueDashboard';
+import PlansManagement from './pages/PlansManagement';
+import RevenueAnalytics from './pages/RevenueAnalytics';
+import CostTracking from './pages/CostTracking';
+import SystemMonitoring from './pages/SystemMonitoring';
+import FeatureFlagsManagement from './pages/FeatureFlagsManagement';
+import SystemAlerts from './pages/SystemAlerts';
 
 // Protected Route component
 function ProtectedRoute({ children }) {
@@ -211,6 +217,11 @@ function AppRoutes() {
       <Route path="/superadmin/tenants/create" element={<TenantCreate />} />
       <Route path="/superadmin/tenants/:tenantId" element={<TenantDetail />} />
       <Route path="/superadmin/revenue" element={<RevenueDashboard />} />
+      <Route path="/superadmin/plans" element={<PlansManagement />} />
+      <Route path="/superadmin/costs" element={<CostTracking />} />
+      <Route path="/superadmin/monitoring" element={<SystemMonitoring />} />
+      <Route path="/superadmin/feature-flags" element={<FeatureFlagsManagement />} />
+      <Route path="/superadmin/alerts" element={<SystemAlerts />} />
 
       {/* 404 - Redirect to home */}
       <Route path="*" element={<Navigate to="/" replace />} />

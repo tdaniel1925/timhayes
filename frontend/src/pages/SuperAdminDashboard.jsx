@@ -88,24 +88,54 @@ export default function SuperAdminDashboard() {
       {/* Navigation */}
       <nav className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8">
+          <div className="flex space-x-8 overflow-x-auto">
             <Link
               to="/superadmin/dashboard"
-              className="px-3 py-4 text-sm font-medium text-blue-600 border-b-2 border-blue-600"
+              className="px-3 py-4 text-sm font-medium text-blue-600 border-b-2 border-blue-600 whitespace-nowrap"
             >
               Dashboard
             </Link>
             <Link
               to="/superadmin/tenants"
-              className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300"
+              className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap"
             >
               Tenants
             </Link>
             <Link
+              to="/superadmin/plans"
+              className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap"
+            >
+              Plans & Pricing
+            </Link>
+            <Link
               to="/superadmin/revenue"
-              className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300"
+              className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap"
             >
               Revenue
+            </Link>
+            <Link
+              to="/superadmin/costs"
+              className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap"
+            >
+              Cost Tracking
+            </Link>
+            <Link
+              to="/superadmin/monitoring"
+              className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap"
+            >
+              Monitoring
+            </Link>
+            <Link
+              to="/superadmin/feature-flags"
+              className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap"
+            >
+              Feature Flags
+            </Link>
+            <Link
+              to="/superadmin/alerts"
+              className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap"
+            >
+              Alerts
             </Link>
           </div>
         </div>
