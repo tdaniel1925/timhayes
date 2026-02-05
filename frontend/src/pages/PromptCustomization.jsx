@@ -742,6 +742,7 @@ export default function PromptCustomization() {
             )}
           </div>
         </div>
+        </div>
       </DashboardLayout>
 
       {/* Digital Signature Modal */}
