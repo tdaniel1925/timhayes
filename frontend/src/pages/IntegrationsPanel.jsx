@@ -12,6 +12,7 @@ import {
   Server, Key, Settings as SettingsIcon, BookOpen, ChevronDown, ChevronUp,
   Loader2
 } from 'lucide-react'
+import DashboardLayout from '@/components/DashboardLayout'
 
 export default function IntegrationsPanel() {
   const navigate = useNavigate()
@@ -131,17 +132,20 @@ export default function IntegrationsPanel() {
 
   if (loading && phoneSystems.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 text-blue-600 mx-auto mb-4 animate-spin" />
-          <p className="text-gray-600">Loading integrations...</p>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 text-blue-600 mx-auto mb-4 animate-spin" />
+            <p className="text-gray-600">Loading integrations...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <DashboardLayout>
+      <div className="p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -483,6 +487,7 @@ export default function IntegrationsPanel() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

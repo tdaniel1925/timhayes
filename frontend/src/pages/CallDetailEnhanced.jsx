@@ -23,6 +23,7 @@ import {
   Zap,
   ShieldAlert
 } from 'lucide-react'
+import DashboardLayout from '@/components/DashboardLayout'
 
 export default function CallDetailEnhanced() {
   const { callId } = useParams()
@@ -83,37 +84,42 @@ export default function CallDetailEnhanced() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading call details...</p>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading call details...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle>Error</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-            <Button onClick={() => navigate('/dashboard')} className="mt-4">
-              Back to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Card className="max-w-md">
+            <CardHeader>
+              <CardTitle>Error</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+              <Button onClick={() => navigate('/dashboard')} className="mt-4">
+                Back to Dashboard
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <DashboardLayout>
+      <div className="p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -859,6 +865,7 @@ export default function CallDetailEnhanced() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

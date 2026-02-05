@@ -118,9 +118,19 @@ export default function Sidebar() {
       {/* Logo & Toggle */}
       <div className="p-4 border-b border-gray-200 flex items-center justify-between">
         {!collapsed && (
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">AudiaPro</h1>
-            <p className="text-xs text-gray-500">{user?.tenant?.company_name}</p>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Phone className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">AudiaPro</h1>
+              <p className="text-xs text-gray-500">{user?.tenant?.company_name}</p>
+            </div>
+          </div>
+        )}
+        {collapsed && (
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center mx-auto">
+            <Phone className="w-4 h-4 text-white" />
           </div>
         )}
         <Button

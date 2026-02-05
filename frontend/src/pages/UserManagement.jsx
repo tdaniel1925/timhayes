@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { api } from '@/lib/api'
 import { UserPlus, Trash2, Edit, Mail } from 'lucide-react'
+import DashboardLayout from '@/components/DashboardLayout'
 
 export default function UserManagement() {
   const navigate = useNavigate()
@@ -149,17 +150,20 @@ export default function UserManagement() {
 
   if (loading && !users.length) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading users...</p>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading users...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <DashboardLayout>
+      <div className="p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -415,6 +419,7 @@ export default function UserManagement() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

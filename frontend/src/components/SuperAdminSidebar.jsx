@@ -16,7 +16,8 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  PlusCircle
+  PlusCircle,
+  Phone
 } from 'lucide-react';
 
 const navigationItems = [
@@ -77,12 +78,22 @@ export default function SuperAdminSidebar() {
       {/* Logo & Toggle */}
       <div className="p-4 border-b border-purple-700 flex items-center justify-between">
         {!collapsed && (
-          <div>
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Super Admin
-            </h1>
-            <p className="text-xs text-purple-200">AudiaPro Platform</p>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Phone className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Super Admin
+              </h1>
+              <p className="text-xs text-purple-200">AudiaPro Platform</p>
+            </div>
+          </div>
+        )}
+        {collapsed && (
+          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center mx-auto">
+            <Phone className="w-4 h-4 text-white" />
           </div>
         )}
         <Button

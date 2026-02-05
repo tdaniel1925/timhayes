@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
+import DashboardLayout from '@/components/DashboardLayout'
 
 export default function AdminSetupRequests() {
   const navigate = useNavigate()
@@ -115,17 +116,20 @@ export default function AdminSetupRequests() {
 
   if (loading && !requests.length) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading setup requests...</p>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading setup requests...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <DashboardLayout>
+      <div className="p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -418,6 +422,7 @@ export default function AdminSetupRequests() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

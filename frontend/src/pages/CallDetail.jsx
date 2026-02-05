@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '../lib/api'
+import DashboardLayout from '@/components/DashboardLayout'
 
 export default function CallDetail() {
   const { callId } = useParams()
@@ -64,36 +65,40 @@ export default function CallDetail() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading call details...</p>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading call details...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle>Error</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-red-600">{error}</p>
-            <Button onClick={() => navigate('/dashboard')} className="mt-4">
-              Back to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Card className="max-w-md">
+            <CardHeader>
+              <CardTitle>Error</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-red-600">{error}</p>
+              <Button onClick={() => navigate('/dashboard')} className="mt-4">
+                Back to Dashboard
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
+    <DashboardLayout>
+      <div className="max-w-7xl mx-auto p-4 md:p-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -363,6 +368,6 @@ export default function CallDetail() {
           </div>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

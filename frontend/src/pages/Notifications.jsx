@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { api } from '@/lib/api'
 import { Bell } from 'lucide-react'
+import DashboardLayout from '@/components/DashboardLayout'
 
 export default function Notifications() {
   const navigate = useNavigate()
@@ -126,7 +127,8 @@ export default function Notifications() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <DashboardLayout>
+      <div className="p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -395,6 +397,7 @@ export default function Notifications() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

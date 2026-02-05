@@ -18,6 +18,7 @@ import {
   FileCog,
   Clock
 } from 'lucide-react';
+import DashboardLayout from '@/components/DashboardLayout'
 
 export default function AdvancedReporting() {
   const navigate = useNavigate();
@@ -153,7 +154,7 @@ export default function AdvancedReporting() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <DashboardLayout>
       {/* Header */}
       <header className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -515,6 +516,6 @@ export default function AdvancedReporting() {
           </div>
         </div>
       </main>
-    </div>
+    </DashboardLayout>
   );
 }
