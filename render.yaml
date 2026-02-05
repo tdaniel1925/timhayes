@@ -1,5 +1,5 @@
+# Backend service only - Frontend configured separately in Render dashboard
 services:
-  # Backend API Service
   - type: web
     name: audiapro-backend
     env: python
@@ -9,51 +9,3 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     healthCheckPath: /api/health
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.9
-      - key: DATABASE_URL
-        sync: false  # Set manually in Render dashboard
-      - key: SUPABASE_URL
-        sync: false  # Set manually in Render dashboard
-      - key: SUPABASE_KEY
-        sync: false  # Set manually in Render dashboard
-      - key: SUPABASE_BUCKET
-        value: call-recordings
-      - key: JWT_SECRET_KEY
-        generateValue: true
-      - key: ENCRYPTION_KEY
-        generateValue: true
-      - key: OPENAI_API_KEY
-        sync: false  # Set manually in Render dashboard
-      - key: TRANSCRIPTION_ENABLED
-        value: true
-      - key: SENTIMENT_ENABLED
-        value: true
-      - key: UCM_IP
-        sync: false  # Set manually in Render dashboard
-      - key: UCM_USERNAME
-        value: admin
-      - key: UCM_PASSWORD
-        sync: false  # Set manually in Render dashboard
-      - key: UCM_PORT
-        value: 8089
-      - key: WEBHOOK_USERNAME
-        value: admin
-      - key: WEBHOOK_PASSWORD
-        generateValue: true
-      - key: PORT
-        value: 10000
-
-  # Frontend Static Site
-  - type: web
-    name: audiapro-frontend
-    env: static
-    region: oregon
-    plan: free
-    buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: frontend/dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
