@@ -1775,115 +1775,115 @@ def process_call_ai_async(call_id, ucm_recording_path):
             try:
                 # Get call from database
                 call = CDRRecord.query.get(call_id)
-            if not call:
-                logger.error(f"Call {call_id} not found for AI processing")
-                return
+                if not call:
+                    logger.error(f"Call {call_id} not found for AI processing")
+                    return
 
-            tenant_id = call.tenant_id
+                tenant_id = call.tenant_id
 
-            # Step 0: Download recording from UCM and upload to Supabase
-            storage_manager = get_storage_manager()
-            storage_path = None
+                # Step 0: Download recording from UCM and upload to Supabase
+                storage_manager = get_storage_manager()
+                storage_path = None
 
-            if ucm_recording_path:
-                logger.info(f"Downloading recording from UCM for call {call_id}")
-                storage_path = download_and_upload_recording(
-                    UCM_IP,
-                    UCM_USERNAME,
-                    UCM_PASSWORD,
-                    ucm_recording_path,
-                    tenant_id,
-                    call.uniqueid,
-                    storage_manager
-                )
+                if ucm_recording_path:
+                    logger.info(f"Downloading recording from UCM for call {call_id}")
+                    storage_path = download_and_upload_recording(
+                        UCM_IP,
+                        UCM_USERNAME,
+                        UCM_PASSWORD,
+                        ucm_recording_path,
+                        tenant_id,
+                        call.uniqueid,
+                        storage_manager
+                    )
 
-                if storage_path:
-                    # Update CDR with Supabase storage path
-                    call.recordfiles = storage_path
-                    db.session.commit()
-                    logger.info(f"✅ Recording stored in Supabase: {storage_path}")
-                else:
-                    logger.warning(f"Failed to download/upload recording for call {call_id}")
+                    if storage_path:
+                        # Update CDR with Supabase storage path
+                        call.recordfiles = storage_path
+                        db.session.commit()
+                        logger.info(f"✅ Recording stored in Supabase: {storage_path}")
+                    else:
+                        logger.warning(f"Failed to download/upload recording for call {call_id}")
 
-            if not storage_path:
-                logger.warning(f"No recording available for call {call_id}, skipping AI processing")
-                return
+                if not storage_path:
+                    logger.warning(f"No recording available for call {call_id}, skipping AI processing")
+                    return
 
-            # Get enabled features for this tenant
-            enabled_features = get_enabled_features(tenant_id)
-            logger.info(f"Processing call {call_id} with features: {enabled_features}")
+                # Get enabled features for this tenant
+                enabled_features = get_enabled_features(tenant_id)
+                logger.info(f"Processing call {call_id} with features: {enabled_features}")
 
-            # Step 1: Transcribe audio (required for most features)
-            transcription_text = None
-            if 'multilingual-transcription' in enabled_features or len(enabled_features) > 0:
-                transcription = transcribe_audio(storage_path, call_id, tenant_id)
-                if transcription:
-                    # Save transcription to Transcription model
-                    trans_obj = Transcription.query.filter_by(cdr_id=call_id).first()
-                    if not trans_obj:
-                        trans_obj = Transcription(cdr_id=call_id)
-                        db.session.add(trans_obj)
+                # Step 1: Transcribe audio (required for most features)
+                transcription_text = None
+                if 'multilingual-transcription' in enabled_features or len(enabled_features) > 0:
+                    transcription = transcribe_audio(storage_path, call_id, tenant_id)
+                    if transcription:
+                        # Save transcription to Transcription model
+                        trans_obj = Transcription.query.filter_by(cdr_id=call_id).first()
+                        if not trans_obj:
+                            trans_obj = Transcription(cdr_id=call_id)
+                            db.session.add(trans_obj)
 
-                    trans_obj.transcription_text = transcription.transcription_text
-                    trans_obj.language = transcription.language
-                    db.session.commit()
-
-                    transcription_text = transcription.transcription_text
-                    logger.info(f"Transcription saved for call {call_id}")
-
-                    track_feature_usage(tenant_id, 'multilingual-transcription')
-
-            if not transcription_text:
-                logger.warning(f"No transcription available for call {call_id}, skipping AI processing")
-                return
-
-            # Step 2: Process with enabled features
-            if 'sentiment-analysis' in enabled_features:
-                sentiment_result = analyze_sentiment(transcription_text, call_id)
-                if sentiment_result:
-                    trans_obj = Transcription.query.filter_by(cdr_id=call_id).first()
-                    if trans_obj:
-                        sent = SentimentAnalysis.query.filter_by(transcription_id=trans_obj.id).first()
-                        if not sent:
-                            sent = SentimentAnalysis(transcription_id=trans_obj.id)
-                            db.session.add(sent)
-
-                        sent.sentiment = sentiment_result['sentiment']
-                        sent.sentiment_score = sentiment_result['score']
+                        trans_obj.transcription_text = transcription.transcription_text
+                        trans_obj.language = transcription.language
                         db.session.commit()
 
-                    track_feature_usage(tenant_id, 'sentiment-analysis')
-                    logger.info(f"Sentiment saved for call {call_id}")
+                        transcription_text = transcription.transcription_text
+                        logger.info(f"Transcription saved for call {call_id}")
 
-            if 'call-summaries' in enabled_features:
-                generate_call_summary(transcription_text, tenant_id, call_id)
+                        track_feature_usage(tenant_id, 'multilingual-transcription')
 
-            if 'action-items' in enabled_features:
-                extract_action_items(transcription_text, tenant_id, call_id)
+                if not transcription_text:
+                    logger.warning(f"No transcription available for call {call_id}, skipping AI processing")
+                    return
 
-            if 'topic-extraction' in enabled_features:
-                extract_topics(transcription_text, tenant_id, call_id)
+                # Step 2: Process with enabled features
+                if 'sentiment-analysis' in enabled_features:
+                    sentiment_result = analyze_sentiment(transcription_text, call_id)
+                    if sentiment_result:
+                        trans_obj = Transcription.query.filter_by(cdr_id=call_id).first()
+                        if trans_obj:
+                            sent = SentimentAnalysis.query.filter_by(transcription_id=trans_obj.id).first()
+                            if not sent:
+                                sent = SentimentAnalysis(transcription_id=trans_obj.id)
+                                db.session.add(sent)
 
-            if 'intent-detection' in enabled_features:
-                detect_intent(transcription_text, tenant_id, call_id)
+                            sent.sentiment = sentiment_result['sentiment']
+                            sent.sentiment_score = sentiment_result['score']
+                            db.session.commit()
 
-            if 'quality-scoring' in enabled_features:
-                score_call_quality(transcription_text, tenant_id, call_id)
+                        track_feature_usage(tenant_id, 'sentiment-analysis')
+                        logger.info(f"Sentiment saved for call {call_id}")
 
-            if 'emotion-detection' in enabled_features:
-                detect_emotions(transcription_text, tenant_id, call_id)
+                if 'call-summaries' in enabled_features:
+                    generate_call_summary(transcription_text, tenant_id, call_id)
 
-            if 'churn-prediction' in enabled_features:
-                predict_churn(transcription_text, tenant_id, call_id)
+                if 'action-items' in enabled_features:
+                    extract_action_items(transcription_text, tenant_id, call_id)
 
-            if 'objection-handling' in enabled_features:
-                analyze_objections(transcription_text, tenant_id, call_id)
+                if 'topic-extraction' in enabled_features:
+                    extract_topics(transcription_text, tenant_id, call_id)
 
-            if 'deal-risk' in enabled_features:
-                predict_deal_risk(transcription_text, tenant_id, call_id)
+                if 'intent-detection' in enabled_features:
+                    detect_intent(transcription_text, tenant_id, call_id)
 
-            if 'compliance-monitoring' in enabled_features:
-                monitor_compliance(transcription_text, tenant_id, call_id)
+                if 'quality-scoring' in enabled_features:
+                    score_call_quality(transcription_text, tenant_id, call_id)
+
+                if 'emotion-detection' in enabled_features:
+                    detect_emotions(transcription_text, tenant_id, call_id)
+
+                if 'churn-prediction' in enabled_features:
+                    predict_churn(transcription_text, tenant_id, call_id)
+
+                if 'objection-handling' in enabled_features:
+                    analyze_objections(transcription_text, tenant_id, call_id)
+
+                if 'deal-risk' in enabled_features:
+                    predict_deal_risk(transcription_text, tenant_id, call_id)
+
+                if 'compliance-monitoring' in enabled_features:
+                    monitor_compliance(transcription_text, tenant_id, call_id)
 
                 logger.info(f"✅ AI processing complete for call {call_id}")
 
