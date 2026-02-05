@@ -2503,6 +2503,16 @@ def receive_cdr(subdomain):
         uniqueid = cdr_data.get('uniqueid', 'unknown')
         logger.info(f"[{subdomain}] Received CDR: {uniqueid} | {cdr_data.get('src')} -> {cdr_data.get('dst')}")
 
+        # Check if CDR already exists (prevent duplicates)
+        existing_cdr = CDRRecord.query.filter_by(
+            tenant_id=tenant.id,
+            uniqueid=uniqueid
+        ).first()
+
+        if existing_cdr:
+            logger.info(f"[{subdomain}] CDR {uniqueid} already exists, skipping duplicate")
+            return jsonify({'status': 'success', 'message': 'Duplicate CDR ignored'}), 200
+
         # Check usage limits
         if not check_usage_limit(tenant.id):
             logger.warning(f"[{subdomain}] Usage limit exceeded for tenant {tenant.id}")
