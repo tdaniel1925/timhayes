@@ -6295,7 +6295,7 @@ def get_available_plans():
 
 @app.route('/api/tenant/billing-history', methods=['GET'])
 @jwt_required()
-def get_billing_history():
+def get_tenant_billing_history():
     """Get billing history for current tenant"""
     try:
         claims = get_jwt()
