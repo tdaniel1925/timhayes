@@ -875,6 +875,284 @@ class TenantAIFeature(db.Model):
 
     __table_args__ = (db.UniqueConstraint('tenant_id', 'ai_feature_id', name='_tenant_feature_uc'),)
 
+class Plan(db.Model):
+    """Pricing plans (Starter, Professional, Enterprise, etc.)"""
+    __tablename__ = 'plans'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)  # "Starter", "Professional"
+    slug = db.Column(db.String(100), nullable=False, unique=True)  # "starter", "professional"
+    description = db.Column(db.Text)
+
+    # Pricing
+    monthly_price = db.Column(db.Float, nullable=False, default=0)
+    annual_price = db.Column(db.Float)  # Discounted annual price
+    setup_fee = db.Column(db.Float, default=0)
+
+    # Limits
+    max_calls_per_month = db.Column(db.Integer, default=100)
+    max_users = db.Column(db.Integer, default=5)
+    max_storage_gb = db.Column(db.Integer, default=10)
+    max_recording_minutes = db.Column(db.Integer, default=1000)
+
+    # Features included
+    has_api_access = db.Column(db.Boolean, default=False)
+    has_white_label = db.Column(db.Boolean, default=False)
+    has_priority_support = db.Column(db.Boolean, default=False)
+    has_custom_branding = db.Column(db.Boolean, default=False)
+
+    # Trial settings
+    trial_days = db.Column(db.Integer, default=14)
+
+    # Status
+    is_active = db.Column(db.Boolean, default=True)
+    is_public = db.Column(db.Boolean, default=True)  # Show on pricing page
+    sort_order = db.Column(db.Integer, default=0)  # Display order
+
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class PlanFeature(db.Model):
+    """AI Features included in each plan"""
+    __tablename__ = 'plan_features'
+
+    id = db.Column(db.Integer, primary_key=True)
+    plan_id = db.Column(db.Integer, db.ForeignKey('plans.id'), nullable=False)
+    ai_feature_id = db.Column(db.Integer, db.ForeignKey('ai_features.id'), nullable=False)
+
+    # Usage limits for this feature on this plan
+    monthly_quota = db.Column(db.Integer)  # e.g., 1000 transcriptions/month
+    is_unlimited = db.Column(db.Boolean, default=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('plan_id', 'ai_feature_id', name='_plan_feature_uc'),)
+
+
+class Subscription(db.Model):
+    """Tenant subscriptions and billing cycles"""
+    __tablename__ = 'subscriptions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=False, unique=True)
+    plan_id = db.Column(db.Integer, db.ForeignKey('plans.id'), nullable=False)
+
+    # Status
+    status = db.Column(db.String(50), default='trialing')  # trialing, active, past_due, canceled, paused
+
+    # Billing
+    billing_cycle = db.Column(db.String(20), default='monthly')  # monthly, annual
+    current_period_start = db.Column(db.DateTime, default=datetime.utcnow)
+    current_period_end = db.Column(db.DateTime)
+
+    # Trial
+    trial_start = db.Column(db.DateTime)
+    trial_end = db.Column(db.DateTime)
+
+    # Payment
+    payment_method = db.Column(db.String(50))  # stripe, paypal, manual
+    payment_gateway_id = db.Column(db.String(200))  # External subscription ID
+    last_payment_date = db.Column(db.DateTime)
+    next_billing_date = db.Column(db.DateTime)
+
+    # Cancellation
+    cancel_at_period_end = db.Column(db.Boolean, default=False)
+    canceled_at = db.Column(db.DateTime)
+    cancellation_reason = db.Column(db.Text)
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class RevenueMetric(db.Model):
+    """Track revenue metrics over time (MRR, ARR, churn, etc.)"""
+    __tablename__ = 'revenue_metrics'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Period (daily snapshot)
+    date = db.Column(db.Date, nullable=False, unique=True)
+
+    # Revenue
+    mrr = db.Column(db.Float, default=0)  # Monthly Recurring Revenue
+    arr = db.Column(db.Float, default=0)  # Annual Recurring Revenue
+    total_revenue = db.Column(db.Float, default=0)  # All-time revenue
+
+    # Customers
+    total_tenants = db.Column(db.Integer, default=0)
+    active_tenants = db.Column(db.Integer, default=0)  # Paying customers
+    trial_tenants = db.Column(db.Integer, default=0)
+    churned_tenants = db.Column(db.Integer, default=0)
+
+    # New business
+    new_tenants = db.Column(db.Integer, default=0)  # Signups today
+    new_paying_tenants = db.Column(db.Integer, default=0)  # Trial → Paid today
+
+    # Churn
+    churn_rate = db.Column(db.Float, default=0)  # Percentage
+    ltv = db.Column(db.Float, default=0)  # Customer Lifetime Value
+
+    # By plan
+    starter_mrr = db.Column(db.Float, default=0)
+    professional_mrr = db.Column(db.Float, default=0)
+    enterprise_mrr = db.Column(db.Float, default=0)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class SystemMetric(db.Model):
+    """Operational metrics (API usage, costs, performance)"""
+    __tablename__ = 'system_metrics'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Period (hourly snapshot)
+    timestamp = db.Column(db.DateTime, nullable=False)
+    metric_type = db.Column(db.String(50), nullable=False)  # 'api_usage', 'openai_cost', 'storage_usage'
+
+    # Tenant-specific or system-wide
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'))
+
+    # Metrics
+    value = db.Column(db.Float, nullable=False)
+    unit = db.Column(db.String(20))  # 'requests', 'dollars', 'gb', 'minutes'
+
+    # Metadata
+    details = db.Column(db.Text)  # JSON with additional context
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.Index('idx_system_metrics_timestamp', 'timestamp'),
+                      db.Index('idx_system_metrics_type', 'metric_type'))
+
+
+class CallMetric(db.Model):
+    """Detailed analytics per call for business intelligence"""
+    __tablename__ = 'call_metrics'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cdr_id = db.Column(db.Integer, db.ForeignKey('cdr_records.id'), nullable=False, unique=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=False)
+
+    # Cost tracking
+    transcription_cost = db.Column(db.Float, default=0)  # OpenAI Whisper cost
+    analysis_cost = db.Column(db.Float, default=0)  # GPT-4 analysis cost
+    storage_cost = db.Column(db.Float, default=0)  # Supabase storage cost
+    total_cost = db.Column(db.Float, default=0)
+
+    # Performance
+    processing_time_seconds = db.Column(db.Float)  # Total AI processing time
+    transcription_time = db.Column(db.Float)
+    analysis_time = db.Column(db.Float)
+
+    # Quality
+    audio_quality_score = db.Column(db.Float)  # 0-100
+    transcription_confidence = db.Column(db.Float)  # 0-1
+
+    # Business value indicators
+    is_sales_call = db.Column(db.Boolean, default=False)
+    is_support_call = db.Column(db.Boolean, default=False)
+    has_action_items = db.Column(db.Boolean, default=False)
+    has_compliance_alert = db.Column(db.Boolean, default=False)
+
+    # Engagement
+    agent_talk_time_percent = db.Column(db.Float)
+    customer_talk_time_percent = db.Column(db.Float)
+    silence_time_percent = db.Column(db.Float)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class FeatureFlag(db.Model):
+    """Feature flags for gradual rollouts and A/B testing"""
+    __tablename__ = 'feature_flags'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    slug = db.Column(db.String(100), nullable=False, unique=True)
+    description = db.Column(db.Text)
+
+    # Status
+    is_enabled = db.Column(db.Boolean, default=False)
+    rollout_percentage = db.Column(db.Integer, default=0)  # 0-100, gradual rollout
+
+    # Targeting
+    target_plan_ids = db.Column(db.Text)  # JSON array of plan IDs
+    target_tenant_ids = db.Column(db.Text)  # JSON array of specific tenant IDs
+
+    # Metadata
+    created_by = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class UsageQuota(db.Model):
+    """Track usage quotas and overages per tenant"""
+    __tablename__ = 'usage_quotas'
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=False)
+
+    # Period
+    period_start = db.Column(db.DateTime, nullable=False)
+    period_end = db.Column(db.DateTime, nullable=False)
+
+    # Usage
+    calls_used = db.Column(db.Integer, default=0)
+    calls_limit = db.Column(db.Integer, nullable=False)
+
+    transcription_minutes_used = db.Column(db.Float, default=0)
+    transcription_minutes_limit = db.Column(db.Float, nullable=False)
+
+    storage_gb_used = db.Column(db.Float, default=0)
+    storage_gb_limit = db.Column(db.Float, nullable=False)
+
+    api_requests_used = db.Column(db.Integer, default=0)
+    api_requests_limit = db.Column(db.Integer, nullable=False)
+
+    # Overages
+    overage_calls = db.Column(db.Integer, default=0)
+    overage_cost = db.Column(db.Float, default=0)
+
+    # Status
+    quota_exceeded = db.Column(db.Boolean, default=False)
+    warning_sent = db.Column(db.Boolean, default=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (db.Index('idx_usage_quota_tenant_period', 'tenant_id', 'period_start'),)
+
+
+class SystemAlert(db.Model):
+    """System-wide alerts for super admins"""
+    __tablename__ = 'system_alerts'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Alert details
+    alert_type = db.Column(db.String(50), nullable=False)  # 'high_cost', 'error_rate', 'downtime', 'quota_exceeded'
+    severity = db.Column(db.String(20), default='warning')  # 'info', 'warning', 'critical'
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text)
+
+    # Context
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'))
+    metric_value = db.Column(db.Float)
+    threshold_value = db.Column(db.Float)
+
+    # Status
+    is_resolved = db.Column(db.Boolean, default=False)
+    resolved_at = db.Column(db.DateTime)
+    resolved_by = db.Column(db.String(200))
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.Index('idx_system_alerts_unresolved', 'is_resolved', 'created_at'),)
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -5081,6 +5359,564 @@ def disable_tenant_ai_feature(tenant_id, feature_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Disable tenant AI feature error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# PLANS & PRICING MANAGEMENT
+# ============================================================================
+
+@app.route('/api/superadmin/plans', methods=['GET'])
+@jwt_required()
+def get_all_plans():
+    """Get all pricing plans"""
+    try:
+        claims = get_jwt()
+        if claims.get('role') != 'superadmin':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        plans = Plan.query.order_by(Plan.sort_order).all()
+
+        return jsonify({
+            'plans': [{
+                'id': p.id,
+                'name': p.name,
+                'slug': p.slug,
+                'description': p.description,
+                'monthly_price': p.monthly_price,
+                'annual_price': p.annual_price,
+                'setup_fee': p.setup_fee,
+                'max_calls_per_month': p.max_calls_per_month,
+                'max_users': p.max_users,
+                'max_storage_gb': p.max_storage_gb,
+                'max_recording_minutes': p.max_recording_minutes,
+                'has_api_access': p.has_api_access,
+                'has_white_label': p.has_white_label,
+                'has_priority_support': p.has_priority_support,
+                'trial_days': p.trial_days,
+                'is_active': p.is_active,
+                'is_public': p.is_public,
+                'sort_order': p.sort_order
+            } for p in plans]
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get plans error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/plans', methods=['POST'])
+@jwt_required()
+def create_plan():
+    """Create new pricing plan"""
+    try:
+        claims = get_jwt()
+        if claims.get('role') != 'superadmin':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        data = request.get_json()
+
+        plan = Plan(
+            name=data['name'],
+            slug=data.get('slug', data['name'].lower().replace(' ', '-')),
+            description=data.get('description'),
+            monthly_price=data.get('monthly_price', 0),
+            annual_price=data.get('annual_price'),
+            setup_fee=data.get('setup_fee', 0),
+            max_calls_per_month=data.get('max_calls_per_month', 100),
+            max_users=data.get('max_users', 5),
+            max_storage_gb=data.get('max_storage_gb', 10),
+            max_recording_minutes=data.get('max_recording_minutes', 1000),
+            has_api_access=data.get('has_api_access', False),
+            has_white_label=data.get('has_white_label', False),
+            has_priority_support=data.get('has_priority_support', False),
+            trial_days=data.get('trial_days', 14),
+            is_active=data.get('is_active', True),
+            is_public=data.get('is_public', True),
+            sort_order=data.get('sort_order', 0)
+        )
+
+        db.session.add(plan)
+        db.session.commit()
+
+        logger.info(f"Created plan: {plan.name} (ID: {plan.id})")
+
+        return jsonify({
+            'message': 'Plan created successfully',
+            'plan': {
+                'id': plan.id,
+                'name': plan.name,
+                'slug': plan.slug,
+                'monthly_price': plan.monthly_price
+            }
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Create plan error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/plans/<int:plan_id>', methods=['PUT'])
+@jwt_required()
+def update_plan(plan_id):
+    """Update pricing plan"""
+    try:
+        claims = get_jwt()
+        if claims.get('role') != 'superadmin':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        plan = Plan.query.get_or_404(plan_id)
+        data = request.get_json()
+
+        # Update fields
+        for field in ['name', 'description', 'monthly_price', 'annual_price', 'setup_fee',
+                      'max_calls_per_month', 'max_users', 'max_storage_gb', 'max_recording_minutes',
+                      'has_api_access', 'has_white_label', 'has_priority_support',
+                      'trial_days', 'is_active', 'is_public', 'sort_order']:
+            if field in data:
+                setattr(plan, field, data[field])
+
+        db.session.commit()
+
+        return jsonify({'message': 'Plan updated successfully'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Update plan error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/plans/<int:plan_id>', methods=['DELETE'])
+@jwt_required()
+def delete_plan(plan_id):
+    """Delete pricing plan"""
+    try:
+        claims = get_jwt()
+        if claims.get('role') != 'superadmin':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        plan = Plan.query.get_or_404(plan_id)
+
+        # Check if any active subscriptions
+        active_subs = Subscription.query.filter_by(plan_id=plan_id, status='active').count()
+        if active_subs > 0:
+            return jsonify({'error': f'Cannot delete plan with {active_subs} active subscriptions'}), 400
+
+        db.session.delete(plan)
+        db.session.commit()
+
+        return jsonify({'message': 'Plan deleted successfully'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Delete plan error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# SUBSCRIPTIONS MANAGEMENT
+# ============================================================================
+
+@app.route('/api/superadmin/subscriptions', methods=['GET'])
+@jwt_required()
+def get_all_subscriptions():
+    """Get all tenant subscriptions"""
+    try:
+        claims = get_jwt()
+        if claims.get('role') != 'superadmin':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        status_filter = request.args.get('status')
+
+        query = db.session.query(Subscription, Tenant, Plan).join(
+            Tenant, Subscription.tenant_id == Tenant.id
+        ).join(
+            Plan, Subscription.plan_id == Plan.id
+        )
+
+        if status_filter:
+            query = query.filter(Subscription.status == status_filter)
+
+        subscriptions = query.order_by(Subscription.created_at.desc()).all()
+
+        return jsonify({
+            'subscriptions': [{
+                'id': sub.id,
+                'tenant': {
+                    'id': tenant.id,
+                    'company_name': tenant.company_name,
+                    'subdomain': tenant.subdomain
+                },
+                'plan': {
+                    'id': plan.id,
+                    'name': plan.name,
+                    'monthly_price': plan.monthly_price
+                },
+                'status': sub.status,
+                'billing_cycle': sub.billing_cycle,
+                'current_period_start': sub.current_period_start.isoformat() if sub.current_period_start else None,
+                'current_period_end': sub.current_period_end.isoformat() if sub.current_period_end else None,
+                'trial_end': sub.trial_end.isoformat() if sub.trial_end else None,
+                'next_billing_date': sub.next_billing_date.isoformat() if sub.next_billing_date else None,
+                'cancel_at_period_end': sub.cancel_at_period_end,
+                'created_at': sub.created_at.isoformat()
+            } for sub, tenant, plan in subscriptions]
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get subscriptions error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# REVENUE ANALYTICS
+# ============================================================================
+
+@app.route('/api/superadmin/analytics/revenue', methods=['GET'])
+@jwt_required()
+def get_revenue_analytics():
+    """Get comprehensive revenue analytics"""
+    try:
+        claims = get_jwt()
+        if claims.get('role') != 'superadmin':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        # Current MRR calculation
+        active_subs = db.session.query(
+            Subscription, Plan
+        ).join(Plan).filter(
+            Subscription.status.in_(['active', 'trialing'])
+        ).all()
+
+        mrr = sum(plan.monthly_price for sub, plan in active_subs if sub.billing_cycle == 'monthly')
+        arr = mrr * 12
+
+        # Count tenants by status
+        total_tenants = Tenant.query.count()
+        active_tenants = Subscription.query.filter_by(status='active').count()
+        trial_tenants = Subscription.query.filter_by(status='trialing').count()
+        churned_tenants = Subscription.query.filter_by(status='canceled').count()
+
+        # Revenue by plan
+        revenue_by_plan = db.session.query(
+            Plan.name,
+            func.sum(Plan.monthly_price).label('revenue'),
+            func.count(Subscription.id).label('subscribers')
+        ).join(Subscription).filter(
+            Subscription.status == 'active'
+        ).group_by(Plan.name).all()
+
+        # Last 30 days metrics
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        recent_metrics = RevenueMetric.query.filter(
+            RevenueMetric.date >= thirty_days_ago.date()
+        ).order_by(RevenueMetric.date).all()
+
+        return jsonify({
+            'current': {
+                'mrr': round(mrr, 2),
+                'arr': round(arr, 2),
+                'total_tenants': total_tenants,
+                'active_tenants': active_tenants,
+                'trial_tenants': trial_tenants,
+                'churned_tenants': churned_tenants,
+                'churn_rate': round((churned_tenants / total_tenants * 100) if total_tenants > 0 else 0, 2)
+            },
+            'by_plan': [{
+                'plan': name,
+                'revenue': float(revenue),
+                'subscribers': subscribers
+            } for name, revenue, subscribers in revenue_by_plan],
+            'historical': [{
+                'date': m.date.isoformat(),
+                'mrr': m.mrr,
+                'arr': m.arr,
+                'active_tenants': m.active_tenants,
+                'new_tenants': m.new_tenants
+            } for m in recent_metrics]
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Revenue analytics error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# COST TRACKING & OPERATIONAL METRICS
+# ============================================================================
+
+@app.route('/api/superadmin/analytics/costs', methods=['GET'])
+@jwt_required()
+def get_cost_analytics():
+    """Get cost breakdown and margins"""
+    try:
+        claims = get_jwt()
+        if claims.get('role') != 'superadmin':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        # Total costs from call metrics
+        total_costs = db.session.query(
+            func.sum(CallMetric.total_cost).label('total')
+        ).scalar() or 0
+
+        # Costs this month
+        first_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0)
+        monthly_costs = db.session.query(
+            func.sum(CallMetric.total_cost).label('total')
+        ).join(CDRRecord).filter(
+            CDRRecord.call_date >= first_of_month
+        ).scalar() or 0
+
+        # Cost per tenant
+        cost_by_tenant = db.session.query(
+            Tenant.company_name,
+            func.sum(CallMetric.total_cost).label('cost'),
+            func.count(CallMetric.id).label('calls')
+        ).join(CallMetric, Tenant.id == CallMetric.tenant_id
+        ).group_by(Tenant.company_name
+        ).order_by(func.sum(CallMetric.total_cost).desc()
+        ).limit(10).all()
+
+        # Average cost per call
+        avg_cost_per_call = db.session.query(
+            func.avg(CallMetric.total_cost).label('avg')
+        ).scalar() or 0
+
+        return jsonify({
+            'totals': {
+                'all_time': round(total_costs, 2),
+                'this_month': round(monthly_costs, 2),
+                'avg_per_call': round(avg_cost_per_call, 4)
+            },
+            'by_tenant': [{
+                'tenant': name,
+                'cost': round(float(cost), 2),
+                'calls': calls
+            } for name, cost, calls in cost_by_tenant]
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Cost analytics error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/analytics/system', methods=['GET'])
+@jwt_required()
+def get_system_metrics():
+    """Get system health and performance metrics"""
+    try:
+        claims = get_jwt()
+        if claims.get('role') != 'superadmin':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        # API usage stats
+        total_calls = CDRRecord.query.count()
+        calls_today = CDRRecord.query.filter(
+            func.date(CDRRecord.call_date) == datetime.utcnow().date()
+        ).count()
+
+        # Processing time averages
+        avg_processing_time = db.session.query(
+            func.avg(CallMetric.processing_time_seconds).label('avg')
+        ).scalar() or 0
+
+        # Recent system metrics
+        recent_metrics = SystemMetric.query.filter(
+            SystemMetric.timestamp >= datetime.utcnow() - timedelta(hours=24)
+        ).order_by(SystemMetric.timestamp.desc()).limit(100).all()
+
+        # Active alerts
+        active_alerts = SystemAlert.query.filter_by(is_resolved=False).count()
+
+        return jsonify({
+            'calls': {
+                'total': total_calls,
+                'today': calls_today
+            },
+            'performance': {
+                'avg_processing_time': round(avg_processing_time, 2)
+            },
+            'alerts': {
+                'active': active_alerts
+            },
+            'recent_metrics': [{
+                'timestamp': m.timestamp.isoformat(),
+                'type': m.metric_type,
+                'value': m.value,
+                'unit': m.unit
+            } for m in recent_metrics[:20]]
+        }), 200
+
+    except Exception as e:
+        logger.error(f"System metrics error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# SYSTEM ALERTS
+# ============================================================================
+
+@app.route('/api/superadmin/alerts', methods=['GET'])
+@jwt_required()
+def get_system_alerts():
+    """Get all system alerts"""
+    try:
+        claims = get_jwt()
+        if claims.get('role') != 'superadmin':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        show_resolved = request.args.get('resolved', 'false').lower() == 'true'
+
+        query = SystemAlert.query
+        if not show_resolved:
+            query = query.filter_by(is_resolved=False)
+
+        alerts = query.order_by(SystemAlert.created_at.desc()).limit(100).all()
+
+        return jsonify({
+            'alerts': [{
+                'id': a.id,
+                'alert_type': a.alert_type,
+                'severity': a.severity,
+                'title': a.title,
+                'message': a.message,
+                'tenant_id': a.tenant_id,
+                'metric_value': a.metric_value,
+                'threshold_value': a.threshold_value,
+                'is_resolved': a.is_resolved,
+                'resolved_at': a.resolved_at.isoformat() if a.resolved_at else None,
+                'created_at': a.created_at.isoformat()
+            } for a in alerts]
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get alerts error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/alerts/<int:alert_id>/resolve', methods=['POST'])
+@jwt_required()
+def resolve_alert(alert_id):
+    """Resolve a system alert"""
+    try:
+        claims = get_jwt()
+        if claims.get('role') != 'superadmin':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        alert = SystemAlert.query.get_or_404(alert_id)
+        alert.is_resolved = True
+        alert.resolved_at = datetime.utcnow()
+        alert.resolved_by = get_jwt_identity()
+
+        db.session.commit()
+
+        return jsonify({'message': 'Alert resolved'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Resolve alert error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# FEATURE FLAGS
+# ============================================================================
+
+@app.route('/api/superadmin/feature-flags', methods=['GET'])
+@jwt_required()
+def get_feature_flags():
+    """Get all feature flags"""
+    try:
+        claims = get_jwt()
+        if claims.get('role') != 'superadmin':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        flags = FeatureFlag.query.order_by(FeatureFlag.name).all()
+
+        return jsonify({
+            'flags': [{
+                'id': f.id,
+                'name': f.name,
+                'slug': f.slug,
+                'description': f.description,
+                'is_enabled': f.is_enabled,
+                'rollout_percentage': f.rollout_percentage,
+                'target_plan_ids': json.loads(f.target_plan_ids) if f.target_plan_ids else [],
+                'target_tenant_ids': json.loads(f.target_tenant_ids) if f.target_tenant_ids else [],
+                'created_at': f.created_at.isoformat()
+            } for f in flags]
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get feature flags error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/feature-flags', methods=['POST'])
+@jwt_required()
+def create_feature_flag():
+    """Create new feature flag"""
+    try:
+        claims = get_jwt()
+        if claims.get('role') != 'superadmin':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        data = request.get_json()
+
+        flag = FeatureFlag(
+            name=data['name'],
+            slug=data.get('slug', data['name'].lower().replace(' ', '-')),
+            description=data.get('description'),
+            is_enabled=data.get('is_enabled', False),
+            rollout_percentage=data.get('rollout_percentage', 0),
+            target_plan_ids=json.dumps(data.get('target_plan_ids', [])),
+            target_tenant_ids=json.dumps(data.get('target_tenant_ids', [])),
+            created_by=get_jwt_identity()
+        )
+
+        db.session.add(flag)
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Feature flag created',
+            'flag': {'id': flag.id, 'name': flag.name}
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Create feature flag error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/superadmin/feature-flags/<int:flag_id>', methods=['PUT'])
+@jwt_required()
+def update_feature_flag(flag_id):
+    """Update feature flag"""
+    try:
+        claims = get_jwt()
+        if claims.get('role') != 'superadmin':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        flag = FeatureFlag.query.get_or_404(flag_id)
+        data = request.get_json()
+
+        for field in ['name', 'description', 'is_enabled', 'rollout_percentage']:
+            if field in data:
+                setattr(flag, field, data[field])
+
+        if 'target_plan_ids' in data:
+            flag.target_plan_ids = json.dumps(data['target_plan_ids'])
+        if 'target_tenant_ids' in data:
+            flag.target_tenant_ids = json.dumps(data['target_tenant_ids'])
+
+        db.session.commit()
+
+        return jsonify({'message': 'Feature flag updated'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Update feature flag error: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 
