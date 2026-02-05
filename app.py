@@ -2314,24 +2314,35 @@ def process_call_ai_async(call_id, ucm_recording_path):
                 storage_path = None
 
                 if ucm_recording_path:
-                    logger.info(f"Downloading recording from UCM for call {call_id}")
-                    storage_path = download_and_upload_recording(
-                        UCM_IP,
-                        UCM_USERNAME,
-                        UCM_PASSWORD,
-                        ucm_recording_path,
-                        tenant_id,
-                        call.uniqueid,
-                        storage_manager
-                    )
+                    logger.info(f"📥 Starting recording download for call {call_id}")
+                    logger.info(f"📍 UCM IP: {UCM_IP}")
+                    logger.info(f"👤 UCM Username: {UCM_USERNAME}")
+                    logger.info(f"📂 UCM Recording Path: {ucm_recording_path}")
+                    logger.info(f"🏢 Tenant ID: {tenant_id}")
+                    logger.info(f"🆔 Call Unique ID: {call.uniqueid}")
+                    logger.info(f"☁️ Storage Manager Available: {storage_manager is not None}")
 
-                    if storage_path:
-                        # Update CDR with Supabase storage path
-                        call.recordfiles = storage_path
-                        db.session.commit()
-                        logger.info(f"✅ Recording stored in Supabase: {storage_path}")
-                    else:
-                        logger.warning(f"Failed to download/upload recording for call {call_id}")
+                    try:
+                        storage_path = download_and_upload_recording(
+                            UCM_IP,
+                            UCM_USERNAME,
+                            UCM_PASSWORD,
+                            ucm_recording_path,
+                            tenant_id,
+                            call.uniqueid,
+                            storage_manager
+                        )
+
+                        if storage_path:
+                            # Update CDR with Supabase storage path
+                            call.recordfiles = storage_path
+                            db.session.commit()
+                            logger.info(f"✅ Recording stored in Supabase: {storage_path}")
+                        else:
+                            logger.error(f"❌ download_and_upload_recording returned None for call {call_id}")
+                    except Exception as download_error:
+                        logger.error(f"❌ Exception during download_and_upload_recording: {download_error}", exc_info=True)
+                        storage_path = None
 
                 if not storage_path:
                     logger.warning(f"No recording available for call {call_id}, skipping AI processing")
@@ -3104,9 +3115,17 @@ def receive_cdr(subdomain):
 
         # Trigger AI processing if recording exists
         recording_path = cdr_data.get('recordfiles')
-        if recording_path and (TRANSCRIPTION_ENABLED or SENTIMENT_ENABLED):
-            logger.info(f"Triggering AI processing for call {cdr.id} with recording: {recording_path}")
-            process_call_ai_async(cdr.id, recording_path)
+        if recording_path:
+            logger.info(f"📼 Recording path received: {recording_path}")
+            logger.info(f"🔧 TRANSCRIPTION_ENABLED={TRANSCRIPTION_ENABLED}, SENTIMENT_ENABLED={SENTIMENT_ENABLED}")
+
+            if TRANSCRIPTION_ENABLED or SENTIMENT_ENABLED:
+                logger.info(f"🚀 Triggering AI processing for call {cdr.id} with recording: {recording_path}")
+                process_call_ai_async(cdr.id, recording_path)
+            else:
+                logger.warning(f"⚠️ AI features disabled - recording will not be processed for call {cdr.id}")
+        else:
+            logger.warning(f"⚠️ No recording path in webhook data for call {cdr.id}")
 
         return jsonify({'status': 'success'}), 200
 

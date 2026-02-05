@@ -100,7 +100,7 @@ class UCMRecordingDownloader:
 
             for url in download_urls:
                 try:
-                    logger.info(f"Attempting download from: {url}")
+                    logger.info(f"🔗 Attempting download from: {url}")
                     response = requests.get(
                         url,
                         auth=(self.username, self.password),
@@ -108,16 +108,28 @@ class UCMRecordingDownloader:
                         timeout=30
                     )
 
+                    logger.info(f"   Response status: {response.status_code}")
+
                     if response.status_code == 200:
+                        # Check if we actually got audio data
+                        content_length = len(response.content)
+                        logger.info(f"   Content length: {content_length} bytes")
+
+                        if content_length < 100:
+                            logger.warning(f"   Response too small ({content_length} bytes), probably not a recording")
+                            continue
+
                         # Save to local file
                         with open(local_path, 'wb') as f:
                             f.write(response.content)
 
-                        logger.info(f"✅ Downloaded recording to: {local_path}")
+                        logger.info(f"✅ Downloaded recording to: {local_path} ({content_length} bytes)")
                         return local_path
+                    else:
+                        logger.warning(f"   HTTP {response.status_code}: {response.text[:200]}")
 
                 except Exception as url_error:
-                    logger.debug(f"Failed to download from {url}: {url_error}")
+                    logger.warning(f"   Failed to download from {url}: {str(url_error)}")
                     continue
 
             logger.warning(f"Could not download recording from any URL")
@@ -153,6 +165,13 @@ def download_and_upload_recording(
         Supabase storage path if successful, None otherwise
     """
     try:
+        logger.info(f"📥 Starting download_and_upload_recording")
+        logger.info(f"   UCM IP: {ucm_ip}")
+        logger.info(f"   UCM User: {ucm_username}")
+        logger.info(f"   Recording Path: {recording_path}")
+        logger.info(f"   Tenant ID: {tenant_id}")
+        logger.info(f"   Unique ID: {uniqueid}")
+
         # Create UCM downloader
         downloader = UCMRecordingDownloader(ucm_ip, ucm_username, ucm_password)
 
@@ -161,12 +180,18 @@ def download_and_upload_recording(
         temp_dir = tempfile.gettempdir()
         local_path = os.path.join(temp_dir, f"{uniqueid}_{filename}")
 
+        logger.info(f"📂 Temporary download path: {local_path}")
+
         # Download from UCM
-        logger.info(f"Downloading recording for call {uniqueid}")
+        logger.info(f"🔽 Attempting to download recording for call {uniqueid}")
         downloaded_path = downloader.download_recording(recording_path, local_path)
 
         if not downloaded_path:
-            logger.error(f"Failed to download recording for call {uniqueid}")
+            logger.error(f"❌ Failed to download recording for call {uniqueid}")
+            logger.error(f"   This may be because:")
+            logger.error(f"   1. UCM credentials are incorrect (check UCM_IP, UCM_USERNAME, UCM_PASSWORD env vars)")
+            logger.error(f"   2. Recording path from webhook is invalid: {recording_path}")
+            logger.error(f"   3. UCM API is not accessible from this server")
             return None
 
         # Upload to Supabase Storage
