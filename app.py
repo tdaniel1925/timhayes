@@ -2330,7 +2330,8 @@ def process_call_ai_async(call_id, ucm_recording_path):
                             ucm_recording_path,
                             tenant_id,
                             call.uniqueid,
-                            storage_manager
+                            storage_manager,
+                            UCM_PORT
                         )
 
                         if storage_path:
@@ -3189,7 +3190,8 @@ def ucm_diagnostics():
                 call.recordfiles,
                 call.tenant_id,
                 call.uniqueid,
-                storage_manager
+                storage_manager,
+                UCM_PORT
             )
 
             if result:

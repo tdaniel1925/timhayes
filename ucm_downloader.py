@@ -1,6 +1,6 @@
 """
 UCM Recording Downloader with Supabase Storage Integration
-Downloads recordings from Grandstream UCM and uploads to Supabase Storage
+Downloads recordings from Grandstream UCM using proper API authentication
 """
 
 import os
@@ -9,44 +9,73 @@ import hashlib
 import requests
 from pathlib import Path
 from typing import Optional
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 import tempfile
+import urllib3
+
+# Disable SSL warnings for self-signed certificates
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
 
 class UCMRecordingDownloader:
-    """Downloads recording files from Grandstream UCM via HTTPS API"""
+    """Downloads recording files from Grandstream UCM via authenticated API"""
 
     def __init__(self, ucm_ip: str, username: str, password: str, port: int = 8089):
         self.ucm_ip = ucm_ip
         self.username = username
         self.password = password
         self.port = port
-        self.session = None
-        self.authenticated = False
+        self.cookie = None
+        self.session = requests.Session()
+
+    def _md5(self, text: str) -> str:
+        """Generate MD5 hash of text"""
+        return hashlib.md5(text.encode()).hexdigest()
 
     def authenticate(self) -> bool:
-        """Authenticate with UCM HTTPS API"""
+        """
+        Authenticate with UCM API using challenge-response authentication
+
+        Returns:
+            True if authentication successful, False otherwise
+        """
         try:
-            self.session = requests.Session()
             base_url = f"https://{self.ucm_ip}:{self.port}/api"
+
+            logger.info(f"🔐 Authenticating with UCM at {self.ucm_ip}:{self.port}")
 
             # Step 1: Get challenge
             challenge_request = {
                 "request": {
                     "action": "challenge",
-                    "user": self.username,
-                    "version": "1.0"
+                    "user": self.username
                 }
             }
 
-            response = self.session.post(base_url, json=challenge_request, verify=False, timeout=10)
+            logger.info(f"   Step 1: Requesting challenge for user '{self.username}'")
+            response = self.session.post(
+                base_url,
+                json=challenge_request,
+                verify=False,
+                timeout=10
+            )
             response.raise_for_status()
-            challenge = response.json()['response']['challenge']
 
-            # Step 2: Login with token
-            token = hashlib.md5((challenge + self.password).encode()).hexdigest()
+            response_data = response.json()
+            if 'response' not in response_data or 'challenge' not in response_data['response']:
+                logger.error(f"   Invalid challenge response: {response_data}")
+                return False
+
+            challenge = response_data['response']['challenge']
+            logger.info(f"   Challenge received: {challenge[:20]}...")
+
+            # Step 2: Login with hashed token
+            # Token = MD5(challenge + MD5(password))
+            password_hash = self._md5(self.password)
+            token = self._md5(challenge + password_hash)
+
             login_request = {
                 "request": {
                     "action": "login",
@@ -55,20 +84,46 @@ class UCMRecordingDownloader:
                 }
             }
 
-            login_response = self.session.post(base_url, json=login_request, verify=False, timeout=10)
+            logger.info(f"   Step 2: Logging in with token")
+            login_response = self.session.post(
+                base_url,
+                json=login_request,
+                verify=False,
+                timeout=10
+            )
             login_response.raise_for_status()
 
-            self.authenticated = True
-            logger.info(f"Authenticated with UCM as {self.username}")
-            return True
+            login_data = login_response.json()
+            if 'response' not in login_data:
+                logger.error(f"   Invalid login response: {login_data}")
+                return False
 
+            if login_data['response'].get('need_apply') == 'no':
+                # Successful login
+                self.cookie = login_data['response'].get('cookie')
+                if self.cookie:
+                    logger.info(f"   ✅ Authentication successful! Cookie: {self.cookie[:20]}...")
+                    return True
+                else:
+                    logger.error(f"   No cookie in response: {login_data}")
+                    return False
+            else:
+                logger.error(f"   Login failed: {login_data}")
+                return False
+
+        except requests.exceptions.Timeout:
+            logger.error(f"   ❌ Timeout connecting to UCM at {self.ucm_ip}:{self.port}")
+            return False
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"   ❌ Cannot connect to UCM at {self.ucm_ip}:{self.port}: {e}")
+            return False
         except Exception as e:
-            logger.error(f"UCM authentication failed: {e}")
+            logger.error(f"   ❌ UCM authentication failed: {e}", exc_info=True)
             return False
 
     def download_recording(self, recording_path: str, local_path: str) -> Optional[str]:
         """
-        Download recording file from UCM
+        Download recording file from UCM using authenticated API
 
         Args:
             recording_path: Path on UCM server (from CDR recordfiles field)
@@ -90,66 +145,93 @@ class UCMRecordingDownloader:
             return local_path
 
         # Clean recording path - UCM sometimes appends @ to indicate server/partition
-        # Remove it before attempting download
         original_path = recording_path
         recording_path = recording_path.rstrip('@').rstrip()
 
         if original_path != recording_path:
-            logger.info(f"Cleaned recording path: '{original_path}' -> '{recording_path}'")
+            logger.info(f"   Cleaned recording path: '{original_path}' -> '{recording_path}'")
 
-        # Ensure recording path starts with /
-        if not recording_path.startswith('/'):
-            recording_path = '/' + recording_path
-            logger.info(f"Added leading slash to recording path: {recording_path}")
+        # Authenticate if not already authenticated
+        if not self.cookie:
+            logger.info("   Not authenticated, attempting authentication...")
+            if not self.authenticate():
+                logger.error("   Cannot download recording - authentication failed")
+                return None
 
-        # Try direct HTTPS download (UCM may expose recordings via web interface)
         try:
-            # Common UCM recording paths
-            download_urls = [
-                f"https://{self.ucm_ip}:{self.port}/recordings{recording_path}",
-                f"https://{self.ucm_ip}:{self.port}{recording_path}",
-                f"https://{self.ucm_ip}/cdrapi/recording?file={quote(recording_path)}"
-            ]
+            # Use UCM recapi to download recording
+            # Format: /api?action=recapi&cookie={cookie}&filedir={path}&fileformat=wav
+            base_url = f"https://{self.ucm_ip}:{self.port}/api"
 
-            for url in download_urls:
-                try:
-                    logger.info(f"🔗 Attempting download from: {url}")
-                    response = requests.get(
-                        url,
-                        auth=(self.username, self.password),
-                        verify=False,
-                        timeout=30
-                    )
+            params = {
+                "action": "recapi",
+                "cookie": self.cookie,
+                "filedir": recording_path,
+                "fileformat": "wav"
+            }
 
-                    logger.info(f"   Response status: {response.status_code}")
+            download_url = f"{base_url}?{urlencode(params)}"
 
-                    if response.status_code == 200:
-                        # Check if we actually got audio data
-                        content_length = len(response.content)
-                        logger.info(f"   Content length: {content_length} bytes")
+            logger.info(f"🔽 Downloading recording from UCM API")
+            logger.info(f"   URL: {base_url}?action=recapi&cookie=***&filedir={recording_path}&fileformat=wav")
 
-                        if content_length < 100:
-                            logger.warning(f"   Response too small ({content_length} bytes), probably not a recording")
-                            continue
+            response = self.session.get(
+                download_url,
+                verify=False,
+                timeout=60,  # Longer timeout for large recordings
+                stream=True
+            )
 
-                        # Save to local file
-                        with open(local_path, 'wb') as f:
-                            f.write(response.content)
+            logger.info(f"   Response status: {response.status_code}")
+            logger.info(f"   Content-Type: {response.headers.get('Content-Type', 'unknown')}")
 
-                        logger.info(f"✅ Downloaded recording to: {local_path} ({content_length} bytes)")
-                        return local_path
-                    else:
-                        logger.warning(f"   HTTP {response.status_code}: {response.text[:200]}")
+            if response.status_code == 200:
+                # Check if we got audio data
+                content_length = int(response.headers.get('Content-Length', 0))
 
-                except Exception as url_error:
-                    logger.warning(f"   Failed to download from {url}: {str(url_error)}")
-                    continue
+                if content_length == 0:
+                    # Try to download and measure
+                    content = response.content
+                    content_length = len(content)
+                else:
+                    content = response.content
 
-            logger.warning(f"Could not download recording from any URL")
+                logger.info(f"   Content length: {content_length} bytes")
+
+                if content_length < 100:
+                    logger.warning(f"   Response too small ({content_length} bytes), probably not a recording")
+                    logger.warning(f"   Response preview: {content[:200]}")
+                    return None
+
+                # Check content type
+                content_type = response.headers.get('Content-Type', '')
+                if 'audio' not in content_type and 'octet-stream' not in content_type and content_length > 100:
+                    # Might still be valid - UCM sometimes doesn't set proper content-type
+                    logger.warning(f"   Unexpected content-type: {content_type}, but size looks good")
+
+                # Save to local file
+                with open(local_path, 'wb') as f:
+                    f.write(content)
+
+                logger.info(f"   ✅ Downloaded recording to: {local_path} ({content_length} bytes)")
+                return local_path
+
+            elif response.status_code == 401:
+                logger.error(f"   ❌ Authentication expired, cookie invalid")
+                self.cookie = None
+                return None
+            elif response.status_code == 404:
+                logger.error(f"   ❌ Recording not found on UCM: {recording_path}")
+                return None
+            else:
+                logger.error(f"   ❌ HTTP {response.status_code}: {response.text[:200]}")
+                return None
+
+        except requests.exceptions.Timeout:
+            logger.error(f"   ❌ Timeout downloading recording from UCM")
             return None
-
         except Exception as e:
-            logger.error(f"Recording download failed: {e}", exc_info=True)
+            logger.error(f"   ❌ Recording download failed: {e}", exc_info=True)
             return None
 
 
@@ -160,36 +242,38 @@ def download_and_upload_recording(
     recording_path: str,
     tenant_id: int,
     uniqueid: str,
-    storage_manager
+    storage_manager,
+    ucm_port: int = 8089
 ) -> Optional[str]:
     """
     Download recording from UCM and upload to Supabase Storage
 
     Args:
-        ucm_ip: UCM IP address
+        ucm_ip: UCM IP address or hostname
         ucm_username: UCM username
         ucm_password: UCM password
         recording_path: Path on UCM server
         tenant_id: Tenant ID for organizing storage
         uniqueid: Call unique ID
         storage_manager: SupabaseStorageManager instance
+        ucm_port: UCM HTTPS port (default 8089)
 
     Returns:
         Supabase storage path if successful, None otherwise
     """
     try:
         logger.info(f"📥 Starting download_and_upload_recording")
-        logger.info(f"   UCM IP: {ucm_ip}")
-        logger.info(f"   UCM User: {ucm_username}")
+        logger.info(f"   UCM: {ucm_ip}:{ucm_port}")
+        logger.info(f"   User: {ucm_username}")
         logger.info(f"   Recording Path: {recording_path}")
         logger.info(f"   Tenant ID: {tenant_id}")
         logger.info(f"   Unique ID: {uniqueid}")
 
         # Create UCM downloader
-        downloader = UCMRecordingDownloader(ucm_ip, ucm_username, ucm_password)
+        downloader = UCMRecordingDownloader(ucm_ip, ucm_username, ucm_password, ucm_port)
 
         # Create temporary file for download
-        filename = Path(recording_path).name
+        filename = Path(recording_path).name.rstrip('@')  # Remove @ from filename
         temp_dir = tempfile.gettempdir()
         local_path = os.path.join(temp_dir, f"{uniqueid}_{filename}")
 
@@ -201,10 +285,11 @@ def download_and_upload_recording(
 
         if not downloaded_path:
             logger.error(f"❌ Failed to download recording for call {uniqueid}")
-            logger.error(f"   This may be because:")
-            logger.error(f"   1. UCM credentials are incorrect (check UCM_IP, UCM_USERNAME, UCM_PASSWORD env vars)")
-            logger.error(f"   2. Recording path from webhook is invalid: {recording_path}")
-            logger.error(f"   3. UCM API is not accessible from this server")
+            logger.error(f"   Possible reasons:")
+            logger.error(f"   1. UCM credentials are incorrect")
+            logger.error(f"   2. Recording not found at path: {recording_path}")
+            logger.error(f"   3. Network connectivity issues")
+            logger.error(f"   4. UCM not accessible at {ucm_ip}:{ucm_port}")
             return None
 
         # Upload to Supabase Storage
@@ -212,24 +297,29 @@ def download_and_upload_recording(
             # Organize by tenant: tenant_1/uniqueid_filename.wav
             remote_path = f"tenant_{tenant_id}/{uniqueid}_{filename}"
 
-            logger.info(f"Uploading recording to Supabase: {remote_path}")
+            logger.info(f"☁️  Uploading recording to Supabase: {remote_path}")
             supabase_path = storage_manager.upload_recording(downloaded_path, remote_path)
 
             # Clean up local temp file
             try:
                 os.remove(downloaded_path)
-                logger.debug(f"Cleaned up temp file: {downloaded_path}")
+                logger.debug(f"   Cleaned up temp file: {downloaded_path}")
             except Exception as cleanup_error:
-                logger.warning(f"Failed to clean up temp file: {cleanup_error}")
+                logger.warning(f"   Failed to clean up temp file: {cleanup_error}")
+
+            if supabase_path:
+                logger.info(f"   ✅ Recording uploaded successfully: {supabase_path}")
+            else:
+                logger.error(f"   ❌ Failed to upload recording to Supabase")
 
             return supabase_path
 
         else:
-            logger.warning("Supabase Storage not configured - keeping local recording")
+            logger.warning("⚠️  Supabase Storage not configured - keeping local recording")
             return downloaded_path
 
     except Exception as e:
-        logger.error(f"Error in download_and_upload_recording: {e}", exc_info=True)
+        logger.error(f"❌ Error in download_and_upload_recording: {e}", exc_info=True)
         return None
 
 
