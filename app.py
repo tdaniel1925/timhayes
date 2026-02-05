@@ -112,6 +112,8 @@ if not ENCRYPTION_KEY:
     # Generate a key for development (DO NOT use in production)
     logger.warning("⚠️  ENCRYPTION_KEY not set! Generating temporary key. SET THIS IN PRODUCTION!")
     ENCRYPTION_KEY = Fernet.generate_key().decode()
+else:
+    logger.info(f"✅ ENCRYPTION_KEY loaded: {ENCRYPTION_KEY[:20]}...{ENCRYPTION_KEY[-10:]}")
 
 cipher_suite = Fernet(ENCRYPTION_KEY.encode())
 
@@ -352,9 +354,13 @@ class Tenant(db.Model):
         if not self._webhook_password:
             return None
         try:
-            return cipher_suite.decrypt(self._webhook_password.encode()).decode()
+            decrypted = cipher_suite.decrypt(self._webhook_password.encode()).decode()
+            logger.debug(f"Successfully decrypted webhook_password for tenant {self.id}")
+            return decrypted
         except (InvalidToken, UnicodeDecodeError) as e:
             logger.error(f"Failed to decrypt webhook_password for tenant {self.id}: {e}")
+            logger.error(f"Encrypted value length: {len(self._webhook_password)}, starts with: {self._webhook_password[:30]}")
+            logger.error(f"ENCRYPTION_KEY being used (first 20 chars): {ENCRYPTION_KEY[:20] if ENCRYPTION_KEY else 'None'}")
             return None
 
     @webhook_password.setter
