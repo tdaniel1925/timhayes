@@ -156,56 +156,40 @@ class UCMRecordingDownloader:
                 return None
 
         try:
-            # Use UCM HTTPS API to download recording (CloudUCM)
-            # Per Grandstream support, CloudUCM requires HTTPS API, not legacy /recapi endpoint
-            # Format: POST to /api with JSON body
-            # {
-            #     "request": {
-            #         "action": "recapi",
-            #         "cookie": "xxx",
-            #         "filedir": "monitor",
-            #         "filename": "auto-xxx.wav"
-            #     }
-            # }
+            # Use UCM recapi endpoint to download recording
+            # Format: /recapi?cookie={cookie}&filedir={dir}&filename={file}
+            # Split path into directory and filename (e.g., "2026-02/auto-xxx.wav" -> filedir="2026-02", filename="auto-xxx.wav")
 
-            # Parse recording path to extract directory and filename
-            # CDR provides paths like "2026-02/auto-xxx.wav@"
-            # We need to include the date subdirectory in filedir
+            # Try primary approach: split into filedir and filename
             parts = recording_path.split('/')
-
-            if len(parts) > 1:
-                # Has subdirectory: "2026-02/auto-xxx.wav"
-                # filedir should be "monitor/2026-02"
-                subdirectory = '/'.join(parts[:-1])  # e.g., "2026-02"
-                filename = parts[-1]  # e.g., "auto-1770401677-1000-2815058290.wav"
-                filedir = f"monitor/{subdirectory}"
+            if len(parts) >= 2:
+                filedir = '/'.join(parts[:-1])  # Everything except last part
+                filename = parts[-1]  # Last part
             else:
-                # No subdirectory: "auto-xxx.wav"
-                filename = parts[0]
-                filedir = "monitor"
+                # No directory, just filename
+                filedir = ""
+                filename = recording_path
 
-            base_url = f"https://{self.ucm_ip}:{self.port}/api"
+            # We'll try the download, and if it fails, we'll try alternative format
 
-            # Build request body per Grandstream specification
-            request_body = {
-                "request": {
-                    "action": "recapi",
-                    "cookie": self.cookie,
-                    "filedir": filedir,
-                    "filename": filename
-                }
+            base_url = f"https://{self.ucm_ip}:{self.port}/recapi"
+
+            params = {
+                "cookie": self.cookie,
+                "filedir": filedir,
+                "filename": filename
             }
 
-            logger.info(f"🔽 Downloading recording from UCM HTTPS API")
-            logger.info(f"   Original recording path: {original_path}")
-            logger.info(f"   Extracted filename: '{filename}'")
-            logger.info(f"   Extracted filedir: '{filedir}'")
-            logger.info(f"   Using HTTPS API: POST /api with action=recapi")
-            logger.info(f"   Parameters: filedir='{filedir}', filename='{filename}'")
+            download_url = f"{base_url}?{urlencode(params)}"
 
-            response = self.session.post(
-                base_url,
-                json=request_body,
+            logger.info(f"🔽 Downloading recording from UCM recapi")
+            logger.info(f"   Original recording path: {original_path}")
+            logger.info(f"   Parsed filedir: '{filedir}'")
+            logger.info(f"   Parsed filename: '{filename}'")
+            logger.info(f"   URL: /recapi?cookie=***&filedir={filedir}&filename={filename}")
+
+            response = self.session.get(
+                download_url,
                 verify=False,
                 timeout=60,  # Longer timeout for large recordings
                 stream=True
