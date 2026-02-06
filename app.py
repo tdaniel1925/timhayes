@@ -2301,16 +2301,24 @@ def process_call_ai_async(call_id, ucm_recording_path):
         call_id: Database ID of the call
         ucm_recording_path: Path to recording file on UCM server
     """
-    def ai_worker():
-        with app.app_context():
-            try:
-                # Get call from database
-                call = CDRRecord.query.get(call_id)
-                if not call:
-                    logger.error(f"Call {call_id} not found for AI processing")
-                    return
+    logger.info(f"🎯 process_call_ai_async CALLED for call_id={call_id}, recording={ucm_recording_path}")
 
-                tenant_id = call.tenant_id
+    def ai_worker():
+        logger.info(f"🧵 AI worker thread STARTED for call {call_id}")
+        try:
+            with app.app_context():
+                logger.info(f"📱 Inside app context for call {call_id}")
+                try:
+                    # Get call from database
+                    logger.info(f"🔍 Querying database for call {call_id}")
+                    call = CDRRecord.query.get(call_id)
+                    if not call:
+                        logger.error(f"❌ Call {call_id} not found for AI processing")
+                        return
+
+                    logger.info(f"✅ Found call {call_id} in database")
+                    tenant_id = call.tenant_id
+                    logger.info(f"🏢 Tenant ID: {tenant_id}")
 
                 # Step 0: Download recording from UCM and upload to Supabase
                 storage_manager = get_storage_manager()
@@ -2428,16 +2436,27 @@ def process_call_ai_async(call_id, ucm_recording_path):
                 if 'compliance-monitoring' in enabled_features:
                     monitor_compliance(transcription_text, tenant_id, call_id)
 
-                logger.info(f"✅ AI processing complete for call {call_id}")
+                    logger.info(f"✅ AI processing complete for call {call_id}")
 
-            except Exception as e:
-                logger.error(f"AI processing failed for call {call_id}: {e}", exc_info=True)
+                except Exception as inner_e:
+                    logger.error(f"❌ AI processing INNER exception for call {call_id}: {inner_e}", exc_info=True)
+                    db.session.rollback()
+
+        except Exception as outer_e:
+            logger.error(f"❌ AI worker OUTER exception for call {call_id}: {outer_e}", exc_info=True)
+            try:
                 db.session.rollback()
+            except:
+                pass
+
+        logger.info(f"🏁 AI worker thread FINISHED for call {call_id}")
 
     # Run in background thread
+    logger.info(f"🚀 Creating thread for call {call_id}")
     thread = threading.Thread(target=ai_worker, daemon=True)
+    logger.info(f"▶️ Starting thread for call {call_id}")
     thread.start()
-    logger.info(f"Started AI processing thread for call {call_id}")
+    logger.info(f"✅ Started AI processing thread for call {call_id}")
 
 
 # ============================================================================
@@ -3132,13 +3151,21 @@ def receive_cdr(subdomain):
         # Trigger AI processing if recording exists
         # Use recordfiles_value (which includes workaround fix) instead of original webhook data
         recording_path = recordfiles_value
+        logger.info(f"🎯 WEBHOOK DEBUG: call_id={cdr.id}, recording_path={recording_path}")
+        logger.info(f"🎯 WEBHOOK DEBUG: recordfiles_value={recordfiles_value}, caller_name_value={caller_name_value}")
+
         if recording_path:
             logger.info(f"📼 Recording path received: {recording_path}")
             logger.info(f"🔧 TRANSCRIPTION_ENABLED={TRANSCRIPTION_ENABLED}, SENTIMENT_ENABLED={SENTIMENT_ENABLED}")
+            logger.info(f"🔧 Type of recording_path: {type(recording_path)}, len={len(recording_path) if recording_path else 0}")
 
             if TRANSCRIPTION_ENABLED or SENTIMENT_ENABLED:
                 logger.info(f"🚀 Triggering AI processing for call {cdr.id} with recording: {recording_path}")
-                process_call_ai_async(cdr.id, recording_path)
+                try:
+                    process_call_ai_async(cdr.id, recording_path)
+                    logger.info(f"✅ process_call_ai_async returned successfully")
+                except Exception as proc_e:
+                    logger.error(f"❌ ERROR calling process_call_ai_async: {proc_e}", exc_info=True)
             else:
                 logger.warning(f"⚠️ AI features disabled - recording will not be processed for call {cdr.id}")
         else:
