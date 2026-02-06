@@ -3090,13 +3090,25 @@ def receive_cdr(subdomain):
                 'upgrade_required': True
             }), 202
 
+        # WORKAROUND: UCM sometimes sends recording path in caller_name field
+        # Detect and move to correct field
+        caller_name_value = cdr_data.get('caller_name')
+        recordfiles_value = cdr_data.get('recordfiles')
+
+        # If caller_name looks like a recording path (contains .wav), move it to recordfiles
+        if caller_name_value and ('.wav' in caller_name_value or caller_name_value.endswith('@')):
+            # Remove trailing @ if present
+            recordfiles_value = caller_name_value.rstrip('@')
+            caller_name_value = None  # Clear caller_name
+            logger.info(f"Moved recording path from caller_name to recordfiles: {recordfiles_value}")
+
         # Process CDR normally
         cdr = CDRRecord(
             tenant_id=tenant.id,
             uniqueid=cdr_data.get('uniqueid'),
             src=cdr_data.get('src'),
             dst=cdr_data.get('dst'),
-            caller_name=cdr_data.get('caller_name'),
+            caller_name=caller_name_value,
             clid=cdr_data.get('clid'),
             channel=cdr_data.get('channel'),
             dstchannel=cdr_data.get('dstchannel'),
@@ -3106,7 +3118,7 @@ def receive_cdr(subdomain):
             duration=cdr_data.get('duration'),
             billsec=cdr_data.get('billsec'),
             disposition=cdr_data.get('disposition'),
-            recordfiles=cdr_data.get('recordfiles'),
+            recordfiles=recordfiles_value,
             src_trunk_name=cdr_data.get('src_trunk_name'),
             dst_trunk_name=cdr_data.get('dst_trunk_name')
         )
