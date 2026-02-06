@@ -2490,7 +2490,7 @@ def test_ucm_download():
             call = CDRRecord.query.filter(
                 CDRRecord.recordfiles.isnot(None),
                 CDRRecord.recordfiles != ''
-            ).order_by(CDRRecord.created_at.desc()).first()
+            ).order_by(CDRRecord.id.desc()).first()
 
         if not call:
             return jsonify({
