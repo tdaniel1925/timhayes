@@ -3130,7 +3130,8 @@ def receive_cdr(subdomain):
         increment_usage(tenant.id)
 
         # Trigger AI processing if recording exists
-        recording_path = cdr_data.get('recordfiles')
+        # Use recordfiles_value (which includes workaround fix) instead of original webhook data
+        recording_path = recordfiles_value
         if recording_path:
             logger.info(f"📼 Recording path received: {recording_path}")
             logger.info(f"🔧 TRANSCRIPTION_ENABLED={TRANSCRIPTION_ENABLED}, SENTIMENT_ENABLED={SENTIMENT_ENABLED}")
