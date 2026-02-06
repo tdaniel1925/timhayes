@@ -156,34 +156,44 @@ class UCMRecordingDownloader:
                 return None
 
         try:
-            # Use UCM recapi endpoint to download recording
-            # Format: /recapi?cookie={cookie}&filename={file}
-            # According to Grandstream UCM API documentation:
-            # - Example shows: /recapi?filename=auto-1414771234-1000-1004.wav (just filename, no path)
-            # - CDR provides paths like "2026-02/auto-xxx.wav@"
-            # - Extract just the filename part (after the last /)
+            # Use UCM HTTPS API to download recording (CloudUCM)
+            # Per Grandstream support, CloudUCM requires HTTPS API, not legacy /recapi endpoint
+            # Format: POST to /api with JSON body
+            # {
+            #     "request": {
+            #         "action": "recapi",
+            #         "cookie": "xxx",
+            #         "filedir": "monitor",
+            #         "filename": "auto-xxx.wav"
+            #     }
+            # }
 
             # Extract just the filename (last part after /)
+            # CDR provides paths like "2026-02/auto-xxx.wav@"
             parts = recording_path.split('/')
             filename = parts[-1]  # e.g., "auto-1770401677-1000-2815058290.wav"
 
-            base_url = f"https://{self.ucm_ip}:{self.port}/recapi"
+            base_url = f"https://{self.ucm_ip}:{self.port}/api"
 
-            # Use just the filename, not the full path
-            params = {
-                "cookie": self.cookie,
-                "filename": filename
+            # Build request body per Grandstream specification
+            request_body = {
+                "request": {
+                    "action": "recapi",
+                    "cookie": self.cookie,
+                    "filedir": "monitor",
+                    "filename": filename
+                }
             }
 
-            download_url = f"{base_url}?{urlencode(params)}"
-
-            logger.info(f"🔽 Downloading recording from UCM recapi")
+            logger.info(f"🔽 Downloading recording from UCM HTTPS API")
             logger.info(f"   Original recording path: {original_path}")
             logger.info(f"   Extracted filename: '{filename}'")
-            logger.info(f"   URL: /recapi?cookie=***&filename={filename}")
+            logger.info(f"   Using HTTPS API: POST /api with action=recapi")
+            logger.info(f"   Parameters: filedir='monitor', filename='{filename}'")
 
-            response = self.session.get(
-                download_url,
+            response = self.session.post(
+                base_url,
+                json=request_body,
                 verify=False,
                 timeout=60,  # Longer timeout for large recordings
                 stream=True
