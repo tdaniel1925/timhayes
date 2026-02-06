@@ -157,29 +157,22 @@ class UCMRecordingDownloader:
 
         try:
             # Use UCM recapi endpoint to download recording
-            # Format: /recapi?cookie={cookie}&filedir={dir}&filename={file}
-            # According to UCM API docs:
-            # - When only filename is set, filedir defaults to "monitor"
-            # - filedir uses @ as separator for nested paths (e.g., "monitor@2026-02")
-            # CDR paths like "2026-02/auto-xxx.wav" are relative to monitor directory
+            # Format: /recapi?cookie={cookie}&filename={file}
+            # According to Grandstream UCM API documentation:
+            # - Simple single-file download only needs filename parameter
+            # - Example: /recapi?filename=auto-1414771234-1000-1004.wav
+            # - UCM automatically searches in the monitor directory
+            # CDR paths like "2026-02/auto-xxx.wav@" should be parsed to extract just the filename
 
-            # Parse path: "2026-02/auto-xxx.wav" -> filedir="monitor@2026-02", filename="auto-xxx.wav"
+            # Extract just the filename (last part after /)
             parts = recording_path.split('/')
-            if len(parts) >= 2:
-                # Path has directory component - prepend monitor and use @ separator
-                subdirs = '@'.join(parts[:-1])  # e.g., "2026-02"
-                filedir = f"monitor@{subdirs}"  # e.g., "monitor@2026-02"
-                filename = parts[-1]  # e.g., "auto-xxx.wav"
-            else:
-                # No directory, just filename - use monitor default
-                filedir = "monitor"
-                filename = recording_path
+            filename = parts[-1]  # e.g., "auto-1770401677-1000-2815058290.wav"
 
             base_url = f"https://{self.ucm_ip}:{self.port}/recapi"
 
+            # Simple format - just cookie and filename
             params = {
                 "cookie": self.cookie,
-                "filedir": filedir,
                 "filename": filename
             }
 
@@ -187,9 +180,8 @@ class UCMRecordingDownloader:
 
             logger.info(f"🔽 Downloading recording from UCM recapi")
             logger.info(f"   Original recording path: {original_path}")
-            logger.info(f"   Parsed filedir: '{filedir}'")
-            logger.info(f"   Parsed filename: '{filename}'")
-            logger.info(f"   URL: /recapi?cookie=***&filedir={filedir}&filename={filename}")
+            logger.info(f"   Extracted filename: '{filename}'")
+            logger.info(f"   URL: /recapi?cookie=***&filename={filename}")
 
             response = self.session.get(
                 download_url,
