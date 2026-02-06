@@ -3669,28 +3669,40 @@ def get_recording(call_id):
     claims = get_jwt()
     tenant_id = claims.get('tenant_id')
 
+    logger.info(f"[RECORDING] Request for call {call_id} from tenant {tenant_id}")
+
     call = CDRRecord.query.filter_by(id=call_id, tenant_id=tenant_id).first()
     if not call:
+        logger.warning(f"[RECORDING] Call {call_id} not found for tenant {tenant_id}")
         return jsonify({'error': 'Call not found'}), 404
+
+    logger.info(f"[RECORDING] Call found - recording_local_path: {call.recording_local_path}, recordfiles: {call.recordfiles}")
 
     # Check if recording has been downloaded to Supabase
     if not call.recording_local_path and not call.recordfiles:
+        logger.warning(f"[RECORDING] No recording path available for call {call_id}")
         return jsonify({'error': 'Recording not available'}), 404
 
     storage_manager = get_storage_manager()
+    logger.info(f"[RECORDING] Storage manager available: {storage_manager is not None}")
 
     # If recording is in Supabase Storage (downloaded), return signed URL
     if storage_manager and call.recording_local_path:
+        logger.info(f"[RECORDING] Generating signed URL for: {call.recording_local_path}")
         signed_url = storage_manager.get_signed_url(call.recording_local_path, expires_in=3600)
         if signed_url:
+            logger.info(f"[RECORDING] Signed URL generated successfully")
             return jsonify({'url': signed_url, 'type': 'supabase'}), 200
         else:
+            logger.error(f"[RECORDING] Failed to generate signed URL")
             return jsonify({'error': 'Failed to generate signed URL'}), 500
 
     # If it's a local file, serve it directly
     if call.recordfiles and os.path.exists(call.recordfiles):
+        logger.info(f"[RECORDING] Serving local file: {call.recordfiles}")
         return send_file(call.recordfiles, as_attachment=True)
 
+    logger.error(f"[RECORDING] Recording not found - no valid path")
     return jsonify({'error': 'Recording not found'}), 404
 
 
