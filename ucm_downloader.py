@@ -158,19 +158,20 @@ class UCMRecordingDownloader:
         try:
             # Use UCM recapi endpoint to download recording
             # Format: /recapi?cookie={cookie}&filedir={dir}&filename={file}
-            # According to UCM API docs, recordings are under the "monitor" directory by default
-            # Path from CDR like "2026-02/auto-xxx.wav" is relative to monitor directory
+            # According to UCM API docs:
+            # - When only filename is set, filedir defaults to "monitor"
+            # - When filedir is explicitly set, it's the full path
+            # CDR paths like "2026-02/auto-xxx.wav" appear to be complete filedirs
 
-            # Parse path: "2026-02/auto-xxx.wav" -> filedir="monitor/2026-02", filename="auto-xxx.wav"
+            # Parse path: "2026-02/auto-xxx.wav" -> filedir="2026-02", filename="auto-xxx.wav"
             parts = recording_path.split('/')
             if len(parts) >= 2:
-                # Path has directory component - prepend "monitor"
-                subdirs = '/'.join(parts[:-1])  # e.g., "2026-02"
-                filedir = f"monitor/{subdirs}"  # e.g., "monitor/2026-02"
+                # Path has directory component - use as-is
+                filedir = '/'.join(parts[:-1])  # e.g., "2026-02"
                 filename = parts[-1]  # e.g., "auto-xxx.wav"
             else:
-                # No directory, just filename - use default monitor directory
-                filedir = "monitor"
+                # No directory, just filename - leave filedir empty to use default
+                filedir = ""
                 filename = recording_path
 
             base_url = f"https://{self.ucm_ip}:{self.port}/recapi"
