@@ -37,6 +37,12 @@ gunicorn==21.2.0
 
 # Supabase Storage
 supabase==2.27.3
+httpx==0.28.1
+postgrest==2.27.3
+storage3==2.27.3
+realtime==2.27.3
+supabase-auth==2.27.3
+supabase-functions==2.27.3
 
 # Database driver for PostgreSQL
 psycopg2-binary==2.9.9
