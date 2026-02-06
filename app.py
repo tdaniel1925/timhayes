@@ -228,10 +228,13 @@ SUPABASE_BUCKET = os.getenv('SUPABASE_BUCKET', 'call-recordings')
 
 if SUPABASE_URL and SUPABASE_KEY:
     try:
+        logger.info(f"Initializing Supabase Storage: URL={SUPABASE_URL}, Bucket={SUPABASE_BUCKET}")
         init_storage_manager(SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET)
         logger.info("✅ Supabase Storage initialized successfully")
     except Exception as e:
+        import traceback
         logger.error(f"Failed to initialize Supabase Storage: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
 else:
     logger.warning("⚠️  Supabase Storage not configured - recordings will be stored locally")
 
