@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class UCMRecordingDownloader:
     """Downloads recording files from Grandstream UCM via authenticated API"""
 
-    def __init__(self, ucm_ip: str, username: str, password: str, port: int = 8089):
+    def __init__(self, ucm_ip: str, username: str, password: str, port: int = 8443):
         self.ucm_ip = ucm_ip
         self.username = username
         self.password = password
@@ -50,7 +50,8 @@ class UCMRecordingDownloader:
             challenge_request = {
                 "request": {
                     "action": "challenge",
-                    "user": self.username
+                    "user": self.username,
+                    "version": "1.0"
                 }
             }
 
@@ -72,9 +73,8 @@ class UCMRecordingDownloader:
             logger.info(f"   Challenge received: {challenge[:20]}...")
 
             # Step 2: Login with hashed token
-            # Token = MD5(challenge + MD5(password))
-            password_hash = self._md5(self.password)
-            token = self._md5(challenge + password_hash)
+            # Token = MD5(challenge + password) - direct concatenation
+            token = self._md5(challenge + self.password)
 
             login_request = {
                 "request": {
@@ -98,15 +98,12 @@ class UCMRecordingDownloader:
                 logger.error(f"   Invalid login response: {login_data}")
                 return False
 
-            if login_data['response'].get('need_apply') == 'no':
+            # Check if login successful (status 0 means success, cookie is returned)
+            if login_data.get('status') == 0 and 'cookie' in login_data['response']:
                 # Successful login
-                self.cookie = login_data['response'].get('cookie')
-                if self.cookie:
-                    logger.info(f"   ✅ Authentication successful! Cookie: {self.cookie[:20]}...")
-                    return True
-                else:
-                    logger.error(f"   No cookie in response: {login_data}")
-                    return False
+                self.cookie = login_data['response']['cookie']
+                logger.info(f"   ✅ Authentication successful! Cookie: {self.cookie[:20]}...")
+                return True
             else:
                 logger.error(f"   Login failed: {login_data}")
                 return False
@@ -159,21 +156,30 @@ class UCMRecordingDownloader:
                 return None
 
         try:
-            # Use UCM recapi to download recording
-            # Format: /api?action=recapi&cookie={cookie}&filedir={path}&fileformat=wav
-            base_url = f"https://{self.ucm_ip}:{self.port}/api"
+            # Use UCM recapi endpoint to download recording
+            # Format: /recapi?cookie={cookie}&filedir={dir}&filename={file}
+            # Split path into directory and filename (e.g., "2026-02/auto-xxx.wav" -> filedir="2026-02", filename="auto-xxx.wav")
+            parts = recording_path.split('/')
+            if len(parts) >= 2:
+                filedir = '/'.join(parts[:-1])  # Everything except last part
+                filename = parts[-1]  # Last part
+            else:
+                # No directory, just filename
+                filedir = ""
+                filename = recording_path
+
+            base_url = f"https://{self.ucm_ip}:{self.port}/recapi"
 
             params = {
-                "action": "recapi",
                 "cookie": self.cookie,
-                "filedir": recording_path,
-                "fileformat": "wav"
+                "filedir": filedir,
+                "filename": filename
             }
 
             download_url = f"{base_url}?{urlencode(params)}"
 
-            logger.info(f"🔽 Downloading recording from UCM API")
-            logger.info(f"   URL: {base_url}?action=recapi&cookie=***&filedir={recording_path}&fileformat=wav")
+            logger.info(f"🔽 Downloading recording from UCM recapi")
+            logger.info(f"   URL: /recapi?cookie=***&filedir={filedir}&filename={filename}")
 
             response = self.session.get(
                 download_url,
