@@ -7,10 +7,36 @@ import os
 import logging
 from pathlib import Path
 from typing import Optional
-from supabase import create_client, Client
 from datetime import timedelta
 
 logger = logging.getLogger(__name__)
+
+# Workaround for httpx proxy parameter TypeError
+# supabase 2.3.4 passes 'proxy' to httpx.Client but some httpx versions don't support it
+try:
+    import httpx
+    _original_client_init = httpx.Client.__init__
+
+    def _patched_client_init(self, *args, **kwargs):
+        # Remove proxy parameter if httpx doesn't support it
+        if 'proxy' in kwargs:
+            try:
+                # Test if proxy parameter is accepted
+                import inspect
+                sig = inspect.signature(_original_client_init)
+                if 'proxy' not in sig.parameters:
+                    logger.warning("Removing unsupported 'proxy' parameter from httpx.Client")
+                    kwargs.pop('proxy')
+            except:
+                pass
+        return _original_client_init(self, *args, **kwargs)
+
+    httpx.Client.__init__ = _patched_client_init
+    logger.info("Applied httpx.Client proxy parameter patch")
+except Exception as e:
+    logger.warning(f"Failed to apply httpx patch: {e}")
+
+from supabase import create_client, Client
 
 class SupabaseStorageManager:
     """Manages call recordings in Supabase Storage"""
