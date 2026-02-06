@@ -159,29 +159,25 @@ class UCMRecordingDownloader:
             # Use UCM recapi endpoint to download recording
             # Format: /recapi?cookie={cookie}&filename={file}
             # According to Grandstream UCM API documentation:
-            # - Simple single-file download only needs filename parameter
-            # - Example: /recapi?filename=auto-1414771234-1000-1004.wav
-            # - UCM automatically searches in the monitor directory
-            # CDR paths like "2026-02/auto-xxx.wav@" should be parsed to extract just the filename
-
-            # Extract just the filename (last part after /)
-            parts = recording_path.split('/')
-            filename = parts[-1]  # e.g., "auto-1770401677-1000-2815058290.wav"
+            # - Use the full CDR recording path directly as the filename parameter
+            # - Example: /recapi?filename=2026-02/auto-1414771234-1000-1004.wav
+            # - The path includes the directory structure from the CDR recordfiles field
+            # CDR provides paths like "2026-02/auto-xxx.wav@" - use full path (after stripping @)
 
             base_url = f"https://{self.ucm_ip}:{self.port}/recapi"
 
-            # Simple format - just cookie and filename
+            # Use full recording path from CDR as filename parameter
             params = {
                 "cookie": self.cookie,
-                "filename": filename
+                "filename": recording_path  # Full path: "2026-02/auto-xxx.wav"
             }
 
             download_url = f"{base_url}?{urlencode(params)}"
 
             logger.info(f"🔽 Downloading recording from UCM recapi")
             logger.info(f"   Original recording path: {original_path}")
-            logger.info(f"   Extracted filename: '{filename}'")
-            logger.info(f"   URL: /recapi?cookie=***&filename={filename}")
+            logger.info(f"   Using filename parameter: '{recording_path}'")
+            logger.info(f"   URL: /recapi?cookie=***&filename={recording_path}")
 
             response = self.session.get(
                 download_url,
