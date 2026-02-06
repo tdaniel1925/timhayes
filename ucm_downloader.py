@@ -159,6 +159,8 @@ class UCMRecordingDownloader:
             # Use UCM recapi endpoint to download recording
             # Format: /recapi?cookie={cookie}&filedir={dir}&filename={file}
             # Split path into directory and filename (e.g., "2026-02/auto-xxx.wav" -> filedir="2026-02", filename="auto-xxx.wav")
+
+            # Try primary approach: split into filedir and filename
             parts = recording_path.split('/')
             if len(parts) >= 2:
                 filedir = '/'.join(parts[:-1])  # Everything except last part
@@ -167,6 +169,8 @@ class UCMRecordingDownloader:
                 # No directory, just filename
                 filedir = ""
                 filename = recording_path
+
+            # We'll try the download, and if it fails, we'll try alternative format
 
             base_url = f"https://{self.ucm_ip}:{self.port}/recapi"
 
@@ -179,6 +183,9 @@ class UCMRecordingDownloader:
             download_url = f"{base_url}?{urlencode(params)}"
 
             logger.info(f"🔽 Downloading recording from UCM recapi")
+            logger.info(f"   Original recording path: {original_path}")
+            logger.info(f"   Parsed filedir: '{filedir}'")
+            logger.info(f"   Parsed filename: '{filename}'")
             logger.info(f"   URL: /recapi?cookie=***&filedir={filedir}&filename={filename}")
 
             response = self.session.get(
@@ -211,6 +218,15 @@ class UCMRecordingDownloader:
 
                 # Check content type
                 content_type = response.headers.get('Content-Type', '')
+
+                # Reject HTML responses (error pages)
+                if 'text/html' in content_type:
+                    logger.error(f"   ❌ UCM returned HTML error page instead of audio file")
+                    logger.error(f"   Content-Type: {content_type}")
+                    logger.error(f"   This usually means the file was not found at the specified path")
+                    logger.error(f"   Response preview: {content[:500].decode('utf-8', errors='ignore')}")
+                    return None
+
                 if 'audio' not in content_type and 'octet-stream' not in content_type and content_length > 100:
                     # Might still be valid - UCM sometimes doesn't set proper content-type
                     logger.warning(f"   Unexpected content-type: {content_type}, but size looks good")
