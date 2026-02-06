@@ -9593,6 +9593,16 @@ def health_check():
     else:
         health_status['encryption'] = 'configured'
 
+    # Check storage manager
+    storage_mgr = get_storage_manager()
+    health_status['storage_manager'] = 'initialized' if storage_mgr is not None else 'not_initialized'
+    if storage_mgr is None:
+        health_status['supabase_env'] = {
+            'SUPABASE_URL': 'set' if SUPABASE_URL else 'not_set',
+            'SUPABASE_KEY': 'set' if SUPABASE_KEY else 'not_set',
+            'SUPABASE_BUCKET': SUPABASE_BUCKET if SUPABASE_BUCKET else 'not_set'
+        }
+
     # Return 200 if healthy, 503 if unhealthy
     status_code = 200 if health_status['status'] == 'healthy' else 503
 
