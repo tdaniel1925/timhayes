@@ -56,7 +56,7 @@ from supabase_storage import init_storage_manager, get_storage_manager
 from ucm_downloader import download_and_upload_recording, get_recording_for_transcription
 
 # Import comprehensive default prompts registry
-from default_prompts import DEFAULT_PROMPTS
+from prompts_config import DEFAULT_PROMPTS
 from prompt_scenarios import get_scenarios_for_feature, get_scenario_by_id, get_all_scenarios
 
 # Initialize Flask app
