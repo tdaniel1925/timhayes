@@ -9612,6 +9612,44 @@ def health_check():
     return jsonify(health_status), status_code
 
 
+@app.route('/api/debug/storage', methods=['GET'])
+def debug_storage():
+    """Debug endpoint to test storage manager initialization"""
+    try:
+        result = {
+            'env_vars': {
+                'SUPABASE_URL': SUPABASE_URL if SUPABASE_URL else None,
+                'SUPABASE_KEY': 'set' if SUPABASE_KEY else None,
+                'SUPABASE_BUCKET': SUPABASE_BUCKET if SUPABASE_BUCKET else None,
+            },
+            'current_storage_manager': 'initialized' if get_storage_manager() is not None else 'not_initialized'
+        }
+
+        # Try to manually initialize
+        if SUPABASE_URL and SUPABASE_KEY:
+            try:
+                from supabase import create_client
+                result['supabase_import'] = 'success'
+
+                test_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+                result['client_creation'] = 'success'
+
+                # Try to list bucket
+                buckets = test_client.storage.list_buckets()
+                result['bucket_list'] = [b['name'] for b in buckets]
+
+            except Exception as e:
+                result['error'] = str(e)
+                import traceback
+                result['traceback'] = traceback.format_exc()
+        else:
+            result['error'] = 'Missing env vars'
+
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/debug/database', methods=['GET'])
 def debug_database():
     """Debug endpoint to check database configuration and AI features"""
