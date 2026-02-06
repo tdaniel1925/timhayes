@@ -2460,6 +2460,137 @@ def process_call_ai_async(call_id, ucm_recording_path):
 
 
 # ============================================================================
+# DEBUG/TEST ENDPOINTS
+# ============================================================================
+
+@app.route('/api/debug/test-ucm-download', methods=['POST'])
+@jwt_required()
+def test_ucm_download():
+    """
+    Test UCM recording download functionality
+    Tests if we can download recordings from UCM and upload to Supabase
+
+    Body: { "call_id": 123 } (optional - uses most recent call if not provided)
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+
+        if not user or user.role != 'superadmin':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        data = request.get_json() or {}
+        call_id = data.get('call_id')
+
+        # Get call with recording
+        if call_id:
+            call = CDRRecord.query.get(call_id)
+        else:
+            # Get most recent call with recording path
+            call = CDRRecord.query.filter(
+                CDRRecord.recordfiles.isnot(None),
+                CDRRecord.recordfiles != ''
+            ).order_by(CDRRecord.created_at.desc()).first()
+
+        if not call:
+            return jsonify({
+                'success': False,
+                'error': 'No call found with recording'
+            }), 404
+
+        if not call.recordfiles:
+            return jsonify({
+                'success': False,
+                'error': f'Call {call.id} has no recording path',
+                'call_id': call.id
+            }), 400
+
+        # Test download
+        logger.info(f"🧪 TEST: Starting UCM download test for call {call.id}")
+        logger.info(f"🧪 TEST: Recording path: {call.recordfiles}")
+        logger.info(f"🧪 TEST: UCM IP: {UCM_IP}")
+        logger.info(f"🧪 TEST: UCM Port: {UCM_PORT}")
+        logger.info(f"🧪 TEST: UCM Username: {UCM_USERNAME}")
+
+        storage_manager = get_storage_manager()
+
+        result = {
+            'call_id': call.id,
+            'recording_path': call.recordfiles,
+            'uniqueid': call.uniqueid,
+            'tenant_id': call.tenant_id,
+            'ucm_ip': UCM_IP,
+            'ucm_port': UCM_PORT,
+            'ucm_username': UCM_USERNAME,
+            'storage_manager_available': storage_manager is not None,
+            'steps': []
+        }
+
+        try:
+            # Attempt download and upload
+            result['steps'].append({
+                'step': 'Starting download',
+                'status': 'in_progress',
+                'timestamp': datetime.utcnow().isoformat()
+            })
+
+            storage_path = download_and_upload_recording(
+                UCM_IP,
+                UCM_USERNAME,
+                UCM_PASSWORD,
+                call.recordfiles,
+                call.tenant_id,
+                call.uniqueid,
+                storage_manager,
+                UCM_PORT
+            )
+
+            if storage_path:
+                result['success'] = True
+                result['storage_path'] = storage_path
+                result['steps'].append({
+                    'step': 'Download and upload completed',
+                    'status': 'success',
+                    'storage_path': storage_path,
+                    'timestamp': datetime.utcnow().isoformat()
+                })
+                logger.info(f"🧪 TEST: ✅ Successfully downloaded and uploaded to {storage_path}")
+            else:
+                result['success'] = False
+                result['error'] = 'download_and_upload_recording returned None'
+                result['steps'].append({
+                    'step': 'Download failed',
+                    'status': 'failed',
+                    'error': 'Function returned None',
+                    'timestamp': datetime.utcnow().isoformat()
+                })
+                logger.error(f"🧪 TEST: ❌ Download failed - function returned None")
+
+        except Exception as download_error:
+            result['success'] = False
+            result['error'] = str(download_error)
+            result['error_type'] = type(download_error).__name__
+            result['steps'].append({
+                'step': 'Download exception',
+                'status': 'error',
+                'error': str(download_error),
+                'error_type': type(download_error).__name__,
+                'timestamp': datetime.utcnow().isoformat()
+            })
+            logger.error(f"🧪 TEST: ❌ Exception during download: {download_error}", exc_info=True)
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        logger.error(f"🧪 TEST: ❌ Error in test_ucm_download: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'error_type': type(e).__name__
+        }), 500
+
+
+# ============================================================================
 # SUPER ADMIN ENDPOINTS
 # ============================================================================
 
