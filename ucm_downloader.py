@@ -159,25 +159,28 @@ class UCMRecordingDownloader:
             # Use UCM recapi endpoint to download recording
             # Format: /recapi?cookie={cookie}&filename={file}
             # According to Grandstream UCM API documentation:
-            # - Use the full CDR recording path directly as the filename parameter
-            # - Example: /recapi?filename=2026-02/auto-1414771234-1000-1004.wav
-            # - The path includes the directory structure from the CDR recordfiles field
-            # CDR provides paths like "2026-02/auto-xxx.wav@" - use full path (after stripping @)
+            # - Example shows: /recapi?filename=auto-1414771234-1000-1004.wav (just filename, no path)
+            # - CDR provides paths like "2026-02/auto-xxx.wav@"
+            # - Extract just the filename part (after the last /)
+
+            # Extract just the filename (last part after /)
+            parts = recording_path.split('/')
+            filename = parts[-1]  # e.g., "auto-1770401677-1000-2815058290.wav"
 
             base_url = f"https://{self.ucm_ip}:{self.port}/recapi"
 
-            # Use full recording path from CDR as filename parameter
+            # Use just the filename, not the full path
             params = {
                 "cookie": self.cookie,
-                "filename": recording_path  # Full path: "2026-02/auto-xxx.wav"
+                "filename": filename
             }
 
             download_url = f"{base_url}?{urlencode(params)}"
 
             logger.info(f"🔽 Downloading recording from UCM recapi")
             logger.info(f"   Original recording path: {original_path}")
-            logger.info(f"   Using filename parameter: '{recording_path}'")
-            logger.info(f"   URL: /recapi?cookie=***&filename={recording_path}")
+            logger.info(f"   Extracted filename: '{filename}'")
+            logger.info(f"   URL: /recapi?cookie=***&filename={filename}")
 
             response = self.session.get(
                 download_url,
