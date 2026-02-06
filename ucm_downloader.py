@@ -168,10 +168,21 @@ class UCMRecordingDownloader:
             #     }
             # }
 
-            # Extract just the filename (last part after /)
+            # Parse recording path to extract directory and filename
             # CDR provides paths like "2026-02/auto-xxx.wav@"
+            # We need to include the date subdirectory in filedir
             parts = recording_path.split('/')
-            filename = parts[-1]  # e.g., "auto-1770401677-1000-2815058290.wav"
+
+            if len(parts) > 1:
+                # Has subdirectory: "2026-02/auto-xxx.wav"
+                # filedir should be "monitor/2026-02"
+                subdirectory = '/'.join(parts[:-1])  # e.g., "2026-02"
+                filename = parts[-1]  # e.g., "auto-1770401677-1000-2815058290.wav"
+                filedir = f"monitor/{subdirectory}"
+            else:
+                # No subdirectory: "auto-xxx.wav"
+                filename = parts[0]
+                filedir = "monitor"
 
             base_url = f"https://{self.ucm_ip}:{self.port}/api"
 
@@ -180,7 +191,7 @@ class UCMRecordingDownloader:
                 "request": {
                     "action": "recapi",
                     "cookie": self.cookie,
-                    "filedir": "monitor",
+                    "filedir": filedir,
                     "filename": filename
                 }
             }
@@ -188,8 +199,9 @@ class UCMRecordingDownloader:
             logger.info(f"🔽 Downloading recording from UCM HTTPS API")
             logger.info(f"   Original recording path: {original_path}")
             logger.info(f"   Extracted filename: '{filename}'")
+            logger.info(f"   Extracted filedir: '{filedir}'")
             logger.info(f"   Using HTTPS API: POST /api with action=recapi")
-            logger.info(f"   Parameters: filedir='monitor', filename='{filename}'")
+            logger.info(f"   Parameters: filedir='{filedir}', filename='{filename}'")
 
             response = self.session.post(
                 base_url,
