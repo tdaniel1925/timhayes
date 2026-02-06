@@ -36,8 +36,7 @@ Flask-Limiter==3.5.0
 gunicorn==21.2.0
 
 # Supabase Storage
-supabase==2.3.4
-storage3==0.7.4
+supabase==2.27.3
 
 # Database driver for PostgreSQL
 psycopg2-binary==2.9.9
