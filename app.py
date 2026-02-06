@@ -3673,21 +3673,22 @@ def get_recording(call_id):
     if not call:
         return jsonify({'error': 'Call not found'}), 404
 
-    if not call.recordfiles:
+    # Check if recording has been downloaded to Supabase
+    if not call.recording_local_path and not call.recordfiles:
         return jsonify({'error': 'Recording not available'}), 404
 
     storage_manager = get_storage_manager()
 
-    # If recording is in Supabase Storage, return signed URL
-    if storage_manager and call.recordfiles.startswith('tenant_'):
-        signed_url = storage_manager.get_signed_url(call.recordfiles, expires_in=3600)
+    # If recording is in Supabase Storage (downloaded), return signed URL
+    if storage_manager and call.recording_local_path:
+        signed_url = storage_manager.get_signed_url(call.recording_local_path, expires_in=3600)
         if signed_url:
             return jsonify({'url': signed_url, 'type': 'supabase'}), 200
         else:
             return jsonify({'error': 'Failed to generate signed URL'}), 500
 
     # If it's a local file, serve it directly
-    if os.path.exists(call.recordfiles):
+    if call.recordfiles and os.path.exists(call.recordfiles):
         return send_file(call.recordfiles, as_attachment=True)
 
     return jsonify({'error': 'Recording not found'}), 404
