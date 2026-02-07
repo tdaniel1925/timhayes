@@ -115,7 +115,18 @@ export const api = {
     if (!response.ok) {
       throw new Error('Failed to fetch recording');
     }
-    return response.blob();
+
+    // Check content type to determine if it's JSON (Supabase URL) or blob (local file)
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      // Backend returned JSON with signed URL (Supabase storage)
+      const data = await response.json();
+      return { url: data.url, type: data.type || 'supabase' };
+    } else {
+      // Backend returned blob (legacy local file)
+      const blob = await response.blob();
+      return { blob, type: 'blob' };
+    }
   },
 
   getPhoneSystems: async () => {

@@ -138,14 +138,28 @@ export default function Dashboard() {
 
   const handleDownloadRecording = async (callId) => {
     try {
-      const blob = await api.getRecording(callId);
-      const url = window.URL.createObjectURL(blob);
+      const recording = await api.getRecording(callId);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `recording-${callId}.wav`;
+
+      if (recording.type === 'supabase') {
+        // Download from signed URL (Supabase storage)
+        a.href = recording.url;
+        a.download = `recording-${callId}.mp3`;
+        a.target = '_blank';  // Open in new tab if download attribute doesn't work
+      } else if (recording.type === 'blob') {
+        // Download blob (legacy local files)
+        const url = window.URL.createObjectURL(recording.blob);
+        a.href = url;
+        a.download = `recording-${callId}.wav`;
+
+        // Clean up object URL after download
+        setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      } else {
+        throw new Error('Invalid recording response type');
+      }
+
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
       console.error('Failed to download recording:', error);
@@ -203,14 +217,25 @@ export default function Dashboard() {
         return;
       }
 
-      // Clean up previous audio
-      if (audioUrl) {
+      // Clean up previous audio object URL if it was a blob
+      if (audioUrl && audioUrl.startsWith('blob:')) {
         window.URL.revokeObjectURL(audioUrl);
       }
 
-      // Load and play new recording
-      const blob = await api.getRecording(callId);
-      const url = window.URL.createObjectURL(blob);
+      // Load recording (can be signed URL or blob)
+      const recording = await api.getRecording(callId);
+      let url;
+
+      if (recording.type === 'supabase') {
+        // Use signed URL directly (Supabase storage)
+        url = recording.url;
+      } else if (recording.type === 'blob') {
+        // Create object URL from blob (legacy local files)
+        url = window.URL.createObjectURL(recording.blob);
+      } else {
+        throw new Error('Invalid recording response type');
+      }
+
       setAudioUrl(url);
       setPlayingCallId(callId);
 
@@ -837,6 +862,22 @@ export default function Dashboard() {
                                     </div>
                                   ) : (
                                     <div className="space-y-3">
+                                      {/* Customer Intent & Call Outcome Badges */}
+                                      {(aiSummaries[call.id].customer_intent || aiSummaries[call.id].call_outcome) && (
+                                        <div className="flex gap-2 flex-wrap">
+                                          {aiSummaries[call.id].customer_intent && (
+                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                              Intent: {aiSummaries[call.id].customer_intent}
+                                            </span>
+                                          )}
+                                          {aiSummaries[call.id].call_outcome && (
+                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                                              Outcome: {aiSummaries[call.id].call_outcome}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+
                                       {/* Overview */}
                                       {aiSummaries[call.id].summary && (
                                         <div className="bg-white p-3 rounded-md border border-blue-200">
@@ -874,6 +915,16 @@ export default function Dashboard() {
                                         <div className="bg-white p-3 rounded-md border border-blue-200">
                                           <h4 className="text-sm font-semibold text-gray-700 mb-2">Sentiment Analysis</h4>
                                           <p className="text-sm text-gray-600">{aiSummaries[call.id].sentiment_analysis}</p>
+                                        </div>
+                                      )}
+
+                                      {/* Full Transcription */}
+                                      {call.transcription && (
+                                        <div className="bg-white p-3 rounded-md border border-blue-200">
+                                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Full Transcription</h4>
+                                          <div className="text-sm text-gray-600 max-h-60 overflow-y-auto p-2 bg-gray-50 rounded border border-gray-200">
+                                            {call.transcription}
+                                          </div>
                                         </div>
                                       )}
                                     </div>

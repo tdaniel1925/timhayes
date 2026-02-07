@@ -5880,7 +5880,9 @@ Format your response as JSON with keys: summary, key_points (array), action_item
                     'summary': summary_data.get('summary', ''),
                     'key_points': summary_data.get('key_points', []),
                     'action_items': summary_data.get('action_items', []),
-                    'sentiment_analysis': summary_data.get('sentiment_analysis', '')
+                    'sentiment_analysis': summary_data.get('sentiment_analysis', ''),
+                    'customer_intent': summary_data.get('customer_intent', None),
+                    'call_outcome': summary_data.get('call_outcome', None)
                 }), 200
 
             except Exception as e:
@@ -5892,7 +5894,9 @@ Format your response as JSON with keys: summary, key_points (array), action_item
             'summary': ai_summary.summary_text or '',
             'key_points': json.loads(ai_summary.topics) if ai_summary.topics else [],
             'action_items': json.loads(ai_summary.action_items) if ai_summary.action_items else [],
-            'sentiment_analysis': f"Customer Intent: {ai_summary.customer_intent or 'Unknown'}, Outcome: {ai_summary.call_outcome or 'Unknown'}"
+            'sentiment_analysis': ai_summary.customer_intent or ai_summary.call_outcome or None,
+            'customer_intent': ai_summary.customer_intent,
+            'call_outcome': ai_summary.call_outcome
         }), 200
 
     except Exception as e:
