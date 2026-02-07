@@ -156,7 +156,7 @@ class UCMRecordingScraper:
                                 tenant_id=self.tenant_id,
                                 src=caller,
                                 dst=callee,
-                                calldate=call_datetime
+                                call_date=call_datetime
                             ).first()
 
                             if existing_cdr:
@@ -175,7 +175,7 @@ class UCMRecordingScraper:
                                     uniqueid=uniqueid,
                                     src=caller,
                                     dst=callee,
-                                    calldate=call_datetime,
+                                    call_date=call_datetime,
                                     disposition='ANSWERED',  # We know it was answered if there's a recording
                                     duration=0,  # Will be calculated from recording
                                     billsec=0,
