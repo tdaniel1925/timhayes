@@ -78,10 +78,10 @@ limiter = Limiter(
 # Fix Railway's postgres:// URL to postgresql:// for SQLAlchemy compatibility
 database_url = os.getenv('DATABASE_URL')
 
-# TEMPORARY: Hardcode Railway database URL until we fix environment variables
+# TEMPORARY: Hardcode Supabase database URL until we fix environment variables
 if not database_url:
-    database_url = 'postgresql://postgres:jbleFfJMAiljcizINgmQtYOSaUTuuKSK@postgres.railway.internal:5432/railway'
-    print("⚠️  Using hardcoded DATABASE_URL - environment variable not set")
+    database_url = 'postgresql://postgres.fcubjohwzfhjcwcnwost:ttandSellaBella1234@aws-0-us-west-2.pooler.supabase.com:6543/postgres'
+    print("WARNING: Using hardcoded DATABASE_URL (Supabase) - environment variable not set")
 
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
@@ -5901,6 +5901,94 @@ Format your response as JSON with keys: summary, key_points (array), action_item
 
     except Exception as e:
         logger.error(f"Get AI summary error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# ACTIVITY LOGS ENDPOINTS
+# ============================================================================
+
+@app.route('/api/activity-logs', methods=['GET'])
+@jwt_required()
+def get_activity_logs():
+    """Get system activity logs"""
+    try:
+        claims = get_jwt()
+        tenant_id = claims.get('tenant_id')
+        role = claims.get('role', 'user')
+
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 50))
+
+        logs = []
+
+        # Get recent calls as activity logs
+        if role == 'superadmin':
+            calls_query = CDRRecord.query.order_by(CDRRecord.id.desc())
+        else:
+            calls_query = CDRRecord.query.filter_by(tenant_id=tenant_id).order_by(CDRRecord.id.desc())
+
+        calls = calls_query.limit(per_page).offset((page - 1) * per_page).all()
+        total = calls_query.count()
+
+        for call in calls:
+            # Add call received log
+            logs.append({
+                'type': 'call_received',
+                'message': f'Call received from {call.src} to {call.dst}',
+                'details': f'{call.disposition} - Duration: {call.duration}s',
+                'timestamp': call.received_at.isoformat() if call.received_at else call.calldate.isoformat(),
+                'call_id': call.id
+            })
+
+            # Add recording downloaded log if available
+            if call.recording_local_path:
+                logs.append({
+                    'type': 'recording_downloaded',
+                    'message': f'Recording downloaded for call {call.uniqueid}',
+                    'details': 'MP3 format, uploaded to Supabase storage',
+                    'timestamp': call.received_at.isoformat() if call.received_at else call.calldate.isoformat(),
+                    'call_id': call.id
+                })
+
+            # Add transcription log if available
+            if call.transcription:
+                logs.append({
+                    'type': 'transcription_completed',
+                    'message': f'Transcription completed for call {call.uniqueid}',
+                    'details': f'Transcribed {len(call.transcription.transcription_text or "")} characters',
+                    'timestamp': call.received_at.isoformat() if call.received_at else call.calldate.isoformat(),
+                    'call_id': call.id
+                })
+
+                # Add AI analysis log if sentiment available
+                if call.transcription.sentiment:
+                    logs.append({
+                        'type': 'ai_analysis_completed',
+                        'message': f'AI analysis completed for call {call.uniqueid}',
+                        'details': f'Sentiment: {call.transcription.sentiment.sentiment}, Score: {call.transcription.sentiment.sentiment_score:.2f}',
+                        'timestamp': call.received_at.isoformat() if call.received_at else call.calldate.isoformat(),
+                        'call_id': call.id
+                    })
+
+        # Sort logs by timestamp (most recent first)
+        logs.sort(key=lambda x: x['timestamp'], reverse=True)
+
+        # Limit to per_page after sorting
+        logs = logs[:per_page]
+
+        return jsonify({
+            'logs': logs,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total,
+                'pages': (total + per_page - 1) // per_page
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Get activity logs error: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 

@@ -194,6 +194,15 @@ export const api = {
     return response.json();
   },
 
+  // Activity Logs
+  getActivityLogs: async (page = 1, perPage = 50) => {
+    const response = await fetchWithAuth(`/activity-logs?page=${page}&per_page=${perPage}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch activity logs');
+    }
+    return response.json();
+  },
+
   // Notifications
   getNotifications: async (page = 1, unreadOnly = false) => {
     const response = await fetchWithAuth(`/notifications?page=${page}&unread=${unreadOnly}`);

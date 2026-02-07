@@ -21,7 +21,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Building2,
-  LogOut
+  LogOut,
+  Activity
 } from 'lucide-react';
 
 const navigationItems = [
@@ -36,7 +37,8 @@ const navigationItems = [
     title: 'Call Management',
     items: [
       { name: 'All Calls', path: '/dashboard', icon: Phone },
-      { name: 'Notifications', path: '/notifications', icon: Bell }
+      { name: 'Notifications', path: '/notifications', icon: Bell },
+      { name: 'Activity Logs', path: '/activity-logs', icon: Activity }
     ]
   },
   {

@@ -24,6 +24,7 @@ import SetupRequest from './pages/SetupRequest';
 import CallDetail from './pages/CallDetailEnhanced';
 import AdminSetupRequests from './pages/AdminSetupRequests';
 import Notifications from './pages/Notifications';
+import ActivityLogs from './pages/ActivityLogs';
 import UserManagement from './pages/UserManagement';
 import IntegrationsPanel from './pages/IntegrationsPanel';
 import TenantsPage from './pages/TenantsPage';
@@ -169,6 +170,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Notifications />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activity-logs"
+        element={
+          <ProtectedRoute>
+            <ActivityLogs />
           </ProtectedRoute>
         }
       />
