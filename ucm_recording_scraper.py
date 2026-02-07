@@ -11,18 +11,16 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+from pydub import AudioSegment
 
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app import app, db, CDRRecord, Transcription
+from app import app, db, CDRRecord, Transcription, Tenant
 from supabase_storage import get_storage_manager
 
 # Configuration
-UCM_URL = os.getenv('UCM_URL', 'https://071ffb.c.myucm.cloud:8443')
-UCM_USERNAME = os.getenv('UCM_USERNAME', 'admin1')
-UCM_PASSWORD = os.getenv('UCM_PASSWORD', 'BotMakers@2026')
-SCRAPER_INTERVAL = int(os.getenv('SCRAPER_INTERVAL', '300'))  # 5 minutes default
+SCRAPER_INTERVAL = int(os.getenv('SCRAPER_INTERVAL', '900'))  # 15 minutes default
 DOWNLOAD_DIR = os.getenv('DOWNLOAD_DIR', '/tmp/ucm_recordings')
 
 # Logging
@@ -36,10 +34,26 @@ logger = logging.getLogger(__name__)
 class UCMRecordingScraper:
     """Scrapes recordings from CloudUCM web interface"""
 
-    def __init__(self):
-        self.ucm_url = UCM_URL
-        self.username = UCM_USERNAME
-        self.password = UCM_PASSWORD
+    def __init__(self, tenant=None):
+        """
+        Initialize scraper for a specific tenant
+        If tenant is None, uses environment variables (backward compatibility)
+        """
+        if tenant:
+            # Multi-tenant mode: use tenant's UCM credentials
+            self.tenant_id = tenant.id
+            self.tenant_name = tenant.company_name
+            self.ucm_url = f"https://{tenant.pbx_ip}:{tenant.pbx_port}" if tenant.pbx_ip else None
+            self.username = tenant.pbx_username
+            self.password = tenant.pbx_password
+        else:
+            # Single tenant mode: use environment variables
+            self.tenant_id = 1  # Default tenant
+            self.tenant_name = "Default"
+            self.ucm_url = os.getenv('UCM_URL', 'https://071ffb.c.myucm.cloud:8443')
+            self.username = os.getenv('UCM_USERNAME', 'admin1')
+            self.password = os.getenv('UCM_PASSWORD', 'BotMakers@2026')
+
         self.download_dir = Path(DOWNLOAD_DIR)
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self.storage_manager = get_storage_manager()
@@ -47,10 +61,16 @@ class UCMRecordingScraper:
     def scrape_recordings(self):
         """Main scraping function"""
         logger.info("=" * 70)
-        logger.info("Starting CloudUCM recording scraper")
+        logger.info(f"Starting CloudUCM recording scraper for tenant: {self.tenant_name} (ID: {self.tenant_id})")
         logger.info(f"UCM URL: {self.ucm_url}")
         logger.info(f"Download dir: {self.download_dir}")
         logger.info("=" * 70)
+
+        # Validate credentials
+        if not self.ucm_url or not self.username or not self.password:
+            logger.error(f"Missing UCM credentials for tenant {self.tenant_name}. Skipping.")
+            logger.error(f"  URL: {self.ucm_url}, Username: {self.username}, Password: {'SET' if self.password else 'NOT SET'}")
+            return
 
         try:
             with sync_playwright() as p:
@@ -103,7 +123,9 @@ class UCMRecordingScraper:
                 # Step 3: Get list of calls that need recordings downloaded
                 with app.app_context():
                     # Find CDRs that have recording paths but no Supabase storage path
+                    # Filter by tenant_id to only process this tenant's calls
                     calls_needing_recordings = CDRRecord.query.filter(
+                        CDRRecord.tenant_id == self.tenant_id,
                         CDRRecord.recordfiles.isnot(None),
                         CDRRecord.recordfiles != '',
                         db.or_(
@@ -219,6 +241,39 @@ class UCMRecordingScraper:
                 logger.error("Supabase storage not configured")
                 return False
 
+            # Convert WAV to MP3 to reduce file size
+            mp3_path = file_path.with_suffix('.mp3')
+            try:
+                logger.info(f"Converting {file_path.name} to MP3...")
+                audio = AudioSegment.from_file(str(file_path))
+
+                # Export as MP3 with good quality (128 kbps)
+                audio.export(
+                    str(mp3_path),
+                    format="mp3",
+                    bitrate="128k",
+                    parameters=["-q:a", "2"]  # VBR quality (0=best, 9=worst)
+                )
+
+                original_size = file_path.stat().st_size / (1024 * 1024)  # MB
+                mp3_size = mp3_path.stat().st_size / (1024 * 1024)  # MB
+                compression_ratio = ((original_size - mp3_size) / original_size) * 100
+
+                logger.info(f"✓ Converted to MP3: {original_size:.2f}MB → {mp3_size:.2f}MB (saved {compression_ratio:.1f}%)")
+
+                # Delete original WAV file
+                file_path.unlink()
+                logger.info(f"Deleted original WAV file: {file_path}")
+
+                # Use MP3 file for upload
+                file_path = mp3_path
+
+            except Exception as e:
+                logger.error(f"Failed to convert to MP3: {e}. Using original file.")
+                # If conversion fails, use original WAV file
+                if mp3_path.exists():
+                    mp3_path.unlink()
+
             # Upload to Supabase
             remote_path = f"tenant_{call.tenant_id}/{call.uniqueid}_{file_path.name}"
 
@@ -255,12 +310,10 @@ class UCMRecordingScraper:
 
 
 def run_scraper_loop():
-    """Main loop - runs continuously"""
-    scraper = UCMRecordingScraper()
-
+    """Main loop - runs continuously, processing all active tenants"""
     logger.info("=" * 70)
-    logger.info("UCM RECORDING SCRAPER STARTED")
-    logger.info(f"Interval: {SCRAPER_INTERVAL} seconds")
+    logger.info("UCM RECORDING SCRAPER STARTED (MULTI-TENANT)")
+    logger.info(f"Interval: {SCRAPER_INTERVAL} seconds ({SCRAPER_INTERVAL/60:.0f} minutes)")
     logger.info("=" * 70)
 
     iteration = 0
@@ -271,12 +324,39 @@ def run_scraper_loop():
         logger.info(f"{'=' * 70}")
 
         try:
-            scraper.scrape_recordings()
+            with app.app_context():
+                # Get all active tenants with UCM configured
+                tenants = Tenant.query.filter_by(
+                    is_active=True,
+                    phone_system_type='grandstream_ucm'
+                ).all()
+
+                logger.info(f"Found {len(tenants)} active tenants with UCM configured")
+
+                if not tenants:
+                    logger.warning("No active tenants found. Waiting for next iteration...")
+                else:
+                    # Process each tenant
+                    for tenant in tenants:
+                        logger.info(f"\n{'─' * 70}")
+                        logger.info(f"Processing tenant: {tenant.company_name} (ID: {tenant.id})")
+                        logger.info(f"{'─' * 70}")
+
+                        try:
+                            scraper = UCMRecordingScraper(tenant=tenant)
+                            scraper.scrape_recordings()
+                        except Exception as e:
+                            logger.error(f"Error processing tenant {tenant.company_name}: {e}", exc_info=True)
+                            continue  # Continue to next tenant
+
         except Exception as e:
             logger.error(f"Error in scraper loop: {e}", exc_info=True)
 
         # Wait before next iteration
-        logger.info(f"Sleeping for {SCRAPER_INTERVAL} seconds...")
+        logger.info(f"\n{'=' * 70}")
+        logger.info(f"Completed iteration #{iteration}")
+        logger.info(f"Sleeping for {SCRAPER_INTERVAL} seconds ({SCRAPER_INTERVAL/60:.0f} minutes)...")
+        logger.info(f"{'=' * 70}")
         time.sleep(SCRAPER_INTERVAL)
 
 

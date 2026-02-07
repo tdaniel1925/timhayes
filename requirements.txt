@@ -47,3 +47,6 @@ schedule==1.2.0
 
 # Browser automation for web scraping
 playwright==1.40.0
+
+# Audio conversion (WAV to MP3)
+pydub==0.25.1
