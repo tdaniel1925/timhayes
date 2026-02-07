@@ -370,11 +370,10 @@ def run_scraper_loop():
 if __name__ == "__main__":
     # Check environment
     logger.info("Environment check:")
-    logger.info(f"  UCM_URL: {UCM_URL}")
-    logger.info(f"  UCM_USERNAME: {UCM_USERNAME}")
-    logger.info(f"  UCM_PASSWORD: {'SET' if UCM_PASSWORD else 'NOT SET'}")
     logger.info(f"  DATABASE_URL: {'SET' if os.getenv('DATABASE_URL') else 'NOT SET'}")
     logger.info(f"  SUPABASE_URL: {'SET' if os.getenv('SUPABASE_URL') else 'NOT SET'}")
+    logger.info(f"  SCRAPER_INTERVAL: {SCRAPER_INTERVAL} seconds")
+    logger.info(f"  Mode: Multi-tenant (credentials from database)")
 
     # Run the scraper
     run_scraper_loop()
