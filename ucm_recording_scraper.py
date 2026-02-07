@@ -261,6 +261,14 @@ class UCMRecordingScraper:
                 audio_duration_seconds = int(len(audio) / 1000)
                 logger.info(f"Audio duration: {audio_duration_seconds} seconds")
 
+                # Skip recordings under 30 seconds (not worth storing/transcribing)
+                if audio_duration_seconds < 30:
+                    logger.info(f"⏭️  Skipping recording under 30s (only {audio_duration_seconds}s)")
+                    file_path.unlink()  # Delete file
+                    if mp3_path.exists():
+                        mp3_path.unlink()
+                    return False
+
                 # Export as MP3 with good quality (128 kbps)
                 audio.export(
                     str(mp3_path),
