@@ -22,6 +22,9 @@ from supabase_storage import get_storage_manager
 # Configuration
 SCRAPER_INTERVAL = int(os.getenv('SCRAPER_INTERVAL', '900'))  # 15 minutes default
 DOWNLOAD_DIR = os.getenv('DOWNLOAD_DIR', '/tmp/ucm_recordings')
+MAX_RECORDINGS_PER_ITERATION = 20  # Limit recordings to prevent overwhelming UCM
+DOWNLOAD_TIMEOUT_MS = 60000  # 60 seconds timeout for downloads
+RATE_LIMIT_DELAY_SECONDS = 3  # Delay between downloads to avoid overwhelming UCM
 
 # Logging
 logging.basicConfig(
@@ -132,9 +135,13 @@ class UCMRecordingScraper:
                     return
 
                 # Step 4: Process each row - create CDR if needed, download recording
+                # Limit to MAX_RECORDINGS_PER_ITERATION to avoid overwhelming UCM
+                recordings_to_process = min(row_count, MAX_RECORDINGS_PER_ITERATION)
+                logger.info(f"Processing {recordings_to_process} of {row_count} recordings (limit: {MAX_RECORDINGS_PER_ITERATION})")
+
                 downloaded_count = 0
                 with app.app_context():
-                    for i in range(row_count):
+                    for i in range(recordings_to_process):
                         try:
                             row = rows.nth(i)
 
@@ -143,7 +150,7 @@ class UCMRecordingScraper:
                             callee = row.locator('td').nth(2).text_content().strip()
                             call_time_str = row.locator('td').nth(3).text_content().strip()  # "2026-02-06 16:21:36"
 
-                            logger.info(f"Processing row {i+1}/{row_count}: {caller} → {callee} at {call_time_str}")
+                            logger.info(f"Processing row {i+1}/{recordings_to_process}: {caller} → {callee} at {call_time_str}")
 
                             # Parse call time
                             call_datetime = datetime.strptime(call_time_str, '%Y-%m-%d %H:%M:%S')
@@ -191,9 +198,11 @@ class UCMRecordingScraper:
                             if download_button.count() > 0:
                                 logger.info("  Downloading recording...")
 
-                                # Set up download listener
-                                with page.expect_download(timeout=30000) as download_info:
+                                # Set up download listener with increased timeout
+                                with page.expect_download(timeout=DOWNLOAD_TIMEOUT_MS) as download_info:
                                     download_button.click()
+                                    # Give CloudUCM a moment to prepare the download
+                                    time.sleep(1)
 
                                 download = download_info.value
                                 logger.info(f"  ✓ Download started: {download.suggested_filename}")
@@ -208,6 +217,11 @@ class UCMRecordingScraper:
                                 if self.process_downloaded_file(local_path, call):
                                     downloaded_count += 1
                                     logger.info(f"  ✓ Successfully processed recording")
+
+                                    # Rate limiting: delay between downloads to avoid overwhelming UCM
+                                    if i < recordings_to_process - 1:  # Don't delay after last recording
+                                        logger.info(f"  ⏸️  Waiting {RATE_LIMIT_DELAY_SECONDS}s before next download...")
+                                        time.sleep(RATE_LIMIT_DELAY_SECONDS)
                                 else:
                                     logger.error(f"  Failed to process downloaded file")
 
