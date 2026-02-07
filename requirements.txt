@@ -44,3 +44,6 @@ psycopg2-binary==2.9.9
 
 # Background task scheduling
 schedule==1.2.0
+
+# Browser automation for web scraping
+playwright==1.40.0

@@ -1,5 +1,6 @@
-# Backend service only - Frontend configured separately in Render dashboard
+# Backend service + Recording Scraper Worker
 services:
+  # Main Flask web application
   - type: web
     name: audiapro-backend
     env: python
@@ -9,3 +10,25 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     healthCheckPath: /api/health
+
+  # Background worker for CloudUCM recording scraper
+  - type: worker
+    name: recording-scraper
+    env: python
+    runtime: python
+    region: oregon
+    plan: starter  # $7/month - required for background workers
+    buildCommand: |
+      pip install -r requirements.txt
+      playwright install chromium
+      playwright install-deps
+    startCommand: python ucm_recording_scraper.py
+    envVars:
+      - key: UCM_URL
+        value: https://071ffb.c.myucm.cloud:8443
+      - key: UCM_USERNAME
+        value: admin1
+      - key: SCRAPER_INTERVAL
+        value: 300
+      - key: DOWNLOAD_DIR
+        value: /tmp/ucm_recordings
