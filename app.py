@@ -6403,12 +6403,46 @@ def superadmin_list_tenants():
         return jsonify({'error': str(e)}), 500
 
 
+def validate_subdomain(subdomain):
+    """
+    Validate subdomain format and check for reserved names
+    Returns (is_valid, error_message)
+    """
+    import re
+
+    # Reserved subdomains
+    reserved = ['admin', 'api', 'www', 'app', 'dashboard', 'mail', 'ftp', 'superadmin',
+                'support', 'help', 'blog', 'docs', 'status', 'billing', 'account']
+
+    # Check length
+    if len(subdomain) < 3:
+        return False, 'Subdomain must be at least 3 characters'
+    if len(subdomain) > 50:
+        return False, 'Subdomain must be 50 characters or less'
+
+    # Check format: alphanumeric and hyphens only, must start/end with alphanumeric
+    if not re.match(r'^[a-z0-9][a-z0-9-]*[a-z0-9]$', subdomain):
+        return False, 'Subdomain must contain only lowercase letters, numbers, and hyphens, and cannot start or end with a hyphen'
+
+    # Check for consecutive hyphens
+    if '--' in subdomain:
+        return False, 'Subdomain cannot contain consecutive hyphens'
+
+    # Check reserved names
+    if subdomain in reserved:
+        return False, f'Subdomain "{subdomain}" is reserved'
+
+    return True, None
+
+
 @app.route('/api/superadmin/tenants', methods=['POST'])
 @jwt_required()
 def superadmin_create_tenant():
-    """Create new tenant (super admin only)"""
+    """Create new tenant (super admin only) - COMPLETE with all required fields"""
     try:
         require_super_admin()
+        claims = get_jwt()
+        admin_email = claims.get('email', 'unknown')
 
         data = request.get_json()
 
@@ -6417,8 +6451,14 @@ def superadmin_create_tenant():
         if not all(field in data for field in required_fields):
             return jsonify({'error': 'Missing required fields'}), 400
 
+        # GAP #6 FIX: Validate subdomain format
+        subdomain = data['subdomain'].lower().strip()
+        is_valid, error_msg = validate_subdomain(subdomain)
+        if not is_valid:
+            return jsonify({'error': error_msg}), 400
+
         # Check if subdomain already exists
-        existing_tenant = Tenant.query.filter_by(subdomain=data['subdomain']).first()
+        existing_tenant = Tenant.query.filter_by(subdomain=subdomain).first()
         if existing_tenant:
             return jsonify({'error': 'Subdomain already exists'}), 400
 
@@ -6427,16 +6467,74 @@ def superadmin_create_tenant():
         if existing_user:
             return jsonify({'error': 'Email already exists'}), 400
 
-        # Create tenant
+        # GAP #3 & #4 FIX: Define plan limits consistently
+        plan = data.get('plan', 'starter')
+        plan_configs = {
+            'starter': {
+                'max_calls_per_month': 500,
+                'max_users': 5,
+                'recording_storage_gb': 10,
+                'trial_days': 30
+            },
+            'professional': {
+                'max_calls_per_month': 2000,
+                'max_users': 20,
+                'recording_storage_gb': 50,
+                'trial_days': 14
+            },
+            'enterprise': {
+                'max_calls_per_month': 10000,
+                'max_users': 100,
+                'recording_storage_gb': 200,
+                'trial_days': 7
+            }
+        }
+
+        plan_config = plan_configs.get(plan, plan_configs['starter'])
+
+        # GAP #2 FIX: Set billing cycle start
+        billing_cycle_start = datetime.utcnow()
+
+        # GAP #7 FIX: Set subscription end date for trial
+        subscription_ends_at = billing_cycle_start + timedelta(days=plan_config['trial_days'])
+
+        # GAP #8 FIX: Generate webhook credentials
+        webhook_username = f"{subdomain}_webhook"
+        webhook_password = crypto_secrets.token_urlsafe(16)
+
+        # Create tenant with ALL required fields
         tenant = Tenant(
-            subdomain=data['subdomain'].lower().strip(),
+            subdomain=subdomain,
             company_name=data['company_name'].strip(),
-            plan=data.get('plan', 'starter'),
+            plan=plan,
             status=data.get('status', 'active'),
-            max_users=data.get('max_users', 5),
-            max_calls_per_month=data.get('max_calls_per_month', 500),
-            subscription_status='active'
+            max_users=plan_config['max_users'],
+            max_calls_per_month=plan_config['max_calls_per_month'],  # Consistent with plan
+            plan_limits=json.dumps({
+                'calls_per_month': plan_config['max_calls_per_month'],
+                'recording_storage_gb': plan_config['recording_storage_gb']
+            }),
+            billing_cycle_start=billing_cycle_start,
+            subscription_ends_at=subscription_ends_at,
+            subscription_status='trial',  # Start as trial
+            usage_this_month=0,
+            webhook_username=webhook_username,
+            webhook_password=webhook_password,  # Auto-encrypted by model
+            phone_system_type=data.get('phone_system_type', 'grandstream_ucm'),
+            transcription_enabled=True,
+            sentiment_enabled=True,
+            is_active=True
         )
+
+        # GAP #1 FIX: Set UCM credentials if provided
+        if data.get('pbx_ip'):
+            tenant.pbx_ip = data['pbx_ip'].strip()
+        if data.get('pbx_username'):
+            tenant.pbx_username = data['pbx_username'].strip()
+        if data.get('pbx_password'):
+            tenant.pbx_password = data['pbx_password']  # Auto-encrypted
+        if data.get('pbx_port'):
+            tenant.pbx_port = int(data['pbx_port'])
 
         db.session.add(tenant)
         db.session.flush()  # Get tenant.id
@@ -6453,6 +6551,35 @@ def superadmin_create_tenant():
         admin_user.set_password(data['admin_password'])
 
         db.session.add(admin_user)
+
+        # GAP #5 FIX: Auto-enable default AI features for the plan
+        # Get all available AI features
+        default_features = AIFeature.query.filter_by(is_active=True).all()
+
+        # Enable features based on plan
+        features_to_enable = []
+        if plan == 'starter':
+            # Starter gets basic features only
+            features_to_enable = ['multilingual-transcription', 'sentiment-analysis']
+        elif plan == 'professional':
+            # Professional gets more features
+            features_to_enable = ['multilingual-transcription', 'sentiment-analysis',
+                                 'call-summary', 'intent-detection']
+        elif plan == 'enterprise':
+            # Enterprise gets all features
+            features_to_enable = [f.slug for f in default_features]
+
+        for feature in default_features:
+            if feature.slug in features_to_enable:
+                tenant_feature = TenantAIFeature(
+                    tenant_id=tenant.id,
+                    ai_feature_id=feature.id,
+                    enabled=True,
+                    enabled_by=admin_email,
+                    enabled_at=datetime.utcnow()
+                )
+                db.session.add(tenant_feature)
+
         db.session.commit()
 
         # Send welcome email to admin user
@@ -6462,6 +6589,9 @@ def superadmin_create_tenant():
         send_new_tenant_notification_to_superadmins(tenant)
 
         logger.info(f"Tenant created by super admin: {tenant.company_name} ({tenant.subdomain})")
+        logger.info(f"  Plan: {plan}, Trial until: {subscription_ends_at.strftime('%Y-%m-%d')}")
+        logger.info(f"  UCM configured: {bool(tenant.pbx_ip)}")
+        logger.info(f"  AI features enabled: {len(features_to_enable)}")
 
         return jsonify({
             'message': 'Tenant created successfully',
@@ -6470,12 +6600,20 @@ def superadmin_create_tenant():
                 'company_name': tenant.company_name,
                 'subdomain': tenant.subdomain,
                 'plan': tenant.plan,
-                'status': tenant.status
+                'status': tenant.status,
+                'subscription_status': tenant.subscription_status,
+                'trial_ends': subscription_ends_at.isoformat(),
+                'max_calls_per_month': tenant.max_calls_per_month,
+                'max_users': tenant.max_users,
+                'ucm_configured': bool(tenant.pbx_ip),
+                'ai_features_enabled': len(features_to_enable),
+                'webhook_username': webhook_username
             },
             'admin_user': {
                 'email': admin_user.email,
                 'full_name': admin_user.full_name
-            }
+            },
+            'next_steps': [] if tenant.pbx_ip else ['Configure UCM/PBX credentials to enable call recording']
         }), 201
 
     except Exception as e:
