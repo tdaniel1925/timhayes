@@ -281,26 +281,28 @@ class UCMRecordingScraper:
             supabase_path = self.storage_manager.upload_recording(str(file_path), remote_path)
 
             if supabase_path:
-                # Update database
+                # Update database - re-query the call to ensure it's in current session
                 with app.app_context():
-                    call.recording_local_path = supabase_path
-                    call.recording_downloaded = True
+                    call_record = CDRRecord.query.get(call.id)
+                    if call_record:
+                        call_record.recording_local_path = supabase_path
+                        call_record.recording_downloaded = True
 
-                    # Update duration if we extracted it from the audio
-                    if audio_duration_seconds > 0:
-                        call.duration = audio_duration_seconds
-                        call.billsec = audio_duration_seconds
-                        logger.info(f"Updated call duration: {audio_duration_seconds}s")
+                        # Update duration if we extracted it from the audio
+                        if audio_duration_seconds > 0:
+                            call_record.duration = audio_duration_seconds
+                            call_record.billsec = audio_duration_seconds
+                            logger.info(f"Updated call duration: {audio_duration_seconds}s")
 
-                    db.session.commit()
+                        db.session.commit()
 
-                    logger.info(f"✅ Updated database with Supabase path: {supabase_path}")
+                        logger.info(f"✅ Updated database with Supabase path: {supabase_path}")
 
-                    # Trigger AI processing if not already done
-                    if not Transcription.query.filter_by(cdr_id=call.id).first():
-                        logger.info(f"Triggering AI processing for call {call.id}")
-                        from app import process_call_ai_async
-                        process_call_ai_async(call.id, supabase_path)
+                        # Trigger AI processing if not already done
+                        if not Transcription.query.filter_by(cdr_id=call_record.id).first():
+                            logger.info(f"Triggering AI processing for call {call_record.id}")
+                            from app import process_call_ai_async
+                            process_call_ai_async(call_record.id, supabase_path)
 
                 # Clean up local file
                 file_path.unlink()
