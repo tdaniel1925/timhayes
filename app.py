@@ -11025,13 +11025,9 @@ def serve_frontend(path):
 if __name__ == '__main__':
     init_db()
 
-    # Start CDR polling service in background
-    try:
-        from cdr_poller import start_poller_thread
-        start_poller_thread()
-        logger.info("✅ CDR Polling service enabled")
-    except Exception as e:
-        logger.warning(f"⚠️  CDR Polling service failed to start: {e}")
+    # CDR polling service DISABLED - using recording scraper to create CDRs instead
+    # The scraper extracts all call data directly from the recordings page
+    logger.info("ℹ️  CDR Polling service disabled - scraper creates CDRs from recordings page")
 
     port = int(os.getenv('PORT', 5000))
     logger.info("=" * 60)

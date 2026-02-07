@@ -120,111 +120,105 @@ class UCMRecordingScraper:
                 page.wait_for_load_state('networkidle', timeout=15000)
                 page.wait_for_timeout(5000)  # Wait for table to load
 
-                # Step 3: Get list of calls that need recordings downloaded
+                # Step 3: Scrape ALL rows from the recordings table
+                # Table structure: Checkbox | Caller | Callee | Call Time | Size | Play | Options
+                rows = page.locator('tbody tr')
+                row_count = rows.count()
+                logger.info(f"Found {row_count} recordings on page")
+
+                if row_count == 0:
+                    logger.info("No recordings found on page")
+                    browser.close()
+                    return
+
+                # Step 4: Process each row - create CDR if needed, download recording
+                downloaded_count = 0
                 with app.app_context():
-                    # Find CDRs that have recording paths but no Supabase storage path
-                    # Filter by tenant_id to only process this tenant's calls
-                    calls_needing_recordings = CDRRecord.query.filter(
-                        CDRRecord.tenant_id == self.tenant_id,
-                        CDRRecord.recordfiles.isnot(None),
-                        CDRRecord.recordfiles != '',
-                        db.or_(
-                            CDRRecord.recording_local_path.is_(None),
-                            CDRRecord.recording_local_path == ''
-                        )
-                    ).order_by(CDRRecord.created_at.desc()).limit(50).all()
-
-                    logger.info(f"Found {len(calls_needing_recordings)} calls needing recordings")
-
-                    if not calls_needing_recordings:
-                        logger.info("No recordings to download at this time")
-                        browser.close()
-                        return
-
-                    # Step 4: Download recordings
-                    downloaded_count = 0
-                    for call in calls_needing_recordings:
+                    for i in range(row_count):
                         try:
-                            logger.info(f"Processing call {call.uniqueid} (Caller: {call.src}, Callee: {call.dst})")
+                            row = rows.nth(i)
 
-                            # Format call time to match CloudUCM display format: "2026-02-06 16:21:36"
-                            call_time_str = call.calldate.strftime('%Y-%m-%d %H:%M:%S') if call.calldate else None
+                            # Extract call data from table cells
+                            caller = row.locator('td').nth(1).text_content().strip()
+                            callee = row.locator('td').nth(2).text_content().strip()
+                            call_time_str = row.locator('td').nth(3).text_content().strip()  # "2026-02-06 16:21:36"
 
-                            if not call_time_str:
-                                logger.warning(f"Call {call.uniqueid} has no calldate, skipping")
-                                continue
+                            logger.info(f"Processing row {i+1}/{row_count}: {caller} → {callee} at {call_time_str}")
 
-                            logger.info(f"Looking for call at time: {call_time_str}")
+                            # Parse call time
+                            call_datetime = datetime.strptime(call_time_str, '%Y-%m-%d %H:%M:%S')
 
-                            # Find the table row that matches this call
-                            # Table structure: Checkbox | Caller | Callee | Call Time | Size | Play | Options
-                            row_found = False
+                            # Create unique ID from call time and caller/callee
+                            uniqueid = f"{int(call_datetime.timestamp())}.{caller[-4:]}"
 
-                            # Get all rows and check each one
-                            rows = page.locator('tbody tr')
-                            row_count = rows.count()
-                            logger.info(f"Checking {row_count} rows on current page")
+                            # Check if CDR already exists
+                            existing_cdr = CDRRecord.query.filter_by(
+                                tenant_id=self.tenant_id,
+                                src=caller,
+                                dst=callee,
+                                calldate=call_datetime
+                            ).first()
 
-                            for i in range(row_count):
-                                row = rows.nth(i)
+                            if existing_cdr:
+                                # Check if already has recording
+                                if existing_cdr.recording_local_path:
+                                    logger.info(f"  ✓ CDR exists and has recording - skipping")
+                                    continue
+                                else:
+                                    logger.info(f"  ✓ CDR exists but needs recording")
+                                    call = existing_cdr
+                            else:
+                                # Create new CDR record from recordings page data
+                                logger.info(f"  Creating new CDR record...")
+                                call = CDRRecord(
+                                    tenant_id=self.tenant_id,
+                                    uniqueid=uniqueid,
+                                    src=caller,
+                                    dst=callee,
+                                    calldate=call_datetime,
+                                    disposition='ANSWERED',  # We know it was answered if there's a recording
+                                    duration=0,  # Will be calculated from recording
+                                    billsec=0,
+                                    received_at=datetime.utcnow()
+                                )
+                                db.session.add(call)
+                                db.session.commit()
+                                logger.info(f"  ✓ Created CDR record with ID: {call.id}")
 
-                                # Get the call time from the 4th cell (index 3)
-                                call_time_cell = row.locator('td').nth(3)
-                                row_call_time = call_time_cell.text_content().strip()
+                            # Download the recording
+                            download_button = row.locator('span.sprite-download')
 
-                                # Also get caller and callee for verification
-                                caller_cell = row.locator('td').nth(1)
-                                callee_cell = row.locator('td').nth(2)
-                                row_caller = caller_cell.text_content().strip()
-                                row_callee = callee_cell.text_content().strip()
+                            if download_button.count() > 0:
+                                logger.info("  Downloading recording...")
 
-                                # Match by call time (most reliable)
-                                if row_call_time == call_time_str:
-                                    logger.info(f"✓ Found matching row: Caller={row_caller}, Callee={row_callee}, Time={row_call_time}")
-                                    row_found = True
+                                # Set up download listener
+                                with page.expect_download(timeout=30000) as download_info:
+                                    download_button.click()
 
-                                    # Click the download button in this row
-                                    # The download icon is in the last cell (Options column)
-                                    # It's a <span class="sprite sprite-download">
-                                    download_button = row.locator('span.sprite-download')
+                                download = download_info.value
+                                logger.info(f"  ✓ Download started: {download.suggested_filename}")
 
-                                    if download_button.count() > 0:
-                                        logger.info("Clicking download button...")
+                                # Save the downloaded file
+                                local_filename = f"{call.uniqueid}_{download.suggested_filename}"
+                                local_path = self.download_dir / local_filename
+                                download.save_as(str(local_path))
+                                logger.info(f"  ✓ Saved to: {local_path}")
 
-                                        # Set up download listener
-                                        with page.expect_download(timeout=30000) as download_info:
-                                            download_button.click()
+                                # Process the downloaded file (upload to Supabase)
+                                if self.process_downloaded_file(local_path, call):
+                                    downloaded_count += 1
+                                    logger.info(f"  ✓ Successfully processed recording")
+                                else:
+                                    logger.error(f"  Failed to process downloaded file")
 
-                                        download = download_info.value
-                                        logger.info(f"✓ Download started: {download.suggested_filename}")
-
-                                        # Save the downloaded file
-                                        local_filename = f"{call.uniqueid}_{download.suggested_filename}"
-                                        local_path = self.download_dir / local_filename
-                                        download.save_as(str(local_path))
-                                        logger.info(f"✓ Saved to: {local_path}")
-
-                                        # Process the downloaded file (upload to Supabase)
-                                        if self.process_downloaded_file(local_path, call):
-                                            downloaded_count += 1
-                                            logger.info(f"✓ Successfully processed recording for call {call.uniqueid}")
-                                        else:
-                                            logger.error(f"Failed to process downloaded file for call {call.uniqueid}")
-
-                                    else:
-                                        logger.warning(f"No download button found in row for call {call.uniqueid}")
-
-                                    break  # Found and processed this call, move to next
-
-                            if not row_found:
-                                logger.warning(f"Could not find row for call {call.uniqueid} with time {call_time_str}")
-                                logger.warning("Recording might be on a different page or not yet available")
+                            else:
+                                logger.warning(f"  No download button found in row")
 
                         except Exception as e:
-                            logger.error(f"Error processing call {call.uniqueid}: {e}", exc_info=True)
+                            logger.error(f"Error processing row {i+1}: {e}", exc_info=True)
                             continue
 
-                    logger.info(f"✓ Downloaded {downloaded_count} recordings successfully")
+                logger.info(f"✓ Downloaded {downloaded_count} recordings successfully")
 
                 browser.close()
                 logger.info("Browser closed")
@@ -241,11 +235,17 @@ class UCMRecordingScraper:
                 logger.error("Supabase storage not configured")
                 return False
 
-            # Convert WAV to MP3 to reduce file size
+            # Convert WAV to MP3 to reduce file size AND extract duration
             mp3_path = file_path.with_suffix('.mp3')
+            audio_duration_seconds = 0
+
             try:
                 logger.info(f"Converting {file_path.name} to MP3...")
                 audio = AudioSegment.from_file(str(file_path))
+
+                # Get duration in seconds
+                audio_duration_seconds = int(len(audio) / 1000)
+                logger.info(f"Audio duration: {audio_duration_seconds} seconds")
 
                 # Export as MP3 with good quality (128 kbps)
                 audio.export(
@@ -285,6 +285,13 @@ class UCMRecordingScraper:
                 with app.app_context():
                     call.recording_local_path = supabase_path
                     call.recording_downloaded = True
+
+                    # Update duration if we extracted it from the audio
+                    if audio_duration_seconds > 0:
+                        call.duration = audio_duration_seconds
+                        call.billsec = audio_duration_seconds
+                        logger.info(f"Updated call duration: {audio_duration_seconds}s")
+
                     db.session.commit()
 
                     logger.info(f"✅ Updated database with Supabase path: {supabase_path}")
