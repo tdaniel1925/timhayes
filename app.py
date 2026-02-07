@@ -2390,7 +2390,7 @@ def process_call_ai_async(call_id, ucm_recording_path):
 
                     # Step 2: Process with enabled features
                     if 'sentiment-analysis' in enabled_features:
-                        sentiment_result = analyze_sentiment(transcription_text, call_id)
+                        sentiment_result = analyze_sentiment(transcription_text, tenant_id, call_id)
                         if sentiment_result:
                             trans_obj = Transcription.query.filter_by(cdr_id=call_id).first()
                             if trans_obj:
@@ -3495,8 +3495,7 @@ def get_calls():
         'recording_available': bool(call.recording_local_path),
         'transcription': call.transcription.transcription_text if call.transcription else None,
         'sentiment': call.transcription.sentiment.sentiment if call.transcription and call.transcription.sentiment else None,
-        'sentiment_score': call.transcription.sentiment.sentiment_score if call.transcription and call.transcription.sentiment else None,
-        'ai_summary': call.transcription.ai_summary if call.transcription else None
+        'sentiment_score': call.transcription.sentiment.sentiment_score if call.transcription and call.transcription.sentiment else None
     } for call in pagination.items]
 
     return jsonify({
@@ -5939,7 +5938,7 @@ def get_activity_logs():
                 'type': 'call_received',
                 'message': f'Call received from {call.src} to {call.dst}',
                 'details': f'{call.disposition} - Duration: {call.duration}s',
-                'timestamp': call.received_at.isoformat() if call.received_at else call.calldate.isoformat(),
+                'timestamp': call.received_at.isoformat() if call.received_at else call.call_date.isoformat(),
                 'call_id': call.id
             })
 
@@ -5949,7 +5948,7 @@ def get_activity_logs():
                     'type': 'recording_downloaded',
                     'message': f'Recording downloaded for call {call.uniqueid}',
                     'details': 'MP3 format, uploaded to Supabase storage',
-                    'timestamp': call.received_at.isoformat() if call.received_at else call.calldate.isoformat(),
+                    'timestamp': call.received_at.isoformat() if call.received_at else call.call_date.isoformat(),
                     'call_id': call.id
                 })
 
@@ -5959,7 +5958,7 @@ def get_activity_logs():
                     'type': 'transcription_completed',
                     'message': f'Transcription completed for call {call.uniqueid}',
                     'details': f'Transcribed {len(call.transcription.transcription_text or "")} characters',
-                    'timestamp': call.received_at.isoformat() if call.received_at else call.calldate.isoformat(),
+                    'timestamp': call.received_at.isoformat() if call.received_at else call.call_date.isoformat(),
                     'call_id': call.id
                 })
 
@@ -5969,7 +5968,7 @@ def get_activity_logs():
                         'type': 'ai_analysis_completed',
                         'message': f'AI analysis completed for call {call.uniqueid}',
                         'details': f'Sentiment: {call.transcription.sentiment.sentiment}, Score: {call.transcription.sentiment.sentiment_score:.2f}',
-                        'timestamp': call.received_at.isoformat() if call.received_at else call.calldate.isoformat(),
+                        'timestamp': call.received_at.isoformat() if call.received_at else call.call_date.isoformat(),
                         'call_id': call.id
                     })
 
