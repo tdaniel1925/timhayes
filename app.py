@@ -6517,6 +6517,7 @@ def superadmin_get_tenant(tenant_id):
             'subdomain': tenant.subdomain,
             'plan': tenant.plan,
             'status': tenant.status,
+            'is_active': tenant.is_active,
             'max_users': tenant.max_users,
             'max_calls_per_month': tenant.max_calls_per_month,
             'subscription_status': tenant.subscription_status,
@@ -6524,7 +6525,13 @@ def superadmin_get_tenant(tenant_id):
             'created_at': tenant.created_at.isoformat(),
             'users': users_data,
             'total_calls': total_calls,
-            'calls_this_month': calls_this_month
+            'calls_this_month': calls_this_month,
+            # UCM Configuration (used by recording scraper)
+            'phone_system_type': tenant.phone_system_type,
+            'pbx_ip': tenant.pbx_ip,
+            'pbx_username': tenant.pbx_username,
+            'pbx_password': '••••••••' if tenant.pbx_password else '',  # Don't expose actual password
+            'pbx_port': tenant.pbx_port
         }), 200
 
     except Exception as e:
@@ -6555,6 +6562,21 @@ def superadmin_update_tenant(tenant_id):
             tenant.max_calls_per_month = data['max_calls_per_month']
         if 'subscription_status' in data:
             tenant.subscription_status = data['subscription_status']
+        if 'is_active' in data:
+            tenant.is_active = data['is_active']
+
+        # Update UCM credentials (used by recording scraper)
+        if 'phone_system_type' in data:
+            tenant.phone_system_type = data['phone_system_type']
+        if 'pbx_ip' in data:
+            tenant.pbx_ip = data['pbx_ip'].strip() if data['pbx_ip'] else None
+        if 'pbx_username' in data:
+            tenant.pbx_username = data['pbx_username'].strip() if data['pbx_username'] else None
+        if 'pbx_password' in data and data['pbx_password']:
+            # Only update password if a new one is provided
+            tenant.pbx_password = data['pbx_password']  # Tenant model auto-encrypts
+        if 'pbx_port' in data:
+            tenant.pbx_port = int(data['pbx_port']) if data['pbx_port'] else 8443
 
         db.session.commit()
 

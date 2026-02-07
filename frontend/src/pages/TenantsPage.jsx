@@ -162,7 +162,11 @@ export default function TenantsPage() {
                   </thead>
                   <tbody>
                     {tenants.map((tenant) => (
-                      <tr key={tenant.id} className="border-b hover:bg-gray-50">
+                      <tr
+                        key={tenant.id}
+                        className="border-b hover:bg-gray-50 cursor-pointer"
+                        onClick={() => navigate(`/tenants/${tenant.id}`)}
+                      >
                         <td className="p-4 font-medium">{tenant.company_name}</td>
                         <td className="p-4 text-sm text-muted-foreground">{tenant.subdomain}</td>
                         <td className="p-4">

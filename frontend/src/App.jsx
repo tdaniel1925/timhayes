@@ -29,6 +29,7 @@ import UserManagement from './pages/UserManagement';
 import IntegrationsPanel from './pages/IntegrationsPanel';
 import TenantsPage from './pages/TenantsPage';
 import CreateTenantPage from './pages/CreateTenantPage';
+import TenantDetailPage from './pages/TenantDetailPage';
 import TeamPerformance from './pages/TeamPerformance';
 import OnboardingWizard from './pages/OnboardingWizard';
 import UsageAnalytics from './pages/UsageAnalytics';
@@ -210,6 +211,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <CreateTenantPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tenants/:tenantId"
+        element={
+          <ProtectedRoute>
+            <TenantDetailPage />
           </ProtectedRoute>
         }
       />
