@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Button } from '../components/ui/button';
 import { Activity, RefreshCw, Phone, Mic, Sparkles, Download, AlertCircle, CheckCircle } from 'lucide-react';
-import api from '../lib/api';
+import { api } from '../lib/api';
 
 const ActivityLogs = () => {
   const navigate = useNavigate();
