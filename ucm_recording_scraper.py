@@ -107,8 +107,8 @@ class UCMRecordingScraper:
                         CDRRecord.recordfiles.isnot(None),
                         CDRRecord.recordfiles != '',
                         db.or_(
-                            CDRRecord.supabase_path.is_(None),
-                            CDRRecord.supabase_path == ''
+                            CDRRecord.recording_local_path.is_(None),
+                            CDRRecord.recording_local_path == ''
                         )
                     ).order_by(CDRRecord.created_at.desc()).limit(50).all()
 
@@ -228,7 +228,8 @@ class UCMRecordingScraper:
             if supabase_path:
                 # Update database
                 with app.app_context():
-                    call.supabase_path = supabase_path
+                    call.recording_local_path = supabase_path
+                    call.recording_downloaded = True
                     db.session.commit()
 
                     logger.info(f"✅ Updated database with Supabase path: {supabase_path}")

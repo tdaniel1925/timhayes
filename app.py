@@ -3489,10 +3489,12 @@ def get_calls():
         'billsec': call.billsec,
         'disposition': call.disposition,
         'recording_path': call.recordfiles,
-        'has_recording': bool(call.recordfiles),
+        'has_recording': bool(call.recording_local_path),
+        'recording_available': bool(call.recording_local_path),
         'transcription': call.transcription.transcription_text if call.transcription else None,
         'sentiment': call.transcription.sentiment.sentiment if call.transcription and call.transcription.sentiment else None,
-        'sentiment_score': call.transcription.sentiment.sentiment_score if call.transcription and call.transcription.sentiment else None
+        'sentiment_score': call.transcription.sentiment.sentiment_score if call.transcription and call.transcription.sentiment else None,
+        'ai_summary': call.transcription.ai_summary if call.transcription else None
     } for call in pagination.items]
 
     return jsonify({
