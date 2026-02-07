@@ -3485,10 +3485,12 @@ def get_calls():
         'dst': call.dst,
         'caller_name': call.caller_name,
         'start_time': call.start_time,
+        'call_date': call.call_date.isoformat() if call.call_date else call.start_time,
         'duration': call.duration,
         'billsec': call.billsec,
         'disposition': call.disposition,
         'recording_path': call.recordfiles,
+        'recording_local_path': call.recording_local_path,  # Include Supabase path
         'has_recording': bool(call.recording_local_path),
         'recording_available': bool(call.recording_local_path),
         'transcription': call.transcription.transcription_text if call.transcription else None,
