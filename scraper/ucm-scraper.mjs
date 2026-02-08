@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { execSync } from 'child_process';
 import { extract as tarExtract } from 'tar';
+import { Solver } from '2captcha';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,6 +24,9 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KE
 const UCM_URL = process.env.UCM_URL || 'https://071ffb.c.myucm.cloud:8443';
 const TENANT_ID = parseInt(process.env.TENANT_ID || '1');
 const SCRAPER_INTERVAL = 15 * 60 * 1000; // 15 minutes
+const CAPTCHA_API_KEY = process.env.CAPTCHA_API_KEY; // 2Captcha API key
+const UCM_USERNAME = process.env.UCM_USERNAME || 'admin';
+const UCM_PASSWORD = process.env.UCM_PASSWORD || 'BotMakers@2026';
 
 // Directories
 const DOWNLOAD_DIR = '/tmp/ucm_recordings';
@@ -120,6 +124,124 @@ async function invalidateSession(tenantId) {
     .update({ is_valid: false })
     .eq('tenant_id', tenantId);
   console.log('[Session] Marked session as invalid');
+}
+
+/**
+ * Automatically login to UCM and save session (with CAPTCHA solving)
+ */
+async function autoLogin(tenantId) {
+  console.log('[AutoLogin] Starting automatic login...');
+
+  if (!CAPTCHA_API_KEY) {
+    console.log('[AutoLogin] ERROR: CAPTCHA_API_KEY not set - cannot auto-login');
+    console.log('[AutoLogin] Please run save-session.mjs locally to capture session manually');
+    return false;
+  }
+
+  const solver = new Solver(CAPTCHA_API_KEY);
+
+  try {
+    // Launch browser
+    console.log('[AutoLogin] Launching browser...');
+    const browser = await chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
+    const context = await browser.newContext({
+      acceptDownloads: true,
+      ignoreHTTPSErrors: true,
+      viewport: { width: 1440, height: 900 }
+    });
+
+    const page = await context.newPage();
+    page.setDefaultTimeout(60000);
+
+    try {
+      // Navigate to login page
+      console.log('[AutoLogin] Navigating to UCM login page...');
+      await page.goto(UCM_URL, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(2000);
+
+      // Fill in username and password
+      console.log('[AutoLogin] Entering credentials...');
+      await page.fill('input[name="username"], input#username, input[type="text"]', UCM_USERNAME);
+      await page.fill('input[name="password"], input#password, input[type="password"]', UCM_PASSWORD);
+      await page.waitForTimeout(1000);
+
+      // Find reCAPTCHA sitekey
+      console.log('[AutoLogin] Detecting reCAPTCHA...');
+      const sitekey = await page.evaluate(() => {
+        const recaptchaDiv = document.querySelector('.g-recaptcha');
+        return recaptchaDiv ? recaptchaDiv.getAttribute('data-sitekey') : null;
+      });
+
+      if (!sitekey) {
+        console.log('[AutoLogin] WARNING: Could not find reCAPTCHA sitekey');
+        await browser.close();
+        return false;
+      }
+
+      console.log('[AutoLogin] Found reCAPTCHA sitekey:', sitekey);
+      console.log('[AutoLogin] Sending to 2Captcha for solving (may take 15-60 seconds)...');
+
+      // Solve CAPTCHA using 2Captcha
+      const solution = await solver.recaptcha({
+        pageurl: UCM_URL,
+        googlekey: sitekey
+      });
+
+      console.log('[AutoLogin] CAPTCHA solved! Submitting login form...');
+
+      // Inject CAPTCHA solution into page
+      await page.evaluate((token) => {
+        const textarea = document.getElementById('g-recaptcha-response');
+        if (textarea) {
+          textarea.value = token;
+          textarea.style.display = 'block';
+        }
+        // Also try to set it in the callback
+        if (window.___grecaptcha_cfg && window.___grecaptcha_cfg.clients) {
+          Object.values(window.___grecaptcha_cfg.clients).forEach(client => {
+            if (client && client.D && client.D.D) {
+              client.D.D.callback(token);
+            }
+          });
+        }
+      }, solution.data);
+
+      // Submit the form
+      await page.click('button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign in")');
+      await page.waitForTimeout(5000);
+
+      // Check if login succeeded
+      const currentUrl = page.url();
+      const content = await page.content();
+
+      if (currentUrl.includes('login') || content.includes('type="password"')) {
+        console.log('[AutoLogin] Login failed - still on login page');
+        await browser.close();
+        return false;
+      }
+
+      console.log('[AutoLogin] Login successful! Saving session...');
+
+      // Save the new session
+      const storageState = await context.storageState();
+      await saveSession(tenantId, storageState);
+
+      console.log('[AutoLogin] Session saved successfully!');
+      await browser.close();
+      return true;
+
+    } finally {
+      await browser.close();
+    }
+
+  } catch (err) {
+    console.error('[AutoLogin] Error:', err.message);
+    return false;
+  }
 }
 
 /**
@@ -291,11 +413,22 @@ async function scrapeRecordings(tenantId) {
       // 5. Check if session expired
       const content = await page.content();
       if (page.url().includes('login') || content.includes('type="password"')) {
-        console.log('[Scraper] SESSION EXPIRED - re-login required');
+        console.log('[Scraper] SESSION EXPIRED - attempting automatic login...');
         await invalidateSession(tenantId);
-        stats.sessionExpired = true;
         await browser.close();
-        return { ...stats, error: 'session_expired' };
+
+        // Attempt automatic login with CAPTCHA solving
+        const loginSuccess = await autoLogin(tenantId);
+
+        if (!loginSuccess) {
+          console.log('[Scraper] Auto-login failed - manual session capture required');
+          stats.sessionExpired = true;
+          return { ...stats, error: 'session_expired_manual_required' };
+        }
+
+        console.log('[Scraper] Auto-login successful! Retrying scraper run...');
+        // Retry the entire scraper function with new session
+        return await scrapeRecordings(tenantId);
       }
 
       // 6. Click "Download All" button
