@@ -161,19 +161,33 @@ async function autoLogin(tenantId) {
       // Navigate to login page
       console.log('[AutoLogin] Navigating to UCM login page...');
       await page.goto(UCM_URL, { waitUntil: 'networkidle' });
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
+
+      // Wait for login form to appear
+      console.log('[AutoLogin] Waiting for login form to load...');
+      try {
+        await page.waitForSelector('input[type="password"]', { timeout: 10000 });
+      } catch (e) {
+        console.log('[AutoLogin] Login form not found - page may not have loaded');
+        const html = await page.content();
+        console.log('[AutoLogin] Full page HTML:', html);
+        await browser.close();
+        return false;
+      }
 
       // Fill in username and password
       console.log('[AutoLogin] Entering credentials...');
       await page.fill('input[name="username"], input#username, input[type="text"]', UCM_USERNAME);
       await page.fill('input[name="password"], input#password, input[type="password"]', UCM_PASSWORD);
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(2000);
 
       // Find reCAPTCHA sitekey - try multiple methods
       console.log('[AutoLogin] Detecting reCAPTCHA...');
 
-      // Wait for reCAPTCHA to load
-      await page.waitForTimeout(3000);
+      // Wait for reCAPTCHA to load (may take a while)
+      await page.waitForTimeout(5000);
+
+      console.log('[AutoLogin] Checking for reCAPTCHA elements...');
 
       const sitekey = await page.evaluate(() => {
         // Method 1: .g-recaptcha element
@@ -214,9 +228,20 @@ async function autoLogin(tenantId) {
         console.log('[AutoLogin] Saving screenshot for debugging...');
         await page.screenshot({ path: '/tmp/ucm_login_page.png' });
 
-        // Log page content snippet for debugging
+        // Log detailed page info for debugging
         const html = await page.content();
-        console.log('[AutoLogin] Page content sample:', html.substring(0, 500));
+        const pageInfo = await page.evaluate(() => {
+          return {
+            hasRecaptchaDiv: !!document.querySelector('.g-recaptcha'),
+            hasRecaptchaIframe: !!document.querySelector('iframe[src*="recaptcha"]'),
+            hasSitekeyAttr: !!document.querySelector('[data-sitekey]'),
+            formAction: document.querySelector('form')?.action || 'no form found',
+            inputFields: Array.from(document.querySelectorAll('input')).map(i => ({ type: i.type, name: i.name, id: i.id }))
+          };
+        });
+
+        console.log('[AutoLogin] Page analysis:', JSON.stringify(pageInfo, null, 2));
+        console.log('[AutoLogin] HTML body:', html.substring(html.indexOf('<body'), html.indexOf('</body>') + 7).substring(0, 1000));
 
         await browser.close();
         return false;
