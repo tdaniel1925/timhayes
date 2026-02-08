@@ -20,7 +20,7 @@ import VerifyEmail from './pages/VerifyEmail';
 
 // App Pages
 import Dashboard from './pages/Dashboard';
-import Settings from './pages/Settings';
+import Settings from './pages/SettingsNew';
 import SetupRequest from './pages/SetupRequest';
 import CallDetail from './pages/CallDetailNew';
 import AdminSetupRequests from './pages/AdminSetupRequests';
