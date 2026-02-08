@@ -200,7 +200,7 @@ class UCMRecordingScraper:
 
                                 # Set up download listener with increased timeout
                                 with page.expect_download(timeout=DOWNLOAD_TIMEOUT_MS) as download_info:
-                                    download_button.click()
+                                    download_button.click(timeout=DOWNLOAD_TIMEOUT_MS)  # UCM can be slow to respond
                                     # Give CloudUCM a moment to prepare the download
                                     time.sleep(1)
 
