@@ -3306,9 +3306,9 @@ def create_tenant():
 
         # Create tenant
         new_tenant = Tenant(
-            name=company_name,
+            company_name=company_name,
             subdomain=subdomain,
-            pbx_type=data.get('phone_system_type', 'grandstream_ucm'),
+            phone_system_type=data.get('phone_system_type', 'grandstream_ucm'),
             pbx_ip=pbx_ip,
             pbx_username=pbx_username,
             pbx_password=pbx_password,
@@ -3316,10 +3316,12 @@ def create_tenant():
             webhook_username=data.get('webhook_username', f'webhook_{subdomain}'),
             webhook_password=data.get('webhook_password', ''),
             plan=data.get('plan', 'professional'),
-            status='active',
-            industry=industry,
-            company_size=data.get('company_size'),
-            trial_end_date=datetime.utcnow() + timedelta(days=14)  # 14-day trial
+            is_active=True,
+            subscription_status='active',
+            subscription_ends_at=datetime.utcnow() + timedelta(days=14),  # 14-day trial
+            billing_cycle_start=datetime.utcnow(),
+            transcription_enabled='transcription' in data.get('ai_features', []),
+            sentiment_enabled='sentiment-analysis' in data.get('ai_features', [])
         )
 
         db.session.add(new_tenant)
