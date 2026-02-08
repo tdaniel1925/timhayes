@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
 
 // Marketing Pages
@@ -43,6 +44,7 @@ import PromptCopilot from './pages/PromptCopilot';
 import PromptScenarios from './pages/PromptScenarios';
 import PromptPerformance from './pages/PromptPerformance';
 import PromptSettings from './pages/PromptSettings';
+import TenantOnboarding from './pages/TenantOnboarding';
 
 // Super Admin Pages
 import SuperAdminLogin from './pages/SuperAdminLogin';
@@ -331,6 +333,7 @@ function AppRoutes() {
       <Route path="/superadmin/login" element={<SuperAdminLogin />} />
       <Route path="/superadmin/dashboard" element={<SuperAdminDashboard />} />
       <Route path="/superadmin/tenants" element={<TenantList />} />
+      <Route path="/superadmin/tenants/onboarding" element={<TenantOnboarding />} />
       <Route path="/superadmin/tenants/create" element={<TenantCreate />} />
       <Route path="/superadmin/tenants/:tenantId" element={<TenantDetail />} />
       <Route path="/superadmin/revenue" element={<RevenueDashboard />} />
@@ -351,7 +354,9 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <ToastProvider>
+            <AppRoutes />
+          </ToastProvider>
         </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>
