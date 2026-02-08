@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
 CloudUCM Recording Scraper
-Uses Playwright to login to CloudUCM web interface and download recordings
+Uses UCM API to download recordings - NO web scraping!
 Runs as a background worker on Render.com
 """
 import os
 import sys
 import time
 import logging
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 from pydub import AudioSegment
 
 # Add current directory to path
@@ -23,7 +23,6 @@ from supabase_storage import get_storage_manager
 SCRAPER_INTERVAL = int(os.getenv('SCRAPER_INTERVAL', '900'))  # 15 minutes default
 DOWNLOAD_DIR = os.getenv('DOWNLOAD_DIR', '/tmp/ucm_recordings')
 MAX_RECORDINGS_PER_ITERATION = 20  # Limit recordings to prevent overwhelming UCM
-DOWNLOAD_TIMEOUT_MS = 60000  # 60 seconds timeout for downloads
 RATE_LIMIT_DELAY_SECONDS = 3  # Delay between downloads to avoid overwhelming UCM
 
 # Logging
@@ -35,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 class UCMRecordingScraper:
-    """Scrapes recordings from CloudUCM web interface"""
+    """Downloads recordings using UCM API"""
 
     def __init__(self, tenant=None):
         """
@@ -62,7 +61,7 @@ class UCMRecordingScraper:
         self.storage_manager = get_storage_manager()
 
     def scrape_recordings(self):
-        """Main scraping function"""
+        """Main scraping function - downloads recordings using UCM API"""
         logger.info("=" * 70)
         logger.info(f"Starting CloudUCM recording scraper for tenant: {self.tenant_name} (ID: {self.tenant_id})")
         logger.info(f"UCM URL: {self.ucm_url}")
@@ -76,166 +75,84 @@ class UCMRecordingScraper:
             return
 
         try:
-            with sync_playwright() as p:
-                # Launch browser (headless in production)
-                logger.info("Launching browser...")
-                browser = p.chromium.launch(
-                    headless=True,  # No GUI
-                    args=['--no-sandbox', '--disable-setuid-sandbox']  # For Docker/Render
-                )
+            # Use database + API downloads instead of web scraping
+            from ucm_downloader import UCMRecordingDownloader
 
-                context = browser.new_context(
-                    accept_downloads=True,
-                    ignore_https_errors=True  # CloudUCM uses self-signed cert
-                )
+            logger.info("Querying database for calls needing recordings...")
+            with app.app_context():
+                # Get calls with recording paths but not downloaded yet
+                calls_needing_recordings = CDRRecord.query.filter(
+                    CDRRecord.tenant_id == self.tenant_id,
+                    CDRRecord.recordfiles.isnot(None),
+                    CDRRecord.recordfiles != '',
+                    CDRRecord.recording_local_path.is_(None)
+                ).order_by(CDRRecord.id.desc()).limit(MAX_RECORDINGS_PER_ITERATION).all()
 
-                page = context.new_page()
+                logger.info(f"Found {len(calls_needing_recordings)} calls needing recordings")
 
-                # Step 1: Login
-                logger.info("Navigating to CloudUCM login...")
-                page.goto(self.ucm_url, timeout=30000)
-
-                # Wait for login page to load
-                logger.info("Waiting for login form...")
-                page.wait_for_selector('input[id="username"]', timeout=10000)
-
-                # Fill in credentials
-                logger.info("Entering credentials...")
-                page.fill('input[id="username"]', self.username)
-                page.fill('input[id="password"]', self.password)
-
-                # Click login button
-                logger.info("Clicking login...")
-                page.click('button[type="submit"]')
-
-                # Wait for dashboard to load
-                logger.info("Waiting for dashboard...")
-                page.wait_for_load_state('networkidle', timeout=30000)
-                page.wait_for_timeout(5000)  # Wait for React to render
-
-                # Step 2: Navigate to CDR/Recordings page
-                logger.info("Expanding CDR menu...")
-                page.locator('li.ant-menu-submenu:has-text("CDR")').first.click()
-                page.wait_for_timeout(2000)  # Wait for submenu animation
-
-                logger.info("Clicking Recordings submenu...")
-                page.locator('li[role="menuitem"]:has-text("Recordings")').click()
-                page.wait_for_load_state('networkidle', timeout=15000)
-                page.wait_for_timeout(5000)  # Wait for table to load
-
-                # Step 3: Scrape ALL rows from the recordings table
-                # Table structure: Checkbox | Caller | Callee | Call Time | Size | Play | Options
-                rows = page.locator('tbody tr')
-                row_count = rows.count()
-                logger.info(f"Found {row_count} recordings on page")
-
-                if row_count == 0:
-                    logger.info("No recordings found on page")
-                    browser.close()
+                if len(calls_needing_recordings) == 0:
+                    logger.info("No recordings to download")
                     return
 
-                # Step 4: Process each row - create CDR if needed, download recording
-                # Limit to MAX_RECORDINGS_PER_ITERATION to avoid overwhelming UCM
-                recordings_to_process = min(row_count, MAX_RECORDINGS_PER_ITERATION)
-                logger.info(f"Processing {recordings_to_process} of {row_count} recordings (limit: {MAX_RECORDINGS_PER_ITERATION})")
+                # Extract IP and port from UCM URL
+                url_match = re.match(r'https?://([^:]+):?(\d+)?', self.ucm_url)
+                if url_match:
+                    ucm_ip = url_match.group(1)
+                    ucm_port = int(url_match.group(2)) if url_match.group(2) else 8443
+                else:
+                    logger.error(f"Invalid UCM URL format: {self.ucm_url}")
+                    return
 
+                # Create API downloader
+                logger.info(f"Creating UCM API downloader for {ucm_ip}:{ucm_port}")
+                downloader = UCMRecordingDownloader(ucm_ip, self.username, self.password, ucm_port)
+
+                # Authenticate once
+                logger.info("Authenticating with UCM API...")
+                if not downloader.authenticate():
+                    logger.error("❌ Failed to authenticate with UCM API")
+                    return
+
+                logger.info("✅ Authentication successful")
+
+                # Download each recording
                 downloaded_count = 0
-                with app.app_context():
-                    for i in range(recordings_to_process):
-                        try:
-                            row = rows.nth(i)
+                for i, call in enumerate(calls_needing_recordings):
+                    try:
+                        logger.info(f"Processing call {i+1}/{len(calls_needing_recordings)}: ID={call.id}, {call.src} → {call.dst}")
+                        logger.info(f"  Recording path: {call.recordfiles}")
 
-                            # Extract call data from table cells
-                            caller = row.locator('td').nth(1).text_content().strip()
-                            callee = row.locator('td').nth(2).text_content().strip()
-                            call_time_str = row.locator('td').nth(3).text_content().strip()  # "2026-02-06 16:21:36"
+                        # Create local filename
+                        filename = Path(call.recordfiles).name.rstrip('@')
+                        local_filename = f"{call.uniqueid}_{filename}"
+                        local_path = self.download_dir / local_filename
 
-                            logger.info(f"Processing row {i+1}/{recordings_to_process}: {caller} → {callee} at {call_time_str}")
+                        # Download using API
+                        logger.info(f"  Downloading via UCM API...")
+                        downloaded_path = downloader.download_recording(call.recordfiles, str(local_path))
 
-                            # Parse call time
-                            call_datetime = datetime.strptime(call_time_str, '%Y-%m-%d %H:%M:%S')
+                        if downloaded_path:
+                            logger.info(f"  ✅ Downloaded: {downloaded_path}")
 
-                            # Create unique ID from call time and caller/callee
-                            uniqueid = f"{int(call_datetime.timestamp())}.{caller[-4:]}"
+                            # Process the downloaded file (upload to Supabase)
+                            if self.process_downloaded_file(Path(downloaded_path), call):
+                                downloaded_count += 1
+                                logger.info(f"  ✅ Successfully processed recording")
 
-                            # Check if CDR already exists
-                            existing_cdr = CDRRecord.query.filter_by(
-                                tenant_id=self.tenant_id,
-                                src=caller,
-                                dst=callee,
-                                call_date=call_datetime
-                            ).first()
-
-                            if existing_cdr:
-                                # Check if already has recording
-                                if existing_cdr.recording_local_path:
-                                    logger.info(f"  ✓ CDR exists and has recording - skipping")
-                                    continue
-                                else:
-                                    logger.info(f"  ✓ CDR exists but needs recording")
-                                    call = existing_cdr
+                                # Rate limiting: delay between downloads
+                                if i < len(calls_needing_recordings) - 1:
+                                    logger.info(f"  ⏸️  Waiting {RATE_LIMIT_DELAY_SECONDS}s before next download...")
+                                    time.sleep(RATE_LIMIT_DELAY_SECONDS)
                             else:
-                                # Create new CDR record from recordings page data
-                                logger.info(f"  Creating new CDR record...")
-                                call = CDRRecord(
-                                    tenant_id=self.tenant_id,
-                                    uniqueid=uniqueid,
-                                    src=caller,
-                                    dst=callee,
-                                    call_date=call_datetime,
-                                    disposition='ANSWERED',  # We know it was answered if there's a recording
-                                    duration=0,  # Will be calculated from recording
-                                    billsec=0,
-                                    received_at=datetime.utcnow()
-                                )
-                                db.session.add(call)
-                                db.session.commit()
-                                logger.info(f"  ✓ Created CDR record with ID: {call.id}")
+                                logger.error(f"  ❌ Failed to process downloaded file")
+                        else:
+                            logger.error(f"  ❌ Failed to download recording")
 
-                            # Download the recording
-                            download_button = row.locator('span.sprite-download')
+                    except Exception as e:
+                        logger.error(f"Error processing call {call.id}: {e}", exc_info=True)
+                        continue
 
-                            if download_button.count() > 0:
-                                logger.info("  Downloading recording...")
-
-                                # Set up download listener with increased timeout
-                                with page.expect_download(timeout=DOWNLOAD_TIMEOUT_MS) as download_info:
-                                    download_button.click()
-                                    # Give CloudUCM a moment to prepare the download
-                                    time.sleep(1)
-
-                                download = download_info.value
-                                logger.info(f"  ✓ Download started: {download.suggested_filename}")
-
-                                # Save the downloaded file
-                                local_filename = f"{call.uniqueid}_{download.suggested_filename}"
-                                local_path = self.download_dir / local_filename
-                                download.save_as(str(local_path))
-                                logger.info(f"  ✓ Saved to: {local_path}")
-
-                                # Process the downloaded file (upload to Supabase)
-                                if self.process_downloaded_file(local_path, call):
-                                    downloaded_count += 1
-                                    logger.info(f"  ✓ Successfully processed recording")
-
-                                    # Rate limiting: delay between downloads to avoid overwhelming UCM
-                                    if i < recordings_to_process - 1:  # Don't delay after last recording
-                                        logger.info(f"  ⏸️  Waiting {RATE_LIMIT_DELAY_SECONDS}s before next download...")
-                                        time.sleep(RATE_LIMIT_DELAY_SECONDS)
-                                else:
-                                    logger.error(f"  Failed to process downloaded file")
-
-                            else:
-                                logger.warning(f"  No download button found in row")
-
-                        except Exception as e:
-                            logger.error(f"Error processing row {i+1}: {e}", exc_info=True)
-                            continue
-
-                logger.info(f"✓ Downloaded {downloaded_count} recordings successfully")
-
-                browser.close()
-                logger.info("Browser closed")
+                logger.info(f"✅ Downloaded {downloaded_count} recordings successfully")
 
         except Exception as e:
             logger.error(f"Scraping error: {e}", exc_info=True)
