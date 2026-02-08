@@ -22,7 +22,7 @@ import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import SetupRequest from './pages/SetupRequest';
-import CallDetail from './pages/CallDetailEnhanced';
+import CallDetail from './pages/CallDetailNew';
 import AdminSetupRequests from './pages/AdminSetupRequests';
 import Notifications from './pages/Notifications';
 import ActivityLogs from './pages/ActivityLogs';
