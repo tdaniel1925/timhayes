@@ -23,7 +23,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
 const UCM_URL = process.env.UCM_URL || 'https://071ffb.c.myucm.cloud:8443';
 const TENANT_ID = parseInt(process.env.TENANT_ID || '1');
-const SCRAPER_INTERVAL = 15 * 60 * 1000; // 15 minutes
+const SCRAPER_INTERVAL = 30 * 60 * 1000; // 30 minutes
 const CAPTCHA_API_KEY = process.env.CAPTCHA_API_KEY; // 2Captcha API key
 const UCM_USERNAME = process.env.UCM_USERNAME || 'admin';
 const UCM_PASSWORD = process.env.UCM_PASSWORD || 'BotMakers@2026';
@@ -673,7 +673,7 @@ async function scrapeRecordings(tenantId) {
 }
 
 /**
- * Run scraper in loop mode (scheduled every 15 minutes)
+ * Run scraper in loop mode (scheduled every 30 minutes)
  */
 async function runScheduled() {
   console.log('[Scheduler] Starting scheduled scraper');
@@ -684,7 +684,7 @@ async function runScheduled() {
     await scrapeRecordings(TENANT_ID);
   }, 30000);
 
-  // Then every 15 minutes
+  // Then every 30 minutes
   setInterval(async () => {
     await scrapeRecordings(TENANT_ID);
   }, SCRAPER_INTERVAL);
