@@ -2325,24 +2325,42 @@ def process_call_ai_async(call_id, ucm_recording_path):
                     storage_path = None
 
                     if ucm_recording_path:
+                        # CRITICAL FIX: Get tenant-specific UCM credentials
+                        tenant = Tenant.query.get(tenant_id)
+                        if not tenant:
+                            logger.error(f"❌ Tenant {tenant_id} not found for call {call_id}")
+                            return
+
+                        # Use tenant-specific credentials instead of global environment variables
+                        ucm_ip = tenant.pbx_ip or UCM_IP
+                        ucm_username = tenant.pbx_username or UCM_USERNAME
+                        ucm_password = tenant.pbx_password or UCM_PASSWORD
+                        ucm_port = tenant.pbx_port or UCM_PORT
+
                         logger.info(f"📥 Starting recording download for call {call_id}")
-                        logger.info(f"📍 UCM IP: {UCM_IP}")
-                        logger.info(f"👤 UCM Username: {UCM_USERNAME}")
+                        logger.info(f"📍 UCM IP: {ucm_ip}")
+                        logger.info(f"👤 UCM Username: {ucm_username}")
                         logger.info(f"📂 UCM Recording Path: {ucm_recording_path}")
                         logger.info(f"🏢 Tenant ID: {tenant_id}")
                         logger.info(f"🆔 Call Unique ID: {call.uniqueid}")
                         logger.info(f"☁️ Storage Manager Available: {storage_manager is not None}")
 
+                        # Validate tenant has UCM credentials configured
+                        if not ucm_ip or not ucm_username or not ucm_password:
+                            logger.error(f"❌ Tenant {tenant_id} missing UCM credentials (IP: {bool(ucm_ip)}, User: {bool(ucm_username)}, Pass: {bool(ucm_password)})")
+                            logger.error(f"   Cannot download recording for call {call_id}. Please configure UCM credentials in tenant settings.")
+                            return
+
                         try:
                             storage_path = download_and_upload_recording(
-                                UCM_IP,
-                                UCM_USERNAME,
-                                UCM_PASSWORD,
+                                ucm_ip,
+                                ucm_username,
+                                ucm_password,
                                 ucm_recording_path,
                                 tenant_id,
                                 call.uniqueid,
                                 storage_manager,
-                                UCM_PORT
+                                ucm_port
                             )
 
                             if storage_path:
