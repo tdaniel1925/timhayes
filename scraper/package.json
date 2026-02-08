@@ -1,0 +1,21 @@
+{
+  "name": "audiapro-ucm-scraper",
+  "version": "1.0.0",
+  "description": "Downloads call recordings from Grandstream UCM using Download All button",
+  "type": "module",
+  "main": "ucm-scraper.mjs",
+  "scripts": {
+    "start": "node ucm-scraper.mjs loop",
+    "test": "node ucm-scraper.mjs once",
+    "save-session": "node save-session.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "playwright": "^1.50.0",
+    "tar": "^7.0.0",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

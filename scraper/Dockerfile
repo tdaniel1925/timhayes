@@ -1,0 +1,56 @@
+# Use Node.js 18 with Ubuntu base for Playwright
+FROM node:18-bullseye
+
+# Install system dependencies required by Playwright/Chromium
+RUN apt-get update && apt-get install -y \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libdbus-1-3 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libasound2 \
+    libatspi2.0-0 \
+    wget \
+    ca-certificates \
+    fonts-liberation \
+    libappindicator3-1 \
+    libu2f-udev \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json* ./
+
+# Install Node.js dependencies
+RUN npm install
+
+# Install Playwright browsers
+RUN npx playwright install chromium
+RUN npx playwright install-deps chromium
+
+# Copy scraper code
+COPY ucm-scraper.mjs .
+COPY save-session.mjs .
+
+# Create directories for downloads
+RUN mkdir -p /tmp/ucm_recordings /tmp/ucm_tar
+
+# Set environment variables for headless mode
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV NODE_ENV=production
+
+# Run scraper in loop mode (every 15 minutes)
+CMD ["node", "ucm-scraper.mjs", "loop"]
