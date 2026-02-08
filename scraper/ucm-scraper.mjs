@@ -169,15 +169,55 @@ async function autoLogin(tenantId) {
       await page.fill('input[name="password"], input#password, input[type="password"]', UCM_PASSWORD);
       await page.waitForTimeout(1000);
 
-      // Find reCAPTCHA sitekey
+      // Find reCAPTCHA sitekey - try multiple methods
       console.log('[AutoLogin] Detecting reCAPTCHA...');
+
+      // Wait for reCAPTCHA to load
+      await page.waitForTimeout(3000);
+
       const sitekey = await page.evaluate(() => {
-        const recaptchaDiv = document.querySelector('.g-recaptcha');
-        return recaptchaDiv ? recaptchaDiv.getAttribute('data-sitekey') : null;
+        // Method 1: .g-recaptcha element
+        let recaptchaDiv = document.querySelector('.g-recaptcha');
+        if (recaptchaDiv && recaptchaDiv.getAttribute('data-sitekey')) {
+          return recaptchaDiv.getAttribute('data-sitekey');
+        }
+
+        // Method 2: Look in grecaptcha config
+        if (window.___grecaptcha_cfg && window.___grecaptcha_cfg.clients) {
+          const clients = window.___grecaptcha_cfg.clients;
+          for (let clientId in clients) {
+            const client = clients[clientId];
+            if (client && client.A && client.A.A) {
+              return client.A.A; // sitekey
+            }
+          }
+        }
+
+        // Method 3: Find iframe and extract from src
+        const iframe = document.querySelector('iframe[src*="recaptcha"]');
+        if (iframe) {
+          const match = iframe.src.match(/[?&]k=([^&]+)/);
+          if (match) return match[1];
+        }
+
+        // Method 4: Look for data-sitekey anywhere
+        const elemWithSitekey = document.querySelector('[data-sitekey]');
+        if (elemWithSitekey) {
+          return elemWithSitekey.getAttribute('data-sitekey');
+        }
+
+        return null;
       });
 
       if (!sitekey) {
         console.log('[AutoLogin] WARNING: Could not find reCAPTCHA sitekey');
+        console.log('[AutoLogin] Saving screenshot for debugging...');
+        await page.screenshot({ path: '/tmp/ucm_login_page.png' });
+
+        // Log page content snippet for debugging
+        const html = await page.content();
+        console.log('[AutoLogin] Page content sample:', html.substring(0, 500));
+
         await browser.close();
         return false;
       }
