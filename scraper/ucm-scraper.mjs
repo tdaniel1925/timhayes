@@ -376,11 +376,26 @@ async function scrapeRecordings(tenantId) {
 
   try {
     // 1. Get saved session
-    const sessionData = await getSession(tenantId);
+    let sessionData = await getSession(tenantId);
     if (!sessionData) {
-      console.log('[Scraper] ERROR: No session found');
-      console.log('[Scraper] Run save-session.mjs locally to create initial session');
-      return { ...stats, error: 'no_session' };
+      console.log('[Scraper] No session found - attempting automatic login...');
+
+      // Attempt automatic login with CAPTCHA solving
+      const loginSuccess = await autoLogin(tenantId);
+
+      if (!loginSuccess) {
+        console.log('[Scraper] Auto-login failed - manual session capture required');
+        console.log('[Scraper] Run save-session.mjs locally to create initial session');
+        return { ...stats, error: 'no_session_manual_required' };
+      }
+
+      console.log('[Scraper] Auto-login successful! Loading new session...');
+      sessionData = await getSession(tenantId);
+
+      if (!sessionData) {
+        console.log('[Scraper] ERROR: Session still not found after auto-login');
+        return { ...stats, error: 'no_session_after_login' };
+      }
     }
 
     // 2. Get already-downloaded files
