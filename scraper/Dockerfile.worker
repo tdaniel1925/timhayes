@@ -37,19 +37,17 @@ COPY package.json package-lock.json* ./
 # Install Node.js dependencies
 RUN npm install
 
-# Install Playwright browsers
-RUN npx playwright install chromium
-RUN npx playwright install-deps chromium
-
 # Copy scraper code
 COPY ucm-scraper.mjs .
 COPY save-session.mjs .
+
+# Install Playwright browsers and dependencies
+RUN npx playwright install --with-deps chromium
 
 # Create directories for downloads
 RUN mkdir -p /tmp/ucm_recordings /tmp/ucm_tar
 
 # Set environment variables for headless mode
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 ENV NODE_ENV=production
 
 # Run scraper in loop mode (every 15 minutes)
