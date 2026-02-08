@@ -62,7 +62,7 @@ class UCMRecordingScraper:
         self.storage_manager = get_storage_manager()
 
     def scrape_recordings(self):
-        """Main scraping function - downloads recordings using UCM API"""
+        """Main scraping function"""
         logger.info("=" * 70)
         logger.info(f"Starting CloudUCM recording scraper for tenant: {self.tenant_name} (ID: {self.tenant_id})")
         logger.info(f"UCM URL: {self.ucm_url}")
@@ -76,89 +76,7 @@ class UCMRecordingScraper:
             return
 
         try:
-            # NEW APPROACH: Use database + API downloads instead of web scraping
-            # Find all calls that have recordfiles but no downloaded recording
-            from ucm_downloader import UCMRecordingDownloader
-
-            logger.info("Querying database for calls needing recordings...")
-            with app.app_context():
-                # Get calls with recording paths but not downloaded yet
-                calls_needing_recordings = CDRRecord.query.filter(
-                    CDRRecord.tenant_id == self.tenant_id,
-                    CDRRecord.recordfiles.isnot(None),
-                    CDRRecord.recordfiles != '',
-                    CDRRecord.recording_local_path.is_(None)
-                ).order_by(CDRRecord.id.desc()).limit(MAX_RECORDINGS_PER_ITERATION).all()
-
-                logger.info(f"Found {len(calls_needing_recordings)} calls needing recordings")
-
-                if len(calls_needing_recordings) == 0:
-                    logger.info("No recordings to download")
-                    return
-
-                # Extract IP and port from UCM URL
-                import re
-                url_match = re.match(r'https?://([^:]+):?(\d+)?', self.ucm_url)
-                if url_match:
-                    ucm_ip = url_match.group(1)
-                    ucm_port = int(url_match.group(2)) if url_match.group(2) else 8443
-                else:
-                    logger.error(f"Invalid UCM URL format: {self.ucm_url}")
-                    return
-
-                # Create API downloader
-                logger.info(f"Creating UCM API downloader for {ucm_ip}:{ucm_port}")
-                downloader = UCMRecordingDownloader(ucm_ip, self.username, self.password, ucm_port)
-
-                # Authenticate once
-                logger.info("Authenticating with UCM API...")
-                if not downloader.authenticate():
-                    logger.error("❌ Failed to authenticate with UCM API")
-                    return
-
-                logger.info("✅ Authentication successful")
-
-                # Download each recording
-                downloaded_count = 0
-                for i, call in enumerate(calls_needing_recordings):
-                    try:
-                        logger.info(f"Processing call {i+1}/{len(calls_needing_recordings)}: ID={call.id}, {call.src} → {call.dst}")
-                        logger.info(f"  Recording path: {call.recordfiles}")
-
-                        # Create local filename
-                        filename = Path(call.recordfiles).name.rstrip('@')
-                        local_filename = f"{call.uniqueid}_{filename}"
-                        local_path = self.download_dir / local_filename
-
-                        # Download using API
-                        logger.info(f"  Downloading via UCM API...")
-                        downloaded_path = downloader.download_recording(call.recordfiles, str(local_path))
-
-                        if downloaded_path:
-                            logger.info(f"  ✅ Downloaded: {downloaded_path}")
-
-                            # Process the downloaded file (upload to Supabase)
-                            if self.process_downloaded_file(Path(downloaded_path), call):
-                                downloaded_count += 1
-                                logger.info(f"  ✅ Successfully processed recording")
-
-                                # Rate limiting: delay between downloads
-                                if i < len(calls_needing_recordings) - 1:
-                                    logger.info(f"  ⏸️  Waiting {RATE_LIMIT_DELAY_SECONDS}s before next download...")
-                                    time.sleep(RATE_LIMIT_DELAY_SECONDS)
-                            else:
-                                logger.error(f"  ❌ Failed to process downloaded file")
-                        else:
-                            logger.error(f"  ❌ Failed to download recording")
-
-                    except Exception as e:
-                        logger.error(f"Error processing call {call.id}: {e}", exc_info=True)
-                        continue
-
-                logger.info(f"✅ Downloaded {downloaded_count} recordings successfully")
-
-        except Exception as e:
-            logger.error(f"Scraping error: {e}", exc_info=True)
+            with sync_playwright() as p:
                 # Launch browser (headless in production)
                 logger.info("Launching browser...")
                 browser = p.chromium.launch(
