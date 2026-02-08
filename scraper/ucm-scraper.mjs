@@ -181,13 +181,9 @@ async function autoLogin(tenantId) {
       await page.fill('input[name="password"], input#password, input[type="password"]', UCM_PASSWORD);
       await page.waitForTimeout(2000);
 
-      // Find reCAPTCHA sitekey - try multiple methods
-      console.log('[AutoLogin] Detecting reCAPTCHA...');
-
-      // Wait for reCAPTCHA to load (may take a while)
-      await page.waitForTimeout(5000);
-
-      console.log('[AutoLogin] Checking for reCAPTCHA elements...');
+      // Check if reCAPTCHA is present (it only appears sometimes)
+      console.log('[AutoLogin] Checking if reCAPTCHA is present...');
+      await page.waitForTimeout(3000); // Wait for page to fully load
 
       const sitekey = await page.evaluate(() => {
         // Method 1: .g-recaptcha element
@@ -224,60 +220,54 @@ async function autoLogin(tenantId) {
       });
 
       if (!sitekey) {
-        console.log('[AutoLogin] WARNING: Could not find reCAPTCHA sitekey');
-        console.log('[AutoLogin] Saving screenshot for debugging...');
-        await page.screenshot({ path: '/tmp/ucm_login_page.png' });
+        // No reCAPTCHA found - this is normal! Just submit the form directly
+        console.log('[AutoLogin] No reCAPTCHA detected - submitting login form directly...');
 
-        // Log detailed page info for debugging
-        const html = await page.content();
-        const pageInfo = await page.evaluate(() => {
-          return {
-            hasRecaptchaDiv: !!document.querySelector('.g-recaptcha'),
-            hasRecaptchaIframe: !!document.querySelector('iframe[src*="recaptcha"]'),
-            hasSitekeyAttr: !!document.querySelector('[data-sitekey]'),
-            formAction: document.querySelector('form')?.action || 'no form found',
-            inputFields: Array.from(document.querySelectorAll('input')).map(i => ({ type: i.type, name: i.name, id: i.id }))
-          };
+        // Submit the form
+        await page.click('button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign in")');
+        await page.waitForTimeout(5000);
+
+      } else {
+        // reCAPTCHA found - need to solve it
+        console.log('[AutoLogin] reCAPTCHA detected with sitekey:', sitekey);
+
+        if (!CAPTCHA_API_KEY) {
+          console.log('[AutoLogin] ERROR: reCAPTCHA present but no CAPTCHA_API_KEY configured');
+          await browser.close();
+          return false;
+        }
+
+        console.log('[AutoLogin] Sending to 2Captcha for solving (may take 15-60 seconds)...');
+
+        // Solve CAPTCHA using 2Captcha
+        const solution = await solver.recaptcha({
+          pageurl: UCM_URL,
+          googlekey: sitekey
         });
 
-        console.log('[AutoLogin] Page analysis:', JSON.stringify(pageInfo, null, 2));
-        console.log('[AutoLogin] HTML body:', html.substring(html.indexOf('<body'), html.indexOf('</body>') + 7).substring(0, 1000));
+        console.log('[AutoLogin] CAPTCHA solved! Submitting login form...');
 
-        await browser.close();
-        return false;
+        // Inject CAPTCHA solution into page
+        await page.evaluate((token) => {
+          const textarea = document.getElementById('g-recaptcha-response');
+          if (textarea) {
+            textarea.value = token;
+            textarea.style.display = 'block';
+          }
+          // Also try to set it in the callback
+          if (window.___grecaptcha_cfg && window.___grecaptcha_cfg.clients) {
+            Object.values(window.___grecaptcha_cfg.clients).forEach(client => {
+              if (client && client.D && client.D.D) {
+                client.D.D.callback(token);
+              }
+            });
+          }
+        }, solution.data);
+
+        // Submit the form
+        await page.click('button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign in")');
+        await page.waitForTimeout(5000);
       }
-
-      console.log('[AutoLogin] Found reCAPTCHA sitekey:', sitekey);
-      console.log('[AutoLogin] Sending to 2Captcha for solving (may take 15-60 seconds)...');
-
-      // Solve CAPTCHA using 2Captcha
-      const solution = await solver.recaptcha({
-        pageurl: UCM_URL,
-        googlekey: sitekey
-      });
-
-      console.log('[AutoLogin] CAPTCHA solved! Submitting login form...');
-
-      // Inject CAPTCHA solution into page
-      await page.evaluate((token) => {
-        const textarea = document.getElementById('g-recaptcha-response');
-        if (textarea) {
-          textarea.value = token;
-          textarea.style.display = 'block';
-        }
-        // Also try to set it in the callback
-        if (window.___grecaptcha_cfg && window.___grecaptcha_cfg.clients) {
-          Object.values(window.___grecaptcha_cfg.clients).forEach(client => {
-            if (client && client.D && client.D.D) {
-              client.D.D.callback(token);
-            }
-          });
-        }
-      }, solution.data);
-
-      // Submit the form
-      await page.click('button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign in")');
-      await page.waitForTimeout(5000);
 
       // Check if login succeeded
       const currentUrl = page.url();
