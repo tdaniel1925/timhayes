@@ -442,5 +442,47 @@ export const api = {
       throw new Error(error.error || 'Failed to cancel subscription');
     }
     return response.json();
+  },
+
+  // Tenant Onboarding
+  checkSubdomainAvailability: async (subdomain) => {
+    const response = await fetch(`${API_BASE}/onboarding/check-subdomain`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subdomain })
+    });
+    if (!response.ok) {
+      throw new Error('Failed to check subdomain availability');
+    }
+    const data = await response.json();
+    return data.available;
+  },
+
+  testUCMConnection: async (credentials) => {
+    const response = await fetch(`${API_BASE}/onboarding/test-ucm-connection`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials)
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      return {
+        success: false,
+        message: error.message || 'Connection failed'
+      };
+    }
+    return response.json();
+  },
+
+  createTenant: async (tenantData) => {
+    const response = await fetchWithAuth('/tenants', {
+      method: 'POST',
+      body: JSON.stringify(tenantData)
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to create tenant');
+    }
+    return response.json();
   }
 };

@@ -8,6 +8,7 @@ import os
 import json
 import logging
 import hashlib
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from functools import wraps
@@ -3125,6 +3126,252 @@ def verify_email():
     except Exception as e:
         logger.error(f"Email verification error: {str(e)}")
         return jsonify({'error': 'Email verification failed'}), 500
+
+
+# ============================================================================
+# TENANT ONBOARDING ENDPOINTS
+# ============================================================================
+
+@app.route('/api/onboarding/check-subdomain', methods=['POST'])
+def check_subdomain_availability():
+    """Check if a subdomain is available for new tenant registration"""
+    try:
+        data = request.get_json()
+        subdomain = data.get('subdomain', '').lower().strip()
+
+        if not subdomain:
+            return jsonify({'error': 'Subdomain is required'}), 400
+
+        # Validate subdomain format (alphanumeric only, 3-20 chars)
+        if not re.match(r'^[a-z0-9]{3,20}$', subdomain):
+            return jsonify({
+                'error': 'Subdomain must be 3-20 characters, alphanumeric only'
+            }), 400
+
+        # Check if subdomain already exists
+        existing_tenant = Tenant.query.filter_by(subdomain=subdomain).first()
+
+        return jsonify({
+            'available': existing_tenant is None,
+            'subdomain': subdomain
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Subdomain check error: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to check subdomain availability'}), 500
+
+
+@app.route('/api/onboarding/test-ucm-connection', methods=['POST'])
+def test_ucm_connection():
+    """Test UCM connection credentials before creating tenant"""
+    try:
+        data = request.get_json()
+        ucm_url = data.get('ucm_url', '').strip()
+        username = data.get('username', '').strip()
+        password = data.get('password', '').strip()
+        port = data.get('port', '8443')
+
+        if not all([ucm_url, username, password]):
+            return jsonify({
+                'success': False,
+                'message': 'UCM URL, username, and password are required'
+            }), 400
+
+        # Format the URL properly
+        if not ucm_url.startswith('http'):
+            ucm_url = f"https://{ucm_url}"
+
+        # Remove port from URL if present
+        ucm_url = re.sub(r':\d+$', '', ucm_url)
+
+        # Add port
+        base_url = f"{ucm_url}:{port}"
+
+        # Test login
+        import requests
+        from requests.auth import HTTPBasicAuth
+
+        # Try to login
+        login_url = f"{base_url}/api"
+        logger.info(f"Testing UCM connection to: {login_url}")
+
+        try:
+            response = requests.get(
+                login_url,
+                auth=HTTPBasicAuth(username, password),
+                verify=False,
+                timeout=10
+            )
+
+            if response.status_code == 200:
+                # Try to fetch CDR list to verify full access
+                cdr_url = f"{base_url}/api/listCdr?page=1&page_size=1"
+                cdr_response = requests.get(
+                    cdr_url,
+                    auth=HTTPBasicAuth(username, password),
+                    verify=False,
+                    timeout=10
+                )
+
+                if cdr_response.status_code == 200:
+                    cdr_data = cdr_response.json()
+                    recording_count = cdr_data.get('total', 0)
+
+                    return jsonify({
+                        'success': True,
+                        'message': 'Connection successful',
+                        'recording_count': recording_count
+                    }), 200
+                else:
+                    return jsonify({
+                        'success': False,
+                        'message': 'Login successful but cannot access CDR records. Check user permissions.'
+                    }), 200
+
+            elif response.status_code == 401:
+                return jsonify({
+                    'success': False,
+                    'message': 'Invalid username or password'
+                }), 200
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': f'UCM returned error: {response.status_code}'
+                }), 200
+
+        except requests.exceptions.Timeout:
+            return jsonify({
+                'success': False,
+                'message': 'Connection timed out. Check if UCM is accessible.'
+            }), 200
+        except requests.exceptions.ConnectionError:
+            return jsonify({
+                'success': False,
+                'message': 'Cannot connect to UCM. Check URL and network connectivity.'
+            }), 200
+        except Exception as conn_error:
+            logger.error(f"UCM connection test error: {conn_error}", exc_info=True)
+            return jsonify({
+                'success': False,
+                'message': f'Connection failed: {str(conn_error)}'
+            }), 200
+
+    except Exception as e:
+        logger.error(f"UCM connection test error: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': 'Connection test failed due to server error'
+        }), 500
+
+
+@app.route('/api/tenants', methods=['POST'])
+@jwt_required()
+def create_tenant():
+    """Create a new tenant (superadmin only)"""
+    try:
+        claims = get_jwt()
+        role = claims.get('role', 'user')
+
+        # Only superadmin can create tenants
+        if role != 'superadmin':
+            return jsonify({'error': 'Superadmin access required'}), 403
+
+        data = request.get_json()
+
+        # Required fields
+        company_name = data.get('company_name', '').strip()
+        subdomain = data.get('subdomain', '').lower().strip()
+        industry = data.get('industry', '').strip()
+        pbx_ip = data.get('pbx_ip', '').strip()
+        pbx_username = data.get('pbx_username', '').strip()
+        pbx_password = data.get('pbx_password', '').strip()
+        admin_user = data.get('admin_user', {})
+
+        # Validate required fields
+        if not all([company_name, subdomain, industry, pbx_ip, pbx_username, pbx_password]):
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        if not all([admin_user.get('email'), admin_user.get('password'), admin_user.get('full_name')]):
+            return jsonify({'error': 'Missing admin user information'}), 400
+
+        # Check subdomain availability again
+        existing_tenant = Tenant.query.filter_by(subdomain=subdomain).first()
+        if existing_tenant:
+            return jsonify({'error': 'Subdomain already exists'}), 409
+
+        # Check if admin email already exists
+        existing_user = User.query.filter_by(email=admin_user['email']).first()
+        if existing_user:
+            return jsonify({'error': 'Admin email already exists'}), 409
+
+        # Create tenant
+        new_tenant = Tenant(
+            name=company_name,
+            subdomain=subdomain,
+            pbx_type=data.get('phone_system_type', 'grandstream_ucm'),
+            pbx_ip=pbx_ip,
+            pbx_username=pbx_username,
+            pbx_password=pbx_password,
+            pbx_port=data.get('pbx_port', 8443),
+            webhook_username=data.get('webhook_username', f'webhook_{subdomain}'),
+            webhook_password=data.get('webhook_password', ''),
+            plan=data.get('plan', 'professional'),
+            status='active',
+            industry=industry,
+            company_size=data.get('company_size'),
+            trial_end_date=datetime.utcnow() + timedelta(days=14)  # 14-day trial
+        )
+
+        db.session.add(new_tenant)
+        db.session.flush()  # Get tenant ID
+
+        # Create admin user
+        admin = User(
+            email=admin_user['email'],
+            username=admin_user['email'].split('@')[0],
+            full_name=admin_user['full_name'],
+            phone=admin_user.get('phone'),
+            role='admin',
+            tenant_id=new_tenant.id,
+            is_active=True,
+            email_verified=True,  # Auto-verify for onboarding
+            created_at=datetime.utcnow()
+        )
+        admin.set_password(admin_user['password'])
+        db.session.add(admin)
+
+        # Configure AI features
+        ai_features = data.get('ai_features', [])
+        feature_config = {
+            'transcription': 'transcription' in ai_features,
+            'sentiment_analysis': 'sentiment-analysis' in ai_features,
+            'call_summary': 'call-summary' in ai_features,
+            'call_quality': 'call-quality' in ai_features,
+            'compliance': 'compliance' in ai_features
+        }
+
+        # Store feature config in tenant settings (you may need to add this column)
+        # For now, we'll log it
+        logger.info(f"AI features configured for {subdomain}: {feature_config}")
+
+        db.session.commit()
+
+        logger.info(f"New tenant created: {subdomain} (ID: {new_tenant.id})")
+
+        # Return success with tenant details
+        return jsonify({
+            'message': 'Tenant created successfully',
+            'tenant_id': new_tenant.id,
+            'subdomain': subdomain,
+            'admin_email': admin_user['email'],
+            'webhook_url': f"{request.url_root}api/webhook/cdr/{subdomain}",
+            'trial_end_date': new_tenant.trial_end_date.isoformat() if new_tenant.trial_end_date else None
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Create tenant error: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to create tenant', 'message': str(e)}), 500
 
 
 # ============================================================================
