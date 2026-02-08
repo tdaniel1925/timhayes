@@ -523,6 +523,18 @@ async function scrapeRecordings(tenantId) {
         throw new Error('Confirmation modal "Download" button not found');
       }
 
+      // Wait for button to be enabled (it starts disabled)
+      console.log('[Scraper] Waiting for Download button to be enabled...');
+      await page.waitForTimeout(2000); // Give modal time to load
+
+      // Wait for the button to not have the disabled attribute
+      await page.waitForFunction(() => {
+        const btn = document.querySelector('.ant-modal button.ant-btn-primary');
+        return btn && !btn.disabled;
+      }, { timeout: 10000 });
+
+      console.log('[Scraper] Download button enabled - clicking...');
+
       // Wait for download to start (tar file)
       console.log('[Scraper] Waiting for tar file download (up to 3 minutes)...');
       const [download] = await Promise.all([
