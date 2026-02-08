@@ -512,34 +512,22 @@ async function scrapeRecordings(tenantId) {
       await downloadAllBtn.click();
       await page.waitForTimeout(2000);
 
-      // 7. Click "Download" in confirmation modal
-      console.log('[Scraper] Confirming download in modal...');
-      const confirmBtn = page.locator(
-        '.ant-modal button:has-text("Download"), ' +
-        'button.ant-btn-primary:has-text("Download")'
-      ).first();
+      // 7. Wait for modal and click Download button
+      console.log('[Scraper] Waiting for confirmation modal...');
+      await page.waitForTimeout(5000); // Wait for modal animation and button to enable
 
-      if (await confirmBtn.count() === 0) {
-        throw new Error('Confirmation modal "Download" button not found');
-      }
+      // Find Download button in modal - try multiple selectors
+      console.log('[Scraper] Looking for Download button...');
+      const downloadBtn = await page.locator('.ant-modal button').filter({ hasText: 'Download' }).first();
 
-      // Wait for button to be enabled (it starts disabled)
-      console.log('[Scraper] Waiting for Download button to be enabled...');
-      await page.waitForTimeout(2000); // Give modal time to load
+      // Just click it - if you can click it manually, Playwright should too
+      console.log('[Scraper] Clicking Download button...');
 
-      // Wait for the button to not have the disabled attribute
-      await page.waitForFunction(() => {
-        const btn = document.querySelector('.ant-modal button.ant-btn-primary');
-        return btn && !btn.disabled;
-      }, { timeout: 10000 });
-
-      console.log('[Scraper] Download button enabled - clicking...');
-
-      // Wait for download to start (tar file)
-      console.log('[Scraper] Waiting for tar file download (up to 3 minutes)...');
+      // Wait for download to start (.tgz file)
+      console.log('[Scraper] Waiting for download to start (up to 3 minutes)...');
       const [download] = await Promise.all([
-        page.waitForEvent('download', { timeout: 180000 }), // 3 min timeout
-        confirmBtn.click()
+        page.waitForEvent('download', { timeout: 180000 }),
+        downloadBtn.click({ force: true }) // Force click to bypass any state checks
       ]);
 
       // 8. Save tar file
