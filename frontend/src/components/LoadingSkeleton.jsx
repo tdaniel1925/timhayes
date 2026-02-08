@@ -181,4 +181,5 @@ export const DashboardSkeleton = () => (
   </div>
 );
 
+export { LoadingSkeleton };
 export default LoadingSkeleton;
