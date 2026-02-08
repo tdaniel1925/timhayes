@@ -352,7 +352,7 @@ async function uploadToStorage(filePath, tenantId, uniqueid, filename) {
       .from('recordings')
       .upload(storagePath, fileBuffer, {
         contentType: 'audio/wav',
-        upsert: false
+        upsert: true  // Overwrite if already exists
       });
 
     if (error) {
