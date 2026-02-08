@@ -389,8 +389,7 @@ async function updateCDRWithRecording(tenantId, filename, storagePath, fileSize)
         .from('cdr_records')
         .update({
           recording_local_path: storagePath,
-          recording_downloaded: true,
-          updated_at: new Date().toISOString()
+          recording_downloaded: true
         })
         .eq('id', record.id);
 
