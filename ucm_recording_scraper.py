@@ -198,9 +198,15 @@ class UCMRecordingScraper:
                             if download_button.count() > 0:
                                 logger.info("  Downloading recording...")
 
+                                # Ensure button is visible and ready
+                                download_button.scroll_into_view_if_needed()
+                                download_button.wait_for(state='visible', timeout=5000)
+                                page.wait_for_timeout(2000)  # Wait for React animations/JS to settle
+
                                 # Set up download listener with increased timeout
                                 with page.expect_download(timeout=DOWNLOAD_TIMEOUT_MS) as download_info:
-                                    download_button.click(timeout=DOWNLOAD_TIMEOUT_MS)  # UCM can be slow to respond
+                                    # Force click to bypass any overlay issues
+                                    download_button.click(timeout=DOWNLOAD_TIMEOUT_MS, force=True)
                                     # Give CloudUCM a moment to prepare the download
                                     time.sleep(1)
 
