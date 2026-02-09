@@ -1,6 +1,7 @@
 """
 UCM Recording Downloader with Supabase Storage Integration
 Downloads recordings from Grandstream UCM using proper API authentication
+Now supports RECAPI for direct downloads (primary) with Supabase fallback
 """
 
 import os
@@ -17,6 +18,17 @@ import warnings
 warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
 logger = logging.getLogger(__name__)
+
+# Import the new UCM API downloader
+try:
+    from ucm_api_downloader import UCMAPIDownloader
+    _ucm_api_available = True
+except ImportError:
+    _ucm_api_available = False
+    logger.warning("ucm_api_downloader not available - will use Supabase fallback only")
+
+# Global UCM API downloader instance
+_ucm_api_downloader_instance: Optional['UCMAPIDownloader'] = None
 
 
 class UCMRecordingDownloader:
@@ -348,42 +360,99 @@ def download_and_upload_recording(
 def get_recording_for_transcription(
     storage_path: str,
     storage_manager,
-    tenant_id: int = None
+    tenant_id: int = None,
+    cdr_record=None
 ) -> Optional[str]:
     """
-    Get recording file for transcription (downloads from Supabase if needed)
+    Get recording file for transcription
+    Tries UCM API direct download first, falls back to Supabase if needed
 
     Args:
-        storage_path: Path in Supabase Storage or local filesystem
+        storage_path: Path in Supabase Storage or local filesystem (can be None)
         storage_manager: SupabaseStorageManager instance
         tenant_id: Tenant ID (for organizing downloads)
+        cdr_record: Optional CDR record object to extract filename from
 
     Returns:
         Local file path ready for transcription, or None if failed
     """
     try:
         # If it's already a local file, return it
-        if os.path.exists(storage_path):
+        if storage_path and os.path.exists(storage_path):
             return storage_path
 
-        # If it's a Supabase path, download temporarily
-        if storage_manager and storage_path.startswith('tenant_'):
+        # METHOD 1: Try UCM API direct download first (preferred - gets standard WAV)
+        ucm_api = _get_ucm_api_downloader()
+
+        if ucm_api and cdr_record and hasattr(cdr_record, 'recordfiles'):
+            try:
+                # Get full recording path from CDR recordfiles field
+                # Format: "2026-02/auto-1770401677-1000-2815058290.wav" (includes directory)
+                recordfiles = cdr_record.recordfiles
+                if recordfiles:
+                    # Clean @ suffix if present
+                    recordfiles_clean = recordfiles.rstrip('@').strip()
+
+                    # Extract just filename for local path
+                    filename_only = recordfiles_clean.split('/')[-1]
+
+                    if recordfiles_clean:
+                        temp_dir = tempfile.gettempdir()
+                        local_path = os.path.join(temp_dir, f"ucm_api_{filename_only}")
+
+                        logger.info(f"🚀 PRIMARY: Trying UCM API direct download for {recordfiles_clean}")
+                        # Pass full path (directory/filename) so ucm_api_downloader can parse it
+                        downloaded = ucm_api.download_recording(recordfiles_clean, local_path)
+
+                        if downloaded and os.path.exists(downloaded):
+                            logger.info(f"   ✅ SUCCESS! Downloaded via UCM API: {downloaded}")
+                            return downloaded
+                        else:
+                            logger.warning(f"   ⚠️ UCM API download failed, will try fallback...")
+            except Exception as api_error:
+                logger.warning(f"   ⚠️ UCM API download error: {api_error}, trying fallback...")
+
+        # METHOD 2: Fallback to Supabase download (from scraper uploads)
+        if storage_manager and storage_path and storage_path.startswith('tenant_'):
             temp_dir = tempfile.gettempdir()
             filename = Path(storage_path).name
             local_path = os.path.join(temp_dir, filename)
 
-            logger.info(f"Downloading recording from Supabase for transcription: {storage_path}")
+            logger.info(f"📦 FALLBACK: Downloading from Supabase: {storage_path}")
             downloaded = storage_manager.download_recording(storage_path, local_path)
 
             if downloaded:
+                logger.info(f"   ✅ Downloaded from Supabase: {downloaded}")
                 return downloaded
             else:
-                logger.error(f"Failed to download recording from Supabase: {storage_path}")
+                logger.error(f"   ❌ Failed to download from Supabase: {storage_path}")
                 return None
 
-        logger.warning(f"Recording not found: {storage_path}")
+        logger.warning(f"Recording not found or not available: storage_path={storage_path}")
         return None
 
     except Exception as e:
         logger.error(f"Error getting recording for transcription: {e}", exc_info=True)
         return None
+
+
+def init_ucm_api_downloader(ucm_url: str, username: str = "cdrapi", password: str = None):
+    """Initialize the global UCM API downloader for direct downloads"""
+    global _ucm_api_downloader_instance
+
+    if not _ucm_api_available:
+        logger.warning("UCM API downloader module not available")
+        return None
+
+    try:
+        _ucm_api_downloader_instance = UCMAPIDownloader(ucm_url, username, password)
+        logger.info(f"✅ Initialized UCM API downloader: {ucm_url}")
+        return _ucm_api_downloader_instance
+    except Exception as e:
+        logger.error(f"Failed to initialize UCM API downloader: {e}")
+        return None
+
+
+def _get_ucm_api_downloader() -> Optional['UCMAPIDownloader']:
+    """Get the global UCM API downloader instance"""
+    return _ucm_api_downloader_instance

@@ -54,7 +54,7 @@ from error_handlers import (
 from supabase_storage import init_storage_manager, get_storage_manager
 
 # Import UCM Recording Downloader
-from ucm_downloader import download_and_upload_recording, get_recording_for_transcription
+from ucm_downloader import download_and_upload_recording, get_recording_for_transcription, init_ucm_api_downloader
 
 # Import comprehensive default prompts registry
 from prompts_config import DEFAULT_PROMPTS
@@ -244,6 +244,19 @@ UCM_IP = os.getenv('UCM_IP', '192.168.1.100')
 UCM_USERNAME = os.getenv('UCM_USERNAME', 'admin')
 UCM_PASSWORD = os.getenv('UCM_PASSWORD', 'password')
 UCM_PORT = int(os.getenv('UCM_PORT', '8089'))
+
+# Initialize UCM API Downloader for direct recording downloads (primary method)
+if UCM_IP and UCM_PASSWORD:
+    try:
+        ucm_url = f"https://{UCM_IP}:{UCM_PORT}"
+        logger.info(f"Initializing UCM API Downloader: URL={ucm_url}, User=cdrapi")
+        init_ucm_api_downloader(ucm_url, username="cdrapi", password=UCM_PASSWORD)
+        logger.info("✅ UCM API Downloader initialized - will use direct downloads (standard WAV)")
+    except Exception as e:
+        logger.warning(f"⚠️  Failed to initialize UCM API Downloader: {e}")
+        logger.warning("   Will fall back to Supabase downloads only")
+else:
+    logger.warning("⚠️  UCM API not configured - will use Supabase downloads only")
 
 # ============================================================================
 # PHONE SYSTEM PRESETS
@@ -1471,9 +1484,23 @@ def transcribe_audio(storage_path, call_id=None, tenant_id=None):
     temp_file = False
 
     try:
-        # Get local file for transcription (downloads from Supabase if needed)
+        # Get CDR record if call_id provided (needed for UCM API direct download)
+        cdr_record = None
+        if call_id:
+            try:
+                cdr_record = CDRRecord.query.filter_by(id=call_id).first()
+            except Exception as e:
+                logger.warning(f"Could not fetch CDR record for call {call_id}: {e}")
+
+        # Get local file for transcription
+        # Tries UCM API direct download first (standard WAV), falls back to Supabase (GSFF)
         storage_manager = get_storage_manager()
-        local_file_path = get_recording_for_transcription(storage_path, storage_manager, tenant_id)
+        local_file_path = get_recording_for_transcription(
+            storage_path,
+            storage_manager,
+            tenant_id,
+            cdr_record=cdr_record  # Pass CDR record for UCM API download
+        )
 
         if not local_file_path or not os.path.exists(local_file_path):
             logger.warning(f"Audio file not available for call {call_id}")
@@ -1482,9 +1509,74 @@ def transcribe_audio(storage_path, call_id=None, tenant_id=None):
         # Mark as temp if it was downloaded from Supabase
         temp_file = storage_path.startswith('tenant_') if storage_path else False
 
+        # Check if file is GSFF format (Grandstream proprietary) and convert to standard WAV
+        file_to_transcribe = local_file_path
+        converted_file = None
+
+        if local_file_path.endswith('.wav'):
+            # Check for GSFF header
+            try:
+                with open(local_file_path, 'rb') as f:
+                    header = f.read(4)
+                    if header == b'GSFF':
+                        logger.info(f"Detected GSFF format for call {call_id}, converting to standard WAV...")
+                        import subprocess
+                        import tempfile
+
+                        # Convert GSFF to standard WAV (GSFF is 8kHz 16-bit PCM with 8-byte header)
+                        wav_path = os.path.join(tempfile.gettempdir(), f"gsff_converted_{call_id}.wav")
+                        result = subprocess.run([
+                            'ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
+                            '-f', 's16le',  # Force 16-bit signed little-endian PCM
+                            '-ar', '8000',  # 8kHz sample rate
+                            '-ac', '1',     # Mono
+                            '-i', local_file_path,
+                            wav_path
+                        ], capture_output=True, text=True, timeout=60)
+
+                        if result.returncode == 0 and os.path.exists(wav_path) and os.path.getsize(wav_path) > 0:
+                            local_file_path = wav_path
+                            converted_file = wav_path
+                            logger.info(f"✅ Converted GSFF to WAV: {wav_path} ({os.path.getsize(wav_path)} bytes)")
+                        else:
+                            logger.warning(f"GSFF conversion failed: {result.stderr}")
+            except Exception as e:
+                logger.warning(f"GSFF detection/conversion error: {e}")
+
+        # Convert WAV to MP3 if needed (Whisper sometimes has issues with WAV format)
+        mp3_file = None
+        if local_file_path.endswith('.wav'):
+            try:
+                import subprocess
+                import tempfile
+
+                # Create temp MP3 file
+                mp3_path = os.path.join(tempfile.gettempdir(), os.path.basename(local_file_path).replace('.wav', '.mp3'))
+
+                # Convert using ffmpeg (suppress banner, only show errors)
+                logger.info(f"Converting WAV to MP3 for call {call_id}")
+                result = subprocess.run(
+                    ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-i', local_file_path,
+                     '-acodec', 'libmp3lame', '-ab', '128k', '-ar', '16000', '-y', mp3_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+
+                if result.returncode == 0 and os.path.exists(mp3_path) and os.path.getsize(mp3_path) > 0:
+                    file_to_transcribe = mp3_path
+                    mp3_file = mp3_path
+                    logger.info(f"✅ Converted to MP3: {mp3_path} ({os.path.getsize(mp3_path)} bytes)")
+                else:
+                    error_msg = result.stderr if result.stderr else f"Return code: {result.returncode}"
+                    logger.warning(f"WAV to MP3 conversion failed: {error_msg}")
+                    # Will try WAV directly as fallback
+            except Exception as conv_error:
+                logger.warning(f"WAV conversion error: {conv_error}")
+
         # Open and transcribe audio file
-        with open(local_file_path, 'rb') as audio_file:
-            logger.info(f"Transcribing audio for call {call_id}: {local_file_path}")
+        with open(file_to_transcribe, 'rb') as audio_file:
+            logger.info(f"Transcribing audio for call {call_id}: {file_to_transcribe}")
 
             # Use Whisper API
             transcript = openai_client.audio.transcriptions.create(
@@ -1494,6 +1586,23 @@ def transcribe_audio(storage_path, call_id=None, tenant_id=None):
             )
 
             logger.info(f"✅ Transcription complete for call {call_id} ({len(transcript)} characters)")
+
+            # Clean up GSFF-to-WAV converted file
+            if converted_file and os.path.exists(converted_file):
+                try:
+                    os.remove(converted_file)
+                    logger.debug(f"Cleaned up GSFF-to-WAV file: {converted_file}")
+                except:
+                    pass
+
+            # Clean up WAV-to-MP3 converted file
+            if mp3_file and os.path.exists(mp3_file):
+                try:
+                    os.remove(mp3_file)
+                    logger.debug(f"Cleaned up converted MP3: {mp3_file}")
+                except:
+                    pass
+
             return transcript
 
     except Exception as e:
