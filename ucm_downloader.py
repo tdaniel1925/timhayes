@@ -170,17 +170,19 @@ class UCMRecordingDownloader:
         try:
             # Use UCM recapi endpoint to download recording
             # Format: /recapi?cookie={cookie}&filedir={dir}&filename={file}
-            # Split path into directory and filename (e.g., "2026-02/auto-xxx.wav" -> filedir="2026-02", filename="auto-xxx.wav")
+            # For UCM63XX, filedir should always be "monitor"
+            # UCM RecAPI doesn't navigate into subfolders, so use just the base filename
 
-            # Try primary approach: split into filedir and filename
-            parts = recording_path.split('/')
-            if len(parts) >= 2:
-                filedir = '/'.join(parts[:-1])  # Everything except last part
-                filename = parts[-1]  # Last part
-            else:
-                # No directory, just filename
-                filedir = ""
-                filename = recording_path
+            # Extract just the filename from the path (no date folders)
+            from os import path as os_path
+            just_filename = os_path.basename(recording_path)
+
+            # For UCM63XX, always use "monitor" as filedir
+            filedir = "monitor"
+            filename = just_filename
+
+            logger.info(f"   Original path: {recording_path}")
+            logger.info(f"   Extracted filename: {just_filename}")
 
             # We'll try the download, and if it fails, we'll try alternative format
 

@@ -153,35 +153,36 @@ export default function SidebarNew() {
 
   const SidebarContent = () => (
     <>
-      {/* Logo */}
-      <div className="p-4 border-b border-gray-200">
+      {/* Logo - SUSTAIN Style */}
+      <div className="p-4 border-b border-white/10">
         {!collapsed ? (
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Phone className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-[#E4B756] to-[#C89A8F] rounded-lg flex items-center justify-center flex-shrink-0">
+              <Phone className="w-5 h-5 text-[#31543A]" />
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-bold text-gray-900 truncate">AudiaPro</h1>
-              <p className="text-xs text-gray-600 truncate">{user?.tenant?.company_name || 'Admin'}</p>
+              <h1 className="text-lg font-bold text-white truncate">AudiaPro</h1>
+              <p className="text-xs text-white/70 truncate">{user?.tenant?.company_name || 'Admin'}</p>
             </div>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setCollapsed(true)}
-              className="flex-shrink-0"
+              className="flex-shrink-0 text-white hover:bg-white/10"
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center">
-              <Phone className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-[#E4B756] to-[#C89A8F] rounded-lg flex items-center justify-center">
+              <Phone className="w-5 h-5 text-[#31543A]" />
             </div>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setCollapsed(false)}
+              className="text-white hover:bg-white/10"
             >
               <Menu className="h-4 w-4" />
             </Button>
@@ -207,21 +208,21 @@ export default function SidebarNew() {
 
             return (
               <div key={item.id}>
-                {/* Main Item */}
+                {/* Main Item - SUSTAIN Colors */}
                 <button
                   onClick={() => handleNavClick(item)}
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
                     parentActive
-                      ? "bg-primary-50 text-primary-700 shadow-sm"
-                      : "text-gray-700 hover:bg-gray-100",
+                      ? "bg-[#E4B756] text-[#31543A] shadow-sm"
+                      : "text-white/90 hover:bg-white/10",
                     collapsed && "justify-center"
                   )}
                   title={collapsed ? item.name : undefined}
                 >
                   <Icon className={cn(
                     "h-5 w-5 flex-shrink-0",
-                    parentActive && "text-primary-600"
+                    parentActive ? "text-[#31543A]" : "text-white/80"
                   )} />
                   {!collapsed && (
                     <>
@@ -238,9 +239,9 @@ export default function SidebarNew() {
                   )}
                 </button>
 
-                {/* Submenu */}
+                {/* Submenu - SUSTAIN Colors */}
                 {!collapsed && showSubmenu && isExpanded && (
-                  <div className="mt-1 ml-4 pl-4 border-l-2 border-gray-200 space-y-1">
+                  <div className="mt-1 ml-4 pl-4 border-l-2 border-white/20 space-y-1">
                     {filteredSubmenu.map((subItem) => {
                       const SubIcon = subItem.icon;
                       const subActive = isActive(subItem.path);
@@ -255,14 +256,14 @@ export default function SidebarNew() {
                           className={cn(
                             "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
                             subActive
-                              ? "bg-primary-100 text-primary-700 font-medium"
-                              : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                              ? "bg-[#6CA8C2]/20 text-[#6CA8C2] font-medium"
+                              : "text-white/70 hover:text-white hover:bg-white/5"
                           )}
                         >
                           <SubIcon className="h-4 w-4 flex-shrink-0" />
                           <span className="flex-1 text-left">{subItem.name}</span>
                           {subItem.badge && (
-                            <Badge className="bg-error-100 text-error-700 text-xs">3</Badge>
+                            <Badge className="bg-[#E4B756] text-[#31543A] text-xs">3</Badge>
                           )}
                         </button>
                       );
@@ -275,20 +276,20 @@ export default function SidebarNew() {
         </nav>
       </div>
 
-      {/* User Section */}
-      <div className="p-4 border-t border-gray-200">
+      {/* User Section - SUSTAIN Colors */}
+      <div className="p-4 border-t border-white/10">
         {!collapsed ? (
           <div className="space-y-3">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center flex-shrink-0">
-                <span className="text-primary-700 font-semibold text-sm">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#E4B756] to-[#C89A8F] flex items-center justify-center flex-shrink-0">
+                <span className="text-[#31543A] font-semibold text-sm">
                   {user?.full_name?.charAt(0).toUpperCase() || 'U'}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 text-sm truncate">{user?.full_name}</p>
-                <p className="text-xs text-gray-600 truncate">{user?.email}</p>
-                <Badge className="mt-1 text-xs capitalize">
+                <p className="font-medium text-white text-sm truncate">{user?.full_name}</p>
+                <p className="text-xs text-white/70 truncate">{user?.email}</p>
+                <Badge className="mt-1 text-xs capitalize bg-[#6CA8C2]/20 text-[#6CA8C2] border-[#6CA8C2]/30">
                   {user?.role || 'user'}
                 </Badge>
               </div>
@@ -297,7 +298,7 @@ export default function SidebarNew() {
               variant="outline"
               size="sm"
               onClick={logout}
-              className="w-full flex items-center justify-center gap-2"
+              className="w-full flex items-center justify-center gap-2 border-white/20 text-white hover:bg-white/10 hover:text-white"
             >
               <LogOut className="h-4 w-4" />
               Logout
@@ -308,7 +309,7 @@ export default function SidebarNew() {
             variant="ghost"
             size="icon"
             onClick={logout}
-            className="w-full"
+            className="w-full text-white hover:bg-white/10"
             title="Logout"
           >
             <LogOut className="h-4 w-4" />
@@ -320,20 +321,20 @@ export default function SidebarNew() {
 
   return (
     <>
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar - SUSTAIN Muskeg Pine */}
       <div className={cn(
-        "hidden md:flex h-screen bg-white border-r border-gray-200 flex-col transition-all duration-300",
+        "hidden md:flex h-screen bg-[#31543A] border-r border-[#31543A]/20 flex-col transition-all duration-300",
         collapsed ? "w-20" : "w-64"
       )}>
         <SidebarContent />
       </div>
 
-      {/* Mobile Menu Button */}
+      {/* Mobile Menu Button - SUSTAIN Style */}
       <Button
         variant="ghost"
         size="icon"
         onClick={() => setMobileOpen(true)}
-        className="md:hidden fixed top-4 left-4 z-40 bg-white shadow-md"
+        className="md:hidden fixed top-4 left-4 z-40 bg-[#31543A] text-white shadow-md hover:bg-[#31543A]/90"
       >
         <Menu className="h-5 w-5" />
       </Button>
@@ -347,8 +348,8 @@ export default function SidebarNew() {
             onClick={() => setMobileOpen(false)}
           />
 
-          {/* Drawer */}
-          <div className="md:hidden fixed inset-y-0 left-0 w-64 bg-white z-50 flex flex-col shadow-xl animate-in slide-in-from-left duration-300">
+          {/* Drawer - SUSTAIN Muskeg Pine */}
+          <div className="md:hidden fixed inset-y-0 left-0 w-64 bg-[#31543A] z-50 flex flex-col shadow-xl animate-in slide-in-from-left duration-300">
             <SidebarContent />
           </div>
         </>

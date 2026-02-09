@@ -122,6 +122,7 @@ class UCMAPIDownloader:
         Args:
             filename: Recording filename from CDR (can be just filename or full path)
                      Examples: "auto-1770401677-1000-2815058290.wav"
+                              "/var/spool/asterisk/monitor/2024/12/09/auto-xxx.wav"
                               "2026-02/auto-1770401677-1000-2815058290.wav"
             output_path: Where to save the downloaded file
 
@@ -136,19 +137,21 @@ class UCMAPIDownloader:
                     logger.error("Authentication failed")
                     return None
 
-            # Parse filename to extract directory and filename
-            # Format: "2026-02/auto-xxx.wav" or just "auto-xxx.wav"
-            if '/' in filename:
-                parts = filename.split('/')
-                filedir = '/'.join(parts[:-1])  # Everything except last part
-                just_filename = parts[-1]  # Last part
-            else:
-                filedir = "monitor"  # Default directory
-                just_filename = filename
+            # Parse filename - extract JUST the filename, not the date path
+            # UCM RecAPI doesn't navigate into subfolders
+            # So we use filedir="monitor" and just the base filename
+
+            # Extract just the filename from the path
+            import os
+            just_filename = os.path.basename(filename)
+
+            # For UCM63XX, always use "monitor" as filedir
+            filedir = "monitor"
 
             logger.info(f"Downloading recording: {filename}")
+            logger.info(f"   Original path: {filename}")
+            logger.info(f"   Extracted filename: {just_filename}")
             logger.info(f"   filedir: {filedir}")
-            logger.info(f"   filename: {just_filename}")
 
             response = requests.post(
                 f"{self.ucm_url}/api",
