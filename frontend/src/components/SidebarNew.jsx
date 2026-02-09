@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard, Phone, Settings, Sparkles, Users, Building2,
+  LayoutDashboard, Phone, Settings as SettingsIcon, Sparkles, Users, Building2,
   TrendingUp, Bell, Activity, Sliders, FileText, BarChart3,
   UserCog, CreditCard, Code, Shield, Plug, ChevronDown,
   ChevronRight, Menu, X, LogOut, Zap
@@ -81,7 +81,7 @@ const navigationConfig = [
   {
     id: 'settings',
     name: 'Settings',
-    icon: Settings,
+    icon: SettingsIcon,
     path: '/settings',
     description: 'System configuration'
   }
