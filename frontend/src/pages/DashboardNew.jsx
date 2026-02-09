@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   Phone, TrendingUp, MessageSquare, Play, Download,
-  Search, Filter, ChevronLeft, ChevronRight, X
+  Search, Filter, ChevronLeft, ChevronRight, X, Settings
 } from 'lucide-react';
 import {
   AreaChart, Area, PieChart, Pie, Cell,
