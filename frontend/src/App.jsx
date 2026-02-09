@@ -19,7 +19,7 @@ import Signup from './pages/Signup';
 import VerifyEmail from './pages/VerifyEmail';
 
 // App Pages
-import Dashboard from './pages/Dashboard';
+import Dashboard from './pages/DashboardNew';
 import Settings from './pages/SettingsNew';
 import SetupRequest from './pages/SetupRequest';
 import CallDetail from './pages/CallDetailNew';
