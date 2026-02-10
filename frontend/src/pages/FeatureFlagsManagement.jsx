@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import DashboardLayout from '../components/DashboardLayout';
+import SuperAdminLayout from '@/components/SuperAdminLayout';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -107,19 +107,19 @@ export default function FeatureFlagsManagement() {
 
   if (loading) {
     return (
-      <DashboardLayout title="Feature Flags" subtitle="Gradual rollouts and A/B testing">
+      <SuperAdminLayout title="Feature Flags" subtitle="Gradual rollouts and A/B testing">
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3F8A84] mx-auto"></div>
             <p className="mt-4 text-[#2A2A2A]/70 font-light">Loading feature flags...</p>
           </div>
         </div>
-      </DashboardLayout>
+      </SuperAdminLayout>
     );
   }
 
   return (
-    <DashboardLayout title="Feature Flags" subtitle="Gradual rollouts and A/B testing">
+    <SuperAdminLayout title="Feature Flags" subtitle="Gradual rollouts and A/B testing">
       <div className="space-y-6">
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
@@ -332,6 +332,6 @@ export default function FeatureFlagsManagement() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </SuperAdminLayout>
   );
 }

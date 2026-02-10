@@ -72,14 +72,14 @@ export default function SuperAdminSidebar() {
 
   return (
     <div className={cn(
-      "h-screen bg-gradient-to-b from-purple-900 to-purple-800 text-white flex flex-col transition-all duration-300 shadow-2xl",
+      "h-screen bg-gradient-to-b from-[#31543A] to-[#3F8A84] text-white flex flex-col transition-all duration-300 shadow-2xl",
       collapsed ? "w-16" : "w-64"
     )}>
       {/* Logo & Toggle */}
-      <div className="p-4 border-b border-purple-700 flex items-center justify-between">
+      <div className="p-4 border-b border-white/10 flex items-center justify-between">
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 bg-gradient-to-br from-[#E4B756] to-[#C89A8F] rounded-lg flex items-center justify-center flex-shrink-0">
               <Phone className="w-4 h-4 text-white" />
             </div>
             <div>
@@ -87,12 +87,12 @@ export default function SuperAdminSidebar() {
                 <Shield className="h-5 w-5" />
                 Super Admin
               </h1>
-              <p className="text-xs text-purple-200">AudiaPro Platform</p>
+              <p className="text-xs text-white/70">AudiaPro Platform</p>
             </div>
           </div>
         )}
         {collapsed && (
-          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center mx-auto">
+          <div className="w-8 h-8 bg-gradient-to-br from-[#E4B756] to-[#C89A8F] rounded-lg flex items-center justify-center mx-auto">
             <Phone className="w-4 h-4 text-white" />
           </div>
         )}
@@ -100,7 +100,7 @@ export default function SuperAdminSidebar() {
           variant="ghost"
           size="icon"
           onClick={() => setCollapsed(!collapsed)}
-          className="ml-auto text-white hover:bg-purple-700"
+          className="ml-auto text-white hover:bg-white/10"
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
@@ -111,7 +111,7 @@ export default function SuperAdminSidebar() {
         {navigationItems.map((section, sectionIdx) => (
           <div key={sectionIdx} className="mb-6">
             {!collapsed && (
-              <h3 className="px-4 text-xs font-semibold text-purple-300 uppercase tracking-wider mb-2">
+              <h3 className="px-4 text-xs font-semibold text-white/60 uppercase tracking-wider mb-2">
                 {section.title}
               </h3>
             )}
@@ -127,8 +127,8 @@ export default function SuperAdminSidebar() {
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                       active
-                        ? "bg-white text-purple-900 shadow-lg"
-                        : "text-purple-100 hover:bg-purple-700",
+                        ? "bg-[#E4B756] text-[#31543A] shadow-lg"
+                        : "text-white/90 hover:bg-white/10",
                       collapsed && "justify-center"
                     )}
                     title={collapsed ? item.name : undefined}
@@ -144,22 +144,22 @@ export default function SuperAdminSidebar() {
       </div>
 
       {/* User Profile & Logout */}
-      <div className="p-4 border-t border-purple-700">
+      <div className="p-4 border-t border-white/10">
         {!collapsed ? (
           <div className="space-y-2">
             <div className="text-sm">
               <p className="font-medium text-white truncate">{superAdminUser.full_name || 'Super Admin'}</p>
-              <p className="text-xs text-purple-200 truncate">{superAdminUser.email || ''}</p>
+              <p className="text-xs text-white/70 truncate">{superAdminUser.email || ''}</p>
               <div className="flex items-center gap-1 mt-1">
-                <Shield className="h-3 w-3 text-yellow-300" />
-                <p className="text-xs text-yellow-300 font-medium">SUPER ADMIN</p>
+                <Shield className="h-3 w-3 text-[#E4B756]" />
+                <p className="text-xs text-[#E4B756] font-medium">SUPER ADMIN</p>
               </div>
             </div>
             <Button
               variant="outline"
               size="sm"
               onClick={handleLogout}
-              className="w-full flex items-center gap-2 bg-purple-700 hover:bg-purple-600 text-white border-purple-600"
+              className="w-full flex items-center gap-2 bg-[#3F8A84] hover:bg-[#6CA8C2] text-white border-[#3F8A84]"
             >
               <LogOut className="h-4 w-4" />
               Logout
@@ -170,7 +170,7 @@ export default function SuperAdminSidebar() {
             variant="ghost"
             size="icon"
             onClick={handleLogout}
-            className="w-full text-white hover:bg-purple-700"
+            className="w-full text-white hover:bg-white/10"
             title="Logout"
           >
             <LogOut className="h-4 w-4" />
