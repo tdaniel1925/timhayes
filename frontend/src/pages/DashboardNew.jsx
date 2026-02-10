@@ -656,6 +656,7 @@ const CallTableRow = ({ call, onCallClick, formatDate, formatDuration, getStatus
               <audio
                 controls
                 preload="none"
+                tabIndex={0}
                 className="h-8 max-w-[200px]"
                 aria-label={`Recording for call from ${call.src || 'Unknown'} to ${call.dst || 'Unknown'}`}
                 onLoadStart={(e) => {
@@ -782,6 +783,7 @@ const CallCard = ({ call, onCallClick, formatDate, formatDuration, getStatusColo
             <audio
               controls
               preload="none"
+              tabIndex={0}
               className="h-8 flex-1"
               aria-label={`Recording for call from ${call.src || 'Unknown'} to ${call.dst || 'Unknown'}`}
               onLoadStart={(e) => {

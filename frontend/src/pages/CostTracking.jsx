@@ -124,8 +124,8 @@ export default function CostTracking() {
                             {/* Progress bar */}
                             <div className="w-full bg-[#F9FAFA] rounded-full h-2">
                               <div
-                                className="h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${percentage}%`, backgroundColor: '#E4B756' }}
+                                className="h-2 rounded-full transition-all duration-300 bg-[#E4B756]"
+                                style={{ width: `${percentage}%` }}
                               ></div>
                             </div>
                           </div>
@@ -143,7 +143,7 @@ export default function CostTracking() {
             </div>
 
             {/* Cost Breakdown Info */}
-            <div className="glass-card rounded-2xl p-6" style={{ backgroundColor: 'rgba(111, 168, 194, 0.1)' }}>
+            <div className="glass-card rounded-2xl p-6 bg-[#6CA8C2]/10">
               <h3 className="font-serif font-semibold text-[#2A2A2A] mb-2">About Cost Tracking</h3>
               <p className="text-sm text-[#2A2A2A]/80 font-light">
                 Costs are calculated based on OpenAI API usage for transcription (Whisper) and AI analysis (GPT-4).

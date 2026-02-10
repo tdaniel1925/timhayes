@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { Building2, Users, Phone, TrendingUp } from 'lucide-react';
 import SuperAdminLayout from '@/components/SuperAdminLayout';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -92,9 +93,7 @@ export default function SuperAdminDashboard() {
               <div className="glass-card bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium text-[#2A2A2A]/60">Total Tenants</h3>
-                  <svg className="w-8 h-8 text-[#31543A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
+                  <Building2 className="w-8 h-8 text-[#31543A]" />
                 </div>
                 <p className="text-3xl font-serif text-[#2A2A2A]">{stats.total_tenants}</p>
                 <p className="text-sm font-light text-[#3F8A84] mt-1">{stats.active_tenants} active</p>
@@ -104,9 +103,7 @@ export default function SuperAdminDashboard() {
               <div className="glass-card bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium text-[#2A2A2A]/60">Total Users</h3>
-                  <svg className="w-8 h-8 text-[#6CA8C2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
+                  <Users className="w-8 h-8 text-[#6CA8C2]" />
                 </div>
                 <p className="text-3xl font-serif text-[#2A2A2A]">{stats.total_users}</p>
                 <p className="text-sm font-light text-[#2A2A2A]/60 mt-1">Platform-wide</p>
@@ -116,9 +113,7 @@ export default function SuperAdminDashboard() {
               <div className="glass-card bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium text-[#2A2A2A]/60">Total Calls</h3>
-                  <svg className="w-8 h-8 text-[#3F8A84]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
+                  <Phone className="w-8 h-8 text-[#3F8A84]" />
                 </div>
                 <p className="text-3xl font-serif text-[#2A2A2A]">{stats.total_calls.toLocaleString()}</p>
                 <p className="text-sm font-light text-[#6CA8C2] mt-1">{stats.calls_this_month.toLocaleString()} this month</p>
@@ -128,9 +123,7 @@ export default function SuperAdminDashboard() {
               <div className="glass-card bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-medium text-[#2A2A2A]/60">Calls Today</h3>
-                  <svg className="w-8 h-8 text-[#E4B756]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                  </svg>
+                  <TrendingUp className="w-8 h-8 text-[#E4B756]" />
                 </div>
                 <p className="text-3xl font-serif text-[#2A2A2A]">{stats.calls_today.toLocaleString()}</p>
                 <p className="text-sm font-light text-[#2A2A2A]/60 mt-1">Live activity</p>

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import SuperAdminLayout from '@/components/SuperAdminLayout';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -276,180 +278,190 @@ export default function PlansManagement() {
       </div>
 
       {/* Create/Edit Modal */}
-      {showCreateModal && editingPlan && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <h3 className="text-xl font-serif text-[#31543A]">
-                {editingPlan.id ? 'Edit Plan' : 'Create New Plan'}
-              </h3>
-            </div>
+      <Dialog open={showCreateModal} onOpenChange={(open) => {
+        setShowCreateModal(open);
+        if (!open) setEditingPlan(null);
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-serif text-[#31543A]">
+              {editingPlan?.id ? 'Edit Plan' : 'Create New Plan'}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-[#2A2A2A]/60 font-light">
+              {editingPlan?.id
+                ? 'Update subscription plan details and pricing'
+                : 'Create a new subscription plan for tenants'}
+            </DialogDescription>
+          </DialogHeader>
 
-            <div className="px-6 py-4 space-y-4">
-              {/* Basic Info */}
-              <div>
-                <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Plan Name *</label>
-                <input
-                  type="text"
-                  value={editingPlan.name}
-                  onChange={(e) => setEditingPlan({ ...editingPlan, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
-                  placeholder="e.g., Professional"
-                />
+          {editingPlan && (
+            <>
+              <div className="space-y-4 py-4">
+                {/* Basic Info */}
+                <div>
+                  <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Plan Name *</label>
+                  <input
+                    type="text"
+                    value={editingPlan.name}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
+                    placeholder="e.g., Professional"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Description</label>
+                  <textarea
+                    value={editingPlan.description || ''}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent font-light"
+                    rows="2"
+                    placeholder="Plan description..."
+                  />
+                </div>
+
+                {/* Pricing */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Monthly Price ($)</label>
+                    <input
+                      type="number"
+                      value={editingPlan.monthly_price}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, monthly_price: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Annual Price ($)</label>
+                    <input
+                      type="number"
+                      value={editingPlan.annual_price || ''}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, annual_price: parseFloat(e.target.value) || null })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Setup Fee ($)</label>
+                    <input
+                      type="number"
+                      value={editingPlan.setup_fee}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, setup_fee: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Limits */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Calls per Month</label>
+                    <input
+                      type="number"
+                      value={editingPlan.max_calls_per_month}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, max_calls_per_month: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Max Users</label>
+                    <input
+                      type="number"
+                      value={editingPlan.max_users}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, max_users: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Storage (GB)</label>
+                    <input
+                      type="number"
+                      value={editingPlan.max_storage_gb}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, max_storage_gb: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Recording Minutes</label>
+                    <input
+                      type="number"
+                      value={editingPlan.max_recording_minutes}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, max_recording_minutes: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Features */}
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={editingPlan.has_api_access}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, has_api_access: e.target.checked })}
+                      className="rounded border-gray-300 text-[#31543A] focus:ring-[#31543A]"
+                    />
+                    <span className="ml-2 text-sm font-light text-[#2A2A2A]">API Access</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={editingPlan.has_white_label}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, has_white_label: e.target.checked })}
+                      className="rounded border-gray-300 text-[#31543A] focus:ring-[#31543A]"
+                    />
+                    <span className="ml-2 text-sm font-light text-[#2A2A2A]">White Label</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={editingPlan.has_priority_support}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, has_priority_support: e.target.checked })}
+                      className="rounded border-gray-300 text-[#31543A] focus:ring-[#31543A]"
+                    />
+                    <span className="ml-2 text-sm font-light text-[#2A2A2A]">Priority Support</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={editingPlan.is_active}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, is_active: e.target.checked })}
+                      className="rounded border-gray-300 text-[#31543A] focus:ring-[#31543A]"
+                    />
+                    <span className="ml-2 text-sm font-light text-[#2A2A2A]">Active</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={editingPlan.is_public}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, is_public: e.target.checked })}
+                      className="rounded border-gray-300 text-[#31543A] focus:ring-[#31543A]"
+                    />
+                    <span className="ml-2 text-sm font-light text-[#2A2A2A]">Shown on Pricing Page</span>
+                  </label>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Description</label>
-                <textarea
-                  value={editingPlan.description || ''}
-                  onChange={(e) => setEditingPlan({ ...editingPlan, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent font-light"
-                  rows="2"
-                  placeholder="Plan description..."
-                />
-              </div>
-
-              {/* Pricing */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Monthly Price ($)</label>
-                  <input
-                    type="number"
-                    value={editingPlan.monthly_price}
-                    onChange={(e) => setEditingPlan({ ...editingPlan, monthly_price: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Annual Price ($)</label>
-                  <input
-                    type="number"
-                    value={editingPlan.annual_price || ''}
-                    onChange={(e) => setEditingPlan({ ...editingPlan, annual_price: parseFloat(e.target.value) || null })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Setup Fee ($)</label>
-                  <input
-                    type="number"
-                    value={editingPlan.setup_fee}
-                    onChange={(e) => setEditingPlan({ ...editingPlan, setup_fee: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Limits */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Calls per Month</label>
-                  <input
-                    type="number"
-                    value={editingPlan.max_calls_per_month}
-                    onChange={(e) => setEditingPlan({ ...editingPlan, max_calls_per_month: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Max Users</label>
-                  <input
-                    type="number"
-                    value={editingPlan.max_users}
-                    onChange={(e) => setEditingPlan({ ...editingPlan, max_users: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Storage (GB)</label>
-                  <input
-                    type="number"
-                    value={editingPlan.max_storage_gb}
-                    onChange={(e) => setEditingPlan({ ...editingPlan, max_storage_gb: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Recording Minutes</label>
-                  <input
-                    type="number"
-                    value={editingPlan.max_recording_minutes}
-                    onChange={(e) => setEditingPlan({ ...editingPlan, max_recording_minutes: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#31543A] focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Features */}
-              <div className="space-y-2">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={editingPlan.has_api_access}
-                    onChange={(e) => setEditingPlan({ ...editingPlan, has_api_access: e.target.checked })}
-                    className="rounded border-gray-300 text-[#31543A] focus:ring-[#31543A]"
-                  />
-                  <span className="ml-2 text-sm font-light text-[#2A2A2A]">API Access</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={editingPlan.has_white_label}
-                    onChange={(e) => setEditingPlan({ ...editingPlan, has_white_label: e.target.checked })}
-                    className="rounded border-gray-300 text-[#31543A] focus:ring-[#31543A]"
-                  />
-                  <span className="ml-2 text-sm font-light text-[#2A2A2A]">White Label</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={editingPlan.has_priority_support}
-                    onChange={(e) => setEditingPlan({ ...editingPlan, has_priority_support: e.target.checked })}
-                    className="rounded border-gray-300 text-[#31543A] focus:ring-[#31543A]"
-                  />
-                  <span className="ml-2 text-sm font-light text-[#2A2A2A]">Priority Support</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={editingPlan.is_active}
-                    onChange={(e) => setEditingPlan({ ...editingPlan, is_active: e.target.checked })}
-                    className="rounded border-gray-300 text-[#31543A] focus:ring-[#31543A]"
-                  />
-                  <span className="ml-2 text-sm font-light text-[#2A2A2A]">Active</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={editingPlan.is_public}
-                    onChange={(e) => setEditingPlan({ ...editingPlan, is_public: e.target.checked })}
-                    className="rounded border-gray-300 text-[#31543A] focus:ring-[#31543A]"
-                  />
-                  <span className="ml-2 text-sm font-light text-[#2A2A2A]">Shown on Pricing Page</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 bg-[#F9FAFA] border-t border-gray-100 flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setShowCreateModal(false);
-                  setEditingPlan(null);
-                }}
-                className="px-4 py-2 text-sm font-medium text-[#2A2A2A] bg-white border border-gray-300 rounded-full hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSavePlan}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#31543A] rounded-full hover:bg-[#3F8A84]"
-              >
-                {editingPlan.id ? 'Update Plan' : 'Create Plan'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setEditingPlan(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSavePlan}
+                  className="bg-[#31543A] hover:bg-[#3F8A84]"
+                >
+                  {editingPlan.id ? 'Update Plan' : 'Create Plan'}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </SuperAdminLayout>
   );
 }
