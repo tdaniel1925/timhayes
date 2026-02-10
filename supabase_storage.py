@@ -114,8 +114,21 @@ class SupabaseStorageManager:
         try:
             logger.info(f"Downloading {remote_file_name} from Supabase Storage")
 
-            # Download file data
-            file_data = self.client.storage.from_(self.bucket_name).download(remote_file_name)
+            # Try the official library first
+            try:
+                file_data = self.client.storage.from_(self.bucket_name).download(remote_file_name)
+            except Exception as lib_error:
+                logger.warning(f"Library download failed: {lib_error}, trying direct HTTP...")
+
+                # Fallback to direct HTTP request (works around library issues)
+                import httpx
+                url = f"{self.supabase_url}/storage/v1/object/{self.bucket_name}/{remote_file_name}"
+                headers = {"Authorization": f"Bearer {self.supabase_key}"}
+
+                response = httpx.get(url, headers=headers, timeout=60)
+                response.raise_for_status()
+                file_data = response.content
+                logger.info("✅ Downloaded via direct HTTP")
 
             # Ensure directory exists
             Path(local_file_path).parent.mkdir(parents=True, exist_ok=True)

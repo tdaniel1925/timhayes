@@ -35,11 +35,20 @@ class CDRPoller:
         Returns session cookie on success, None on failure
         """
         try:
-            # Step 1: Request challenge (using GET request)
+            # Step 1: Request challenge (using POST with JSON)
             logger.info("Requesting authentication challenge from CloudUCM...")
-            challenge_response = requests.get(
+
+            challenge_request = {
+                "request": {
+                    "action": "challenge",
+                    "user": UCM_USERNAME,
+                    "version": "1.0"
+                }
+            }
+
+            challenge_response = requests.post(
                 f"{UCM_API_BASE}/api",
-                params={"action": "challenge", "user": UCM_USERNAME},
+                json=challenge_request,
                 timeout=30,
                 verify=False  # CloudUCM may use self-signed cert
             )
@@ -49,25 +58,29 @@ class CDRPoller:
                 return None
 
             challenge_data = challenge_response.json()
-            if challenge_data.get('status') != 0:
+            if 'response' not in challenge_data or 'challenge' not in challenge_data['response']:
                 logger.error(f"Challenge failed: {challenge_data}")
                 return None
 
-            challenge = challenge_data.get('response', {}).get('challenge')
-            if not challenge:
-                logger.error("No challenge received from CloudUCM")
-                return None
-
+            challenge = challenge_data['response']['challenge']
             logger.info(f"Received challenge: {challenge[:20]}...")
 
             # Step 2: Create MD5 hash of challenge + password
             token = hashlib.md5(f"{challenge}{UCM_PASSWORD}".encode()).hexdigest()
             logger.info(f"Created authentication token: {token[:20]}...")
 
-            # Step 3: Login with username and token (using GET request)
-            login_response = requests.get(
+            # Step 3: Login with username and token (using POST with JSON)
+            login_request = {
+                "request": {
+                    "action": "login",
+                    "token": token,
+                    "user": UCM_USERNAME
+                }
+            }
+
+            login_response = requests.post(
                 f"{UCM_API_BASE}/api",
-                params={"action": "login", "user": UCM_USERNAME, "token": token},
+                json=login_request,
                 timeout=30,
                 verify=False
             )
@@ -77,20 +90,17 @@ class CDRPoller:
                 return None
 
             login_data = login_response.json()
-            if login_data.get('status') != 0:
+
+            # Extract session cookie from JSON response body (not HTTP cookie)
+            if login_data.get('status') == 0 and 'cookie' in login_data.get('response', {}):
+                session_cookie = login_data['response']['cookie']
+                logger.info(f"✅ Authentication successful! Cookie: {session_cookie[:20]}...")
+                self.session_cookie = session_cookie
+                self.session_expiry = datetime.utcnow() + timedelta(minutes=30)  # Sessions typically last 30 min
+                return session_cookie
+            else:
                 logger.error(f"Login failed: {login_data}")
                 return None
-
-            # Extract session cookie
-            session_cookie = login_response.cookies.get('session')
-            if not session_cookie:
-                logger.error("No session cookie received from CloudUCM")
-                return None
-
-            logger.info(f"✅ Authentication successful! Session: {session_cookie[:20]}...")
-            self.session_cookie = session_cookie
-            self.session_expiry = datetime.utcnow() + timedelta(minutes=30)  # Sessions typically last 30 min
-            return session_cookie
 
         except Exception as e:
             logger.error(f"Authentication error: {e}", exc_info=True)
@@ -132,16 +142,20 @@ class CDRPoller:
 
             logger.info(f"Fetching CDRs from {start_time} to {end_time}")
 
-            # Make API request to CloudUCM with session cookie (using GET request)
-            response = requests.get(
-                f"{UCM_API_BASE}/api",
-                params={
+            # Make API request to CloudUCM with session cookie (using POST with JSON)
+            cdr_request = {
+                "request": {
                     "action": "cdrapi",
+                    "cookie": self.session_cookie,
                     "format": "json",
                     "startdate": start_time,
                     "enddate": end_time
-                },
-                cookies={"session": self.session_cookie},
+                }
+            }
+
+            response = requests.post(
+                f"{UCM_API_BASE}/api",
+                json=cdr_request,
                 timeout=30,
                 verify=False
             )
@@ -152,12 +166,29 @@ class CDRPoller:
 
             data = response.json()
 
-            if data.get('status') != 0:
-                logger.error(f"CDR API returned error: {data}")
-                return []
+            # UCM returns CDRs in 'cdr_root' array
+            if 'cdr_root' in data:
+                # Flatten the CDR records - some are simple, some have sub_cdr_*
+                records = []
+                for cdr_entry in data['cdr_root']:
+                    # If it's a simple CDR (has 'AcctId'), add it directly
+                    if 'AcctId' in cdr_entry:
+                        records.append(cdr_entry)
+                    # If it has sub_cdr structure, extract the main call
+                    elif 'main_cdr' in cdr_entry and 'sub_cdr_3' in cdr_entry:
+                        # sub_cdr_3 usually has the recording and is the actual answered call
+                        records.append(cdr_entry['sub_cdr_3'])
 
-            records = data.get('response', {}).get('cdr', [])
-            logger.info(f"Fetched {len(records)} CDR records")
+                logger.info(f"Fetched {len(records)} CDR records")
+                return records
+            elif 'response' in data and 'cdr' in data['response']:
+                # Alternative format
+                records = data['response']['cdr']
+                logger.info(f"Fetched {len(records)} CDR records")
+                return records
+            else:
+                logger.error(f"Unexpected CDR API response format: {list(data.keys())}")
+                return []
             return records
 
         except Exception as e:
