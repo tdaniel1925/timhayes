@@ -50,3 +50,4 @@ recordings/
 # Database
 callinsight.db
 call_analytics.db
+env_vars.json
