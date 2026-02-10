@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { ArrowLeft, Save, Server, AlertCircle, CheckCircle, Building2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import SuperAdminLayout from '@/components/SuperAdminLayout';
 
 export default function TenantDetailPage() {
   const { user, logout } = useAuth();
@@ -95,43 +96,34 @@ export default function TenantDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading tenant...</p>
+      <SuperAdminLayout title="Loading...">
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading tenant...</p>
+          </div>
         </div>
-      </div>
+      </SuperAdminLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/tenants')}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Tenants
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">{tenant.company_name}</h1>
-              <p className="text-sm text-muted-foreground">Manage tenant configuration</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{user?.email}</span>
-            <Button variant="outline" onClick={logout}>Logout</Button>
-          </div>
+    <SuperAdminLayout
+      title={tenant.company_name}
+      subtitle="Manage tenant configuration"
+    >
+      <div className="max-w-5xl mx-auto">
+        <div className="mb-6">
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/superadmin/tenants')}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Tenants
+          </Button>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-6">
           {/* Save Success Alert */}
           {saveSuccess && (
@@ -317,7 +309,7 @@ export default function TenantDetailPage() {
             </Button>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </SuperAdminLayout>
   );
 }

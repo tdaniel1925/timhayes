@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, Building2, Mail, User, Key, Globe, CreditCard, Users, Phone } from 'lucide-react';
+import SuperAdminLayout from '@/components/SuperAdminLayout';
 
 export default function CreateTenantPage() {
   const navigate = useNavigate();
@@ -142,29 +143,29 @@ export default function CreateTenantPage() {
 
   if (user?.role !== 'superadmin') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <SuperAdminLayout title="Access Denied">
         <Alert variant="destructive">
           <AlertDescription>You must be a super admin to access this page.</AlertDescription>
         </Alert>
-      </div>
+      </SuperAdminLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 md:p-8">
+    <SuperAdminLayout
+      title="Create New Tenant"
+      subtitle="Set up a new client account with administrator access"
+    >
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="mb-6">
           <Button
             variant="ghost"
-            onClick={() => navigate('/tenants')}
+            onClick={() => navigate('/superadmin/tenants')}
             className="mb-4"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Tenants
           </Button>
-          <h1 className="text-3xl font-bold text-gray-900">Create New Tenant</h1>
-          <p className="text-gray-600 mt-2">Set up a new client account with administrator access</p>
         </div>
 
         {/* Success Message */}
@@ -391,6 +392,6 @@ export default function CreateTenantPage() {
           </div>
         </form>
       </div>
-    </div>
+    </SuperAdminLayout>
   );
 }

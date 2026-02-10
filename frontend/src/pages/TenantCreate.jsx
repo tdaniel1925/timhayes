@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import SuperAdminLayout from '@/components/SuperAdminLayout';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -116,82 +119,24 @@ export default function TenantCreate() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('superadmin_token');
-    localStorage.removeItem('superadmin_refresh_token');
-    localStorage.removeItem('superadmin_user');
-    navigate('/superadmin/login');
-  };
-
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-red-700 rounded-lg flex items-center justify-center mr-3">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">AudiaPro Super Admin</h1>
-                <p className="text-sm text-gray-600">Platform Management Console</p>
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Navigation */}
-      <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8">
-            <Link
-              to="/superadmin/dashboard"
-              className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300"
-            >
-              Dashboard
-            </Link>
-            <Link
-              to="/superadmin/tenants"
-              className="px-3 py-4 text-sm font-medium text-blue-600 border-b-2 border-blue-600"
-            >
-              Tenants
-            </Link>
-            <Link
-              to="/superadmin/revenue"
-              className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300"
-            >
-              Revenue
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <SuperAdminLayout
+      title="Create New Tenant"
+      subtitle="Set up a new client account"
+    >
+      <div className="max-w-4xl mx-auto">
         <div className="mb-6">
-          <Link
-            to="/superadmin/tenants"
-            className="text-blue-600 hover:text-blue-700 font-medium flex items-center"
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/superadmin/tenants')}
+            className="flex items-center gap-2"
           >
-            <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+            <ArrowLeft className="h-4 w-4" />
             Back to Tenants
-          </Link>
+          </Button>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Create New Tenant</h2>
 
           {error && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
@@ -384,7 +329,7 @@ export default function TenantCreate() {
             </div>
           </form>
         </div>
-      </main>
-    </div>
+      </div>
+    </SuperAdminLayout>
   );
 }
