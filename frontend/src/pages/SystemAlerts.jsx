@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import DashboardLayout from '../components/DashboardLayout';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -61,13 +62,13 @@ export default function SystemAlerts() {
   const getSeverityColor = (severity) => {
     switch (severity) {
       case 'critical':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-50 text-red-800 border-red-200';
       case 'warning':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'border-[#E4B756]/30';
       case 'info':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'border-[#6CA8C2]/30';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'border-gray-200';
     }
   };
 
@@ -81,13 +82,13 @@ export default function SystemAlerts() {
         );
       case 'warning':
         return (
-          <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6 text-[#E4B756]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         );
       case 'info':
         return (
-          <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6 text-[#6CA8C2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         );
@@ -96,19 +97,16 @@ export default function SystemAlerts() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('superadmin_token');
-    navigate('/superadmin/login');
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading alerts...</p>
+      <DashboardLayout title="System Alerts" subtitle="Monitor and resolve system issues">
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3F8A84] mx-auto"></div>
+            <p className="mt-4 text-[#2A2A2A]/70 font-light">Loading alerts...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
@@ -116,63 +114,21 @@ export default function SystemAlerts() {
   const resolvedAlerts = alerts.filter(a => a.is_resolved);
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-red-700 rounded-lg flex items-center justify-center mr-3">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">System Alerts</h1>
-                <p className="text-sm text-gray-600">Monitor and resolve system issues</p>
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Navigation */}
-      <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8 overflow-x-auto">
-            <Link to="/superadmin/dashboard" className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap">Dashboard</Link>
-            <Link to="/superadmin/tenants" className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap">Tenants</Link>
-            <Link to="/superadmin/plans" className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap">Plans & Pricing</Link>
-            <Link to="/superadmin/revenue" className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap">Revenue</Link>
-            <Link to="/superadmin/costs" className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap">Cost Tracking</Link>
-            <Link to="/superadmin/monitoring" className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap">Monitoring</Link>
-            <Link to="/superadmin/feature-flags" className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap">Feature Flags</Link>
-            <Link to="/superadmin/alerts" className="px-3 py-4 text-sm font-medium text-blue-600 border-b-2 border-blue-600 whitespace-nowrap">Alerts</Link>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <DashboardLayout title="System Alerts" subtitle="Monitor and resolve system issues">
+      <div className="space-y-6">
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
             <p className="text-sm text-red-800">{error}</p>
           </div>
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="glass-card rounded-2xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active Alerts</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">{activeAlerts.length}</p>
+                <p className="text-sm font-medium text-[#2A2A2A]/60">Active Alerts</p>
+                <p className="text-3xl font-bold text-[#2A2A2A] mt-1">{activeAlerts.length}</p>
               </div>
               <svg className="w-12 h-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -180,32 +136,32 @@ export default function SystemAlerts() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="glass-card rounded-2xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Critical</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
+                <p className="text-sm font-medium text-[#2A2A2A]/60">Critical</p>
+                <p className="text-3xl font-bold text-[#2A2A2A] mt-1">
                   {activeAlerts.filter(a => a.severity === 'critical').length}
                 </p>
               </div>
-              <svg className="w-12 h-12 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-12 h-12 text-[#E4B756]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="glass-card rounded-2xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Resolved Today</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
+                <p className="text-sm font-medium text-[#2A2A2A]/60">Resolved Today</p>
+                <p className="text-3xl font-bold text-[#2A2A2A] mt-1">
                   {resolvedAlerts.filter(a => {
                     const today = new Date().toDateString();
                     return new Date(a.resolved_at).toDateString() === today;
                   }).length}
                 </p>
               </div>
-              <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-12 h-12 text-[#3F8A84]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
@@ -213,13 +169,13 @@ export default function SystemAlerts() {
         </div>
 
         {/* Filter Toggle */}
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-serif font-bold text-[#2A2A2A]">
             {showResolved ? 'Resolved Alerts' : 'Active Alerts'}
           </h2>
           <button
             onClick={() => setShowResolved(!showResolved)}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-sm font-medium text-[#2A2A2A] bg-white border border-gray-300 rounded-full hover:bg-gray-50"
           >
             {showResolved ? 'Show Active' : 'Show Resolved'}
           </button>
@@ -230,7 +186,7 @@ export default function SystemAlerts() {
           {alerts.map((alert) => (
             <div
               key={alert.id}
-              className={`bg-white rounded-xl shadow-sm border p-6 ${getSeverityColor(alert.severity)}`}
+              className={`glass-card rounded-2xl border p-6 ${getSeverityColor(alert.severity)}`}
             >
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
@@ -240,21 +196,21 @@ export default function SystemAlerts() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-gray-900">{alert.title}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{alert.message}</p>
+                      <h3 className="text-lg font-serif font-bold text-[#2A2A2A]">{alert.title}</h3>
+                      <p className="text-sm text-[#2A2A2A]/70 font-light mt-1">{alert.message}</p>
                     </div>
 
                     {!alert.is_resolved && (
                       <button
                         onClick={() => handleResolveAlert(alert.id)}
-                        className="ml-4 px-3 py-1 text-sm font-medium text-green-700 bg-green-50 border border-green-600 rounded-lg hover:bg-green-100"
+                        className="ml-4 px-3 py-1 text-sm font-medium text-green-700 bg-green-50 border border-green-600 rounded-full hover:bg-green-100"
                       >
                         Resolve
                       </button>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-6 text-sm text-gray-600 mt-3">
+                  <div className="flex items-center gap-6 text-sm text-[#2A2A2A]/60 font-light mt-3">
                     <div className="flex items-center">
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -280,8 +236,8 @@ export default function SystemAlerts() {
                   </div>
 
                   {alert.is_resolved && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <p className="text-sm text-gray-600">
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-sm text-[#2A2A2A]/60 font-light">
                         Resolved {new Date(alert.resolved_at).toLocaleString()}
                         {alert.resolved_by && ` by ${alert.resolved_by}`}
                       </p>
@@ -294,21 +250,21 @@ export default function SystemAlerts() {
         </div>
 
         {alerts.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
-            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="text-center py-12 glass-card rounded-2xl">
+            <svg className="w-16 h-16 text-[#2A2A2A]/40 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <h3 className="text-lg font-serif font-medium text-[#2A2A2A] mb-2">
               {showResolved ? 'No Resolved Alerts' : 'No Active Alerts'}
             </h3>
-            <p className="text-gray-600">
+            <p className="text-[#2A2A2A]/60 font-light">
               {showResolved
                 ? 'No alerts have been resolved yet'
                 : 'All systems operational - no active alerts'}
             </p>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

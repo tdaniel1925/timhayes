@@ -69,17 +69,17 @@ export default function CallDetailEnhanced() {
   }
 
   const getScoreColor = (score) => {
-    if (score >= 80) return 'text-green-600 bg-green-100'
-    if (score >= 60) return 'text-yellow-600 bg-yellow-100'
-    return 'text-red-600 bg-red-100'
+    if (score >= 80) return 'text-[#3F8A84] bg-[#3F8A84]/10'
+    if (score >= 60) return 'text-[#E4B756] bg-[#E4B756]/10'
+    return 'text-[#C89A8F] bg-[#C89A8F]/10'
   }
 
   const getRiskLevelColor = (level) => {
     if (!level) return 'text-gray-600 bg-gray-100'
     const levelLower = level.toLowerCase()
-    if (levelLower === 'low') return 'text-green-600 bg-green-100'
-    if (levelLower === 'medium') return 'text-yellow-600 bg-yellow-100'
-    return 'text-red-600 bg-red-100'
+    if (levelLower === 'low') return 'text-[#3F8A84] bg-[#3F8A84]/10'
+    if (levelLower === 'medium') return 'text-[#E4B756] bg-[#E4B756]/10'
+    return 'text-[#C89A8F] bg-[#C89A8F]/10'
   }
 
   if (loading) {
@@ -87,8 +87,8 @@ export default function CallDetailEnhanced() {
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading call details...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#6CA8C2] mx-auto"></div>
+            <p className="mt-4 text-[#2A2A2A]/70 font-light">Loading call details...</p>
           </div>
         </div>
       </DashboardLayout>
@@ -132,8 +132,8 @@ export default function CallDetailEnhanced() {
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Dashboard
             </Button>
-            <h1 className="text-3xl font-bold text-gray-900">Call Details</h1>
-            <p className="text-gray-600 mt-1">Comprehensive AI-powered analysis</p>
+            <h1 className="text-3xl font-bold font-serif text-[#31543A]">Call Details</h1>
+            <p className="text-[#2A2A2A]/70 font-light mt-1">Comprehensive AI-powered analysis</p>
           </div>
         </div>
 
@@ -141,10 +141,10 @@ export default function CallDetailEnhanced() {
           {/* Left Sidebar - Call Info & Quick Stats */}
           <div className="lg:col-span-1 space-y-6">
             {/* Call Information Card */}
-            <Card>
+            <Card className="glass-card rounded-2xl border-gray-100">
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center">
-                  <Phone className="mr-2 h-5 w-5 text-blue-600" />
+                <CardTitle className="text-lg flex items-center font-serif text-[#31543A]">
+                  <Phone className="mr-2 h-5 w-5 text-[#6CA8C2]" />
                   Call Information
                 </CardTitle>
               </CardHeader>
@@ -176,8 +176,8 @@ export default function CallDetailEnhanced() {
                   <p className="text-xs text-gray-600 mb-1">Status</p>
                   <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
                     call.disposition === 'ANSWERED'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
+                      ? 'bg-[#3F8A84]/10 text-[#3F8A84]'
+                      : 'bg-[#C89A8F]/10 text-[#C89A8F]'
                   }`}>
                     {call.disposition === 'ANSWERED' ? (
                       <CheckCircle className="mr-1 h-3 w-3" />
@@ -192,9 +192,9 @@ export default function CallDetailEnhanced() {
 
             {/* Audio Player */}
             {call.has_recording && (
-              <Card>
+              <Card className="glass-card rounded-2xl border-gray-100">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Recording</CardTitle>
+                  <CardTitle className="text-lg font-serif text-[#31543A]">Recording</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <audio controls className="w-full mb-3" preload="metadata">
@@ -214,16 +214,16 @@ export default function CallDetailEnhanced() {
             )}
 
             {/* Quick AI Insights */}
-            <Card>
+            <Card className="glass-card rounded-2xl border-gray-100">
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Quick Insights</CardTitle>
+                <CardTitle className="text-lg font-serif text-[#31543A]">Quick Insights</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {call.quality_score && (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
-                      <BarChart3 className="h-4 w-4 text-blue-600 mr-2" />
-                      <span className="text-sm text-gray-700">Quality Score</span>
+                      <BarChart3 className="h-4 w-4 text-[#6CA8C2] mr-2" />
+                      <span className="text-sm text-[#2A2A2A]/70 font-light">Quality Score</span>
                     </div>
                     <span className={`px-2 py-1 text-sm font-bold rounded ${getScoreColor(call.quality_score.overall_score)}`}>
                       {call.quality_score.overall_score}
@@ -270,7 +270,7 @@ export default function CallDetailEnhanced() {
 
           {/* Main Content Area - Tabs */}
           <div className="lg:col-span-3">
-            <Card>
+            <Card className="glass-card rounded-2xl border-gray-100">
               <CardHeader>
                 <Tabs value={activeTab} onChange={setActiveTab}>
                   <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
@@ -395,8 +395,8 @@ export default function CallDetailEnhanced() {
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-3">
                               <div
-                                className="bg-green-500 h-3 rounded-full transition-all duration-500"
-                                style={{ width: `${call.sentiment.positive_score * 100}%` }}
+                                className="h-3 rounded-full transition-all duration-500"
+                                style={{ width: `${call.sentiment.positive_score * 100}%`, backgroundColor: '#3F8A84' }}
                               ></div>
                             </div>
                           </div>
@@ -408,8 +408,8 @@ export default function CallDetailEnhanced() {
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-3">
                               <div
-                                className="bg-yellow-500 h-3 rounded-full transition-all duration-500"
-                                style={{ width: `${call.sentiment.neutral_score * 100}%` }}
+                                className="h-3 rounded-full transition-all duration-500"
+                                style={{ width: `${call.sentiment.neutral_score * 100}%`, backgroundColor: '#E4B756' }}
                               ></div>
                             </div>
                           </div>
@@ -421,8 +421,8 @@ export default function CallDetailEnhanced() {
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-3">
                               <div
-                                className="bg-red-500 h-3 rounded-full transition-all duration-500"
-                                style={{ width: `${call.sentiment.negative_score * 100}%` }}
+                                className="h-3 rounded-full transition-all duration-500"
+                                style={{ width: `${call.sentiment.negative_score * 100}%`, backgroundColor: '#C89A8F' }}
                               ></div>
                             </div>
                           </div>

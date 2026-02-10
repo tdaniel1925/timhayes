@@ -169,8 +169,8 @@ export default function AdvancedReporting() {
                 Back to Dashboard
               </Button>
               <div>
-                <h1 className="text-2xl font-bold">Advanced Reporting</h1>
-                <p className="text-sm text-muted-foreground">Create custom reports and analytics</p>
+                <h1 className="text-2xl font-bold font-serif text-[#31543A]">Advanced Reporting</h1>
+                <p className="text-sm text-[#2A2A2A]/70 font-light">Create custom reports and analytics</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -186,13 +186,13 @@ export default function AdvancedReporting() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Report Builder */}
           <div className="lg:col-span-2 space-y-6">
-            <Card>
+            <Card className="glass-card rounded-2xl border-gray-100">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 font-serif text-[#31543A]">
+                  <BarChart3 className="h-5 w-5 text-[#6CA8C2]" />
                   Report Builder
                 </CardTitle>
-                <CardDescription>Configure your custom report</CardDescription>
+                <CardDescription className="font-light text-[#2A2A2A]/70">Configure your custom report</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Report Name */}
@@ -360,13 +360,13 @@ export default function AdvancedReporting() {
             </Card>
 
             {/* Quick Export Templates */}
-            <Card>
+            <Card className="glass-card rounded-2xl border-gray-100">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 font-serif text-[#31543A]">
+                  <TrendingUp className="h-5 w-5 text-[#3F8A84]" />
                   Quick Export Templates
                 </CardTitle>
-                <CardDescription>Pre-configured report templates</CardDescription>
+                <CardDescription className="font-light text-[#2A2A2A]/70">Pre-configured report templates</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -444,23 +444,23 @@ export default function AdvancedReporting() {
 
           {/* Saved Reports */}
           <div className="lg:col-span-1">
-            <Card>
+            <Card className="glass-card rounded-2xl border-gray-100">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileCog className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 font-serif text-[#31543A]">
+                  <FileCog className="h-5 w-5 text-[#6CA8C2]" />
                   Saved Reports
                 </CardTitle>
-                <CardDescription>Your saved report configurations</CardDescription>
+                <CardDescription className="font-light text-[#2A2A2A]/70">Your saved report configurations</CardDescription>
               </CardHeader>
               <CardContent>
                 {savedReports && savedReports.length > 0 ? (
                   <div className="space-y-3">
                     {savedReports.map((report) => (
-                      <div key={report.id} className="p-3 border rounded-lg hover:bg-gray-50">
+                      <div key={report.id} className="p-3 border rounded-2xl hover:bg-[#F9FAFA]">
                         <div className="flex items-start justify-between mb-2">
-                          <h4 className="font-medium text-sm">{report.name}</h4>
+                          <h4 className="font-medium text-sm font-serif text-[#31543A]">{report.name}</h4>
                           {report.schedule !== 'none' && (
-                            <Clock className="h-4 w-4 text-blue-600" />
+                            <Clock className="h-4 w-4 text-[#6CA8C2]" />
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mb-3">
@@ -494,21 +494,21 @@ export default function AdvancedReporting() {
             </Card>
 
             {/* Export Info */}
-            <Card className="mt-6">
+            <Card className="mt-6 glass-card rounded-2xl border-gray-100">
               <CardHeader>
-                <CardTitle className="text-sm">Export Formats</CardTitle>
+                <CardTitle className="text-sm font-serif text-[#31543A]">Export Formats</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm">
+              <CardContent className="space-y-2 text-sm font-light">
                 <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-red-600" />
+                  <FileText className="h-4 w-4 text-[#C89A8F]" />
                   <span><strong>PDF:</strong> Best for sharing and printing</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                  <FileSpreadsheet className="h-4 w-4 text-[#3F8A84]" />
                   <span><strong>CSV:</strong> Simple data for any tool</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <FileSpreadsheet className="h-4 w-4 text-blue-600" />
+                  <FileSpreadsheet className="h-4 w-4 text-[#6CA8C2]" />
                   <span><strong>Excel:</strong> Advanced analysis features</span>
                 </div>
               </CardContent>

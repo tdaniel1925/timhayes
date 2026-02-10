@@ -34,50 +34,51 @@ export default function BookDemo() {
   return (
     <MarketingLayout>
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-6">
+      <section className="relative overflow-hidden bg-[#F9FAFA] py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+          <div className="section-label text-[#2A2A2A]/60 mb-6">01 — BOOK YOUR DEMO</div>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif text-[#31543A] mb-6 leading-tight">
             Book a Demo
             <br />
-            <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            <span className="italic font-light text-[#3F8A84]">
               Enterprise Call Analytics
             </span>
           </h1>
-          <p className="max-w-3xl mx-auto text-xl text-gray-600 mb-10">
+          <p className="max-w-3xl mx-auto text-xl text-[#2A2A2A]/70 font-light mb-16 leading-relaxed">
             Discover how AudiaPro's AI-powered call analytics can transform your customer insights.
             Schedule a personalized demo with our team to see the platform in action.
           </p>
 
           {/* Value Props */}
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto mb-12">
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 hover:border-[#31543A] hover:shadow-md transition-all">
+              <div className="w-14 h-14 bg-gradient-to-br from-[#31543A] to-[#3F8A84] rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">30-Minute Demo</h3>
-              <p className="text-sm text-gray-600">Quick walkthrough of all features tailored to your needs</p>
+              <h3 className="font-serif text-[#2A2A2A] mb-2 text-lg">30-Minute Demo</h3>
+              <p className="text-sm text-[#2A2A2A]/70 font-light">Quick walkthrough of all features tailored to your needs</p>
             </div>
 
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 hover:border-[#31543A] hover:shadow-md transition-all">
+              <div className="w-14 h-14 bg-gradient-to-br from-[#31543A] to-[#3F8A84] rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Custom Solutions</h3>
-              <p className="text-sm text-gray-600">Tailored to your industry, call volume, and requirements</p>
+              <h3 className="font-serif text-[#2A2A2A] mb-2 text-lg">Custom Solutions</h3>
+              <p className="text-sm text-[#2A2A2A]/70 font-light">Tailored to your industry, call volume, and requirements</p>
             </div>
 
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 hover:border-[#31543A] hover:shadow-md transition-all">
+              <div className="w-14 h-14 bg-gradient-to-br from-[#31543A] to-[#3F8A84] rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Quick Setup</h3>
-              <p className="text-sm text-gray-600">Start analyzing calls within 24 hours of onboarding</p>
+              <h3 className="font-serif text-[#2A2A2A] mb-2 text-lg">Quick Setup</h3>
+              <p className="text-sm text-[#2A2A2A]/70 font-light">Start analyzing calls within 24 hours of onboarding</p>
             </div>
           </div>
         </div>
@@ -86,7 +87,8 @@ export default function BookDemo() {
       {/* Calendar Section */}
       <section className="py-12 bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="section-label text-[#2A2A2A]/60 text-center mb-8">02 — SELECT A TIME</div>
+          <div className="bg-white rounded-3xl shadow-lg border border-gray-200 overflow-hidden">
             {/* Cal.com Embed */}
             <div style={{ width: '100%', height: '700px', overflow: 'scroll' }} id="my-cal-inline-30min"></div>
           </div>
@@ -94,13 +96,14 @@ export default function BookDemo() {
       </section>
 
       {/* What to Expect */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-24 bg-[#F9FAFA]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-4">
+          <div className="text-center mb-16">
+            <div className="section-label text-[#2A2A2A]/60 mb-4">03 — WHAT TO EXPECT</div>
+            <h2 className="text-3xl md:text-4xl font-serif text-[#31543A] mb-4">
               What to Expect in Your Demo
             </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-[#2A2A2A]/70 font-light max-w-2xl mx-auto leading-relaxed">
               We'll show you exactly how AudiaPro can revolutionize your call analytics
             </p>
           </div>
@@ -128,10 +131,10 @@ export default function BookDemo() {
                 icon: '💰'
               }
             ].map((item, index) => (
-              <div key={index} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+              <div key={index} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 hover:border-[#31543A] hover:shadow-md transition-all">
                 <div className="text-4xl mb-4">{item.icon}</div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{item.title}</h3>
-                <p className="text-sm text-gray-600">{item.description}</p>
+                <h3 className="text-lg font-serif text-[#2A2A2A] mb-2">{item.title}</h3>
+                <p className="text-sm text-[#2A2A2A]/70 font-light leading-relaxed">{item.description}</p>
               </div>
             ))}
           </div>
@@ -139,15 +142,16 @@ export default function BookDemo() {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-20 bg-white">
+      <section className="py-24 bg-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-4">
+          <div className="text-center mb-16">
+            <div className="section-label text-[#2A2A2A]/60 mb-4">04 — FAQS</div>
+            <h2 className="text-3xl md:text-4xl font-serif text-[#31543A] mb-4">
               Common Questions
             </h2>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4">
             {[
               {
                 question: 'Is there a free trial?',
@@ -172,15 +176,15 @@ export default function BookDemo() {
             ].map((faq, index) => (
               <details
                 key={index}
-                className="bg-gray-50 rounded-lg border border-gray-200 p-6 group"
+                className="bg-[#F9FAFA] rounded-2xl border border-gray-200 p-6 group hover:border-[#31543A] transition-colors"
               >
-                <summary className="font-semibold text-gray-900 cursor-pointer flex justify-between items-center">
+                <summary className="font-serif text-[#2A2A2A] cursor-pointer flex justify-between items-center">
                   {faq.question}
-                  <svg className="w-5 h-5 text-gray-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-[#2A2A2A]/40 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </summary>
-                <p className="mt-4 text-gray-600">
+                <p className="mt-4 text-[#2A2A2A]/70 font-light leading-relaxed">
                   {faq.answer}
                 </p>
               </details>
@@ -190,26 +194,32 @@ export default function BookDemo() {
       </section>
 
       {/* Trust Section */}
-      <section className="py-16 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8 text-center">
+      <section className="relative overflow-hidden py-20 bg-gradient-to-br from-[#31543A] to-[#3F8A84] text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="section-label text-white/60 text-center mb-12">05 — TRUST</div>
+          <div className="grid md:grid-cols-4 gap-10 text-center">
             <div>
-              <div className="text-4xl font-bold mb-2">98%</div>
-              <div className="text-blue-100">Transcription Accuracy</div>
+              <div className="text-5xl font-serif mb-2">98%</div>
+              <div className="text-white/70 font-light">Transcription Accuracy</div>
             </div>
             <div>
-              <div className="text-4xl font-bold mb-2">&lt;30s</div>
-              <div className="text-blue-100">Processing Time</div>
+              <div className="text-5xl font-serif mb-2">&lt;30s</div>
+              <div className="text-white/70 font-light">Processing Time</div>
             </div>
             <div>
-              <div className="text-4xl font-bold mb-2">24/7</div>
-              <div className="text-blue-100">Support Available</div>
+              <div className="text-5xl font-serif mb-2">24/7</div>
+              <div className="text-white/70 font-light">Support Available</div>
             </div>
             <div>
-              <div className="text-4xl font-bold mb-2">99.9%</div>
-              <div className="text-blue-100">Uptime SLA</div>
+              <div className="text-5xl font-serif mb-2">99.9%</div>
+              <div className="text-white/70 font-light">Uptime SLA</div>
             </div>
           </div>
+        </div>
+
+        {/* Decorative background */}
+        <div className="absolute inset-0 pointer-events-none opacity-20">
+          <div className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-[#6CA8C2] rounded-full filter blur-[120px]"></div>
         </div>
       </section>
     </MarketingLayout>

@@ -153,8 +153,8 @@ export default function UserManagement() {
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading users...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#6CA8C2] mx-auto"></div>
+            <p className="mt-4 text-[#2A2A2A]/70 font-light">Loading users...</p>
           </div>
         </div>
       </DashboardLayout>
@@ -168,8 +168,8 @@ export default function UserManagement() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-            <p className="text-gray-600">Manage team members and access</p>
+            <h1 className="text-3xl font-bold font-serif text-[#31543A]">User Management</h1>
+            <p className="text-[#2A2A2A]/70 font-light">Manage team members and access</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => navigate('/dashboard')}>
@@ -179,12 +179,12 @@ export default function UserManagement() {
         </div>
 
         {/* Main Card */}
-        <Card>
+        <Card className="glass-card rounded-2xl border-gray-100">
           <CardHeader>
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle>Team Members ({users.length})</CardTitle>
-                <CardDescription>Invite and manage users in your organization</CardDescription>
+                <CardTitle className="font-serif text-[#31543A]">Team Members ({users.length})</CardTitle>
+                <CardDescription className="font-light text-[#2A2A2A]/70">Invite and manage users in your organization</CardDescription>
               </div>
               <Button onClick={() => setShowNewUser(!showNewUser)} className="flex items-center gap-2">
                 <UserPlus className="h-4 w-4" />
@@ -329,8 +329,8 @@ export default function UserManagement() {
                               </SelectContent>
                             </Select>
                           ) : (
-                            <span className={`px-2 py-1 text-xs font-semibold rounded capitalize ${
-                              u.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${
+                              u.role === 'admin' ? 'bg-[#C89A8F]/10 text-[#C89A8F]' : 'bg-[#6CA8C2]/10 text-[#6CA8C2]'
                             }`}>
                               {u.role}
                             </span>
@@ -351,8 +351,8 @@ export default function UserManagement() {
                               </SelectContent>
                             </Select>
                           ) : (
-                            <span className={`px-2 py-1 text-xs font-semibold rounded ${
-                              u.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              u.is_active ? 'bg-[#3F8A84]/10 text-[#3F8A84]' : 'bg-gray-100 text-gray-800'
                             }`}>
                               {u.is_active ? 'Active' : 'Inactive'}
                             </span>

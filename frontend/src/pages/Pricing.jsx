@@ -114,71 +114,73 @@ export default function Pricing() {
   return (
     <MarketingLayout>
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 py-20">
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#31543A] via-[#3F8A84] to-[#2A2A2A] py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-white mb-6">
+          <div className="section-label text-white/60 mb-6">01 — PRICING</div>
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif text-white mb-6 leading-tight">
             Transparent Pricing
             <br />
-            <span className="text-blue-200">Pay Only For What You Use</span>
+            <span className="italic font-light text-[#6CA8C2]">Pay Only For What You Use</span>
           </h1>
-          <p className="max-w-3xl mx-auto text-xl text-blue-100 mb-10">
+          <p className="max-w-3xl mx-auto text-xl text-white/80 font-light mb-10 leading-relaxed">
             Start with our powerful base platform, then add AI features as your business grows.
             No hidden fees, no surprises.
           </p>
         </div>
 
         {/* Decorative background */}
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-blue-400 rounded-full filter blur-3xl"></div>
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-400 rounded-full filter blur-3xl"></div>
+        <div className="absolute inset-0 pointer-events-none opacity-20">
+          <div className="absolute top-[-10%] left-[-5%] w-[600px] h-[600px] bg-[#6CA8C2] rounded-full filter blur-[120px]"></div>
+          <div className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-[#E4B756] rounded-full filter blur-[120px]"></div>
         </div>
       </section>
 
       {/* Base Service */}
-      <section className="py-20 bg-white">
+      <section className="py-24 bg-[#F9FAFA]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-4">
+          <div className="text-center mb-16">
+            <div className="section-label text-[#2A2A2A]/60 mb-4">02 — BASE PLATFORM</div>
+            <h2 className="text-3xl md:text-4xl font-serif text-[#31543A] mb-4">
               Base Service Included
             </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-[#2A2A2A]/70 font-light max-w-2xl mx-auto leading-relaxed">
               Everything you need to collect, store, and analyze your call data starts here
             </p>
           </div>
 
-          <div className="max-w-4xl mx-auto bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 border-2 border-blue-200">
-            <div className="flex items-center justify-between mb-6">
+          <div className="max-w-4xl mx-auto glass-card rounded-3xl p-10 border border-gray-200 shadow-lg bg-gradient-to-br from-white to-[#F9FAFA]">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
               <div>
-                <h3 className="text-2xl font-bold text-gray-900">Platform Base</h3>
-                <p className="text-gray-600">Everything you need to get started</p>
+                <h3 className="text-2xl font-serif text-[#31543A] mb-2">Platform Base</h3>
+                <p className="text-[#2A2A2A]/60 font-light">Everything you need to get started</p>
               </div>
-              <div className="text-right">
-                <div className="text-4xl font-bold text-blue-600">Contact Us</div>
-                <p className="text-sm text-gray-600">Custom pricing based on volume</p>
+              <div className="text-left md:text-right mt-4 md:mt-0">
+                <div className="text-4xl font-serif text-[#31543A]">Contact Us</div>
+                <p className="text-sm text-[#2A2A2A]/60 font-light">Custom pricing based on volume</p>
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 gap-4 mb-8">
               {baseServiceFeatures.map((feature, index) => (
                 <div key={index} className="flex items-start">
-                  <svg className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-[#3F8A84] mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="text-gray-700">{feature}</span>
+                  <span className="text-[#2A2A2A] font-light">{feature}</span>
                 </div>
               ))}
             </div>
 
-            <div className="mt-8 pt-6 border-t border-blue-200 flex justify-center gap-4">
+            <div className="pt-6 border-t border-gray-200 flex flex-col sm:flex-row justify-center gap-4">
               <Link
                 to="/book-demo"
-                className="px-8 py-3 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all shadow-lg"
+                className="px-8 py-3 text-lg font-medium text-white bg-gradient-to-r from-[#31543A] to-[#3F8A84] rounded-full hover:from-[#2A2A2A] hover:to-[#31543A] transform hover:scale-105 transition-all shadow-md"
               >
                 Schedule Demo
               </Link>
               <Link
                 to="/contact"
-                className="px-8 py-3 text-lg font-semibold text-blue-600 bg-white border-2 border-blue-600 rounded-lg hover:bg-blue-50 transition-all"
+                className="px-8 py-3 text-lg font-medium text-[#31543A] bg-white border-2 border-[#31543A] rounded-full hover:bg-[#F9FAFA] transition-all"
               >
                 Contact Sales
               </Link>
@@ -188,32 +190,33 @@ export default function Pricing() {
       </section>
 
       {/* Add-Ons Overview */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-4">
+          <div className="text-center mb-16">
+            <div className="section-label text-[#2A2A2A]/60 mb-4">03 — AI ADD-ONS</div>
+            <h2 className="text-3xl md:text-4xl font-serif text-[#31543A] mb-4">
               AI-Powered Add-Ons
             </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-[#2A2A2A]/70 font-light max-w-2xl mx-auto leading-relaxed">
               Enhance your platform with 24 AI features across 9 categories. Mix and match to create your perfect solution.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
             {addonCategories.map((category, index) => (
               <div
                 key={index}
-                className="bg-white rounded-xl border-2 border-gray-200 hover:border-blue-500 transition-all hover:shadow-xl p-6"
+                className="bg-[#F9FAFA] rounded-2xl border border-gray-200 hover:border-[#31543A] transition-all hover:shadow-lg p-6 group"
               >
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white mb-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-[#31543A] to-[#3F8A84] rounded-2xl flex items-center justify-center text-white mb-4 group-hover:scale-110 transition-transform">
                   {category.icon}
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{category.name}</h3>
-                <p className="text-sm text-gray-600 mb-4">{category.description}</p>
-                <div className="space-y-1">
+                <h3 className="text-xl font-serif text-[#2A2A2A] mb-2 group-hover:text-[#31543A] transition-colors">{category.name}</h3>
+                <p className="text-sm text-[#2A2A2A]/70 font-light mb-4">{category.description}</p>
+                <div className="space-y-2">
                   {category.examples.map((example, idx) => (
-                    <div key={idx} className="flex items-center text-sm text-gray-700">
-                      <svg className="w-4 h-4 text-blue-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <div key={idx} className="flex items-center text-sm text-[#2A2A2A] font-light">
+                      <svg className="w-4 h-4 text-[#3F8A84] mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                       {example}
@@ -227,7 +230,7 @@ export default function Pricing() {
           <div className="text-center">
             <Link
               to="/features"
-              className="inline-flex items-center px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all shadow-xl"
+              className="inline-flex items-center px-8 py-4 text-lg font-medium text-white bg-gradient-to-r from-[#31543A] to-[#3F8A84] rounded-full hover:from-[#2A2A2A] hover:to-[#31543A] transform hover:scale-105 transition-all shadow-lg"
             >
               View All Features & Pricing
               <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -239,41 +242,42 @@ export default function Pricing() {
       </section>
 
       {/* How It Works */}
-      <section className="py-20 bg-white">
+      <section className="py-24 bg-[#F9FAFA]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-4">
+          <div className="text-center mb-16">
+            <div className="section-label text-[#2A2A2A]/60 mb-4">04 — HOW IT WORKS</div>
+            <h2 className="text-3xl md:text-4xl font-serif text-[#31543A] mb-4">
               How Pricing Works
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-10">
             <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-blue-600">1</span>
+              <div className="w-20 h-20 bg-gradient-to-br from-[#31543A] to-[#3F8A84] rounded-full flex items-center justify-center mx-auto mb-6 shadow-md">
+                <span className="text-3xl font-serif text-white">1</span>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Start With Base</h3>
-              <p className="text-gray-600">
+              <h3 className="text-xl font-serif text-[#2A2A2A] mb-3">Start With Base</h3>
+              <p className="text-[#2A2A2A]/70 font-light leading-relaxed">
                 Get the complete platform with CDR collection, webhooks, and basic analytics
               </p>
             </div>
 
             <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-blue-600">2</span>
+              <div className="w-20 h-20 bg-gradient-to-br from-[#31543A] to-[#3F8A84] rounded-full flex items-center justify-center mx-auto mb-6 shadow-md">
+                <span className="text-3xl font-serif text-white">2</span>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Add AI Features</h3>
-              <p className="text-gray-600">
+              <h3 className="text-xl font-serif text-[#2A2A2A] mb-3">Add AI Features</h3>
+              <p className="text-[#2A2A2A]/70 font-light leading-relaxed">
                 Choose from 24 AI features. Each feature has transparent monthly pricing
               </p>
             </div>
 
             <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-blue-600">3</span>
+              <div className="w-20 h-20 bg-gradient-to-br from-[#31543A] to-[#3F8A84] rounded-full flex items-center justify-center mx-auto mb-6 shadow-md">
+                <span className="text-3xl font-serif text-white">3</span>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Scale As You Grow</h3>
-              <p className="text-gray-600">
+              <h3 className="text-xl font-serif text-[#2A2A2A] mb-3">Scale As You Grow</h3>
+              <p className="text-[#2A2A2A]/70 font-light leading-relaxed">
                 Add or remove features anytime. Only pay for what you use
               </p>
             </div>
@@ -282,60 +286,61 @@ export default function Pricing() {
       </section>
 
       {/* FAQ */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-24 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-4">
+          <div className="text-center mb-16">
+            <div className="section-label text-[#2A2A2A]/60 mb-4">05 — FAQS</div>
+            <h2 className="text-3xl md:text-4xl font-serif text-[#31543A] mb-4">
               Pricing FAQs
             </h2>
           </div>
 
           <div className="space-y-6">
-            <div className="bg-white rounded-xl p-6 border border-gray-200">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
+            <div className="bg-[#F9FAFA] rounded-2xl p-6 border border-gray-200 hover:border-[#31543A] transition-colors">
+              <h3 className="text-lg font-serif text-[#2A2A2A] mb-3">
                 What's included in the base service?
               </h3>
-              <p className="text-gray-600">
+              <p className="text-[#2A2A2A]/70 font-light leading-relaxed">
                 The base service includes all core platform features: CDR collection, webhook integration, call tracking,
                 user management, basic analytics, API access, and secure data storage with 99.9% uptime SLA.
               </p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 border border-gray-200">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
+            <div className="bg-[#F9FAFA] rounded-2xl p-6 border border-gray-200 hover:border-[#31543A] transition-colors">
+              <h3 className="text-lg font-serif text-[#2A2A2A] mb-3">
                 How are AI add-ons priced?
               </h3>
-              <p className="text-gray-600">
+              <p className="text-[#2A2A2A]/70 font-light leading-relaxed">
                 Each AI feature has transparent monthly pricing displayed on our Features page. You can enable or disable
                 features anytime through your account dashboard. Some features may have a one-time setup fee.
               </p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 border border-gray-200">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
+            <div className="bg-[#F9FAFA] rounded-2xl p-6 border border-gray-200 hover:border-[#31543A] transition-colors">
+              <h3 className="text-lg font-serif text-[#2A2A2A] mb-3">
                 Can I customize my package?
               </h3>
-              <p className="text-gray-600">
+              <p className="text-[#2A2A2A]/70 font-light leading-relaxed">
                 Absolutely! That's the beauty of our modular approach. Choose only the features you need. Our sales team
                 can also create custom packages for enterprise customers with specific requirements.
               </p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 border border-gray-200">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
+            <div className="bg-[#F9FAFA] rounded-2xl p-6 border border-gray-200 hover:border-[#31543A] transition-colors">
+              <h3 className="text-lg font-serif text-[#2A2A2A] mb-3">
                 Is there a free trial?
               </h3>
-              <p className="text-gray-600">
+              <p className="text-[#2A2A2A]/70 font-light leading-relaxed">
                 Yes! We offer a free demo where you can test the platform with sample data. Contact our sales team to
                 schedule a personalized demo and discuss your specific needs.
               </p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 border border-gray-200">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
+            <div className="bg-[#F9FAFA] rounded-2xl p-6 border border-gray-200 hover:border-[#31543A] transition-colors">
+              <h3 className="text-lg font-serif text-[#2A2A2A] mb-3">
                 What if I need to change my features later?
               </h3>
-              <p className="text-gray-600">
+              <p className="text-[#2A2A2A]/70 font-light leading-relaxed">
                 You can add or remove AI features at any time through your admin dashboard or by contacting support.
                 Changes take effect immediately, and billing is adjusted for the next cycle.
               </p>
@@ -345,28 +350,34 @@ export default function Pricing() {
       </section>
 
       {/* CTA */}
-      <section className="py-20 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl sm:text-4xl font-extrabold mb-4">
+      <section className="relative overflow-hidden py-24 bg-gradient-to-br from-[#31543A] to-[#3F8A84] text-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+          <div className="section-label text-white/60 mb-6">06 — GET STARTED</div>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif mb-6">
             Ready to Get Started?
           </h2>
-          <p className="text-xl text-blue-100 mb-8">
+          <p className="text-xl text-white/80 font-light mb-10 leading-relaxed">
             Schedule a demo to discuss your needs and get custom pricing
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               to="/book-demo"
-              className="px-8 py-4 text-lg font-semibold bg-white text-blue-600 rounded-xl hover:bg-gray-100 transform hover:scale-105 transition-all shadow-xl"
+              className="px-8 py-4 text-lg font-medium bg-white text-[#31543A] rounded-full hover:bg-[#F9FAFA] transform hover:scale-105 transition-all shadow-lg"
             >
               Schedule Demo
             </Link>
             <Link
               to="/contact"
-              className="px-8 py-4 text-lg font-semibold text-white border-2 border-white rounded-xl hover:bg-white/10 transition-all"
+              className="px-8 py-4 text-lg font-medium text-white border-2 border-white rounded-full hover:bg-white/10 transition-all"
             >
               Contact Sales
             </Link>
           </div>
+        </div>
+
+        {/* Decorative background */}
+        <div className="absolute inset-0 pointer-events-none opacity-20">
+          <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-[#6CA8C2] rounded-full filter blur-[120px]"></div>
         </div>
       </section>
     </MarketingLayout>

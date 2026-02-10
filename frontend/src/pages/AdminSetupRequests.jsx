@@ -94,11 +94,11 @@ export default function AdminSetupRequests() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800'
-      case 'payment_received': return 'bg-blue-100 text-blue-800'
-      case 'in_progress': return 'bg-purple-100 text-purple-800'
-      case 'completed': return 'bg-green-100 text-green-800'
-      case 'cancelled': return 'bg-red-100 text-red-800'
+      case 'pending': return 'bg-[#E4B756]/10 text-[#E4B756]'
+      case 'payment_received': return 'bg-[#6CA8C2]/10 text-[#6CA8C2]'
+      case 'in_progress': return 'bg-[#C89A8F]/10 text-[#C89A8F]'
+      case 'completed': return 'bg-[#3F8A84]/10 text-[#3F8A84]'
+      case 'cancelled': return 'bg-[#C89A8F]/20 text-[#C89A8F]'
       default: return 'bg-gray-100 text-gray-800'
     }
   }
@@ -119,8 +119,8 @@ export default function AdminSetupRequests() {
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading setup requests...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#6CA8C2] mx-auto"></div>
+            <p className="mt-4 text-[#2A2A2A]/70 font-light">Loading setup requests...</p>
           </div>
         </div>
       </DashboardLayout>
@@ -134,8 +134,8 @@ export default function AdminSetupRequests() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Setup Requests</h1>
-            <p className="text-gray-600">Manage customer onboarding requests</p>
+            <h1 className="text-3xl font-bold font-serif text-[#31543A]">Setup Requests</h1>
+            <p className="text-[#2A2A2A]/70 font-light">Manage customer onboarding requests</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => navigate('/dashboard')}>
@@ -148,7 +148,7 @@ export default function AdminSetupRequests() {
         </div>
 
         {/* Filters */}
-        <Card className="mb-6">
+        <Card className="mb-6 glass-card rounded-2xl border-gray-100">
           <CardContent className="pt-6">
             <div className="flex gap-4">
               <div className="flex-1">
@@ -175,9 +175,9 @@ export default function AdminSetupRequests() {
         </Card>
 
         {/* Requests Table */}
-        <Card>
+        <Card className="glass-card rounded-2xl border-gray-100">
           <CardHeader>
-            <CardTitle>Setup Requests ({requests.length})</CardTitle>
+            <CardTitle className="font-serif text-[#31543A]">Setup Requests ({requests.length})</CardTitle>
           </CardHeader>
           <CardContent>
             {error && (
@@ -224,8 +224,8 @@ export default function AdminSetupRequests() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 text-xs font-semibold rounded ${
-                            request.payment_status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            request.payment_status === 'completed' ? 'bg-[#3F8A84]/10 text-[#3F8A84]' : 'bg-[#E4B756]/10 text-[#E4B756]'
                           }`}>
                             {request.payment_status}
                           </span>
@@ -257,17 +257,17 @@ export default function AdminSetupRequests() {
               <div className="p-6">
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">{selectedRequest.company_name}</h2>
-                    <p className="text-gray-600">Request ID: {selectedRequest.request_id}</p>
+                    <h2 className="text-2xl font-bold font-serif text-[#31543A]">{selectedRequest.company_name}</h2>
+                    <p className="text-[#2A2A2A]/70 font-light">Request ID: {selectedRequest.request_id}</p>
                   </div>
                   <Button variant="outline" onClick={() => setShowDetail(false)}>Close</Button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Company Info */}
-                  <Card>
+                  <Card className="glass-card rounded-2xl border-gray-100">
                     <CardHeader>
-                      <CardTitle>Company Information</CardTitle>
+                      <CardTitle className="font-serif text-[#31543A]">Company Information</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       <div><span className="font-semibold">Name:</span> {selectedRequest.company_name}</div>
@@ -278,9 +278,9 @@ export default function AdminSetupRequests() {
                   </Card>
 
                   {/* Contact Info */}
-                  <Card>
+                  <Card className="glass-card rounded-2xl border-gray-100">
                     <CardHeader>
-                      <CardTitle>Contact Information</CardTitle>
+                      <CardTitle className="font-serif text-[#31543A]">Contact Information</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       <div><span className="font-semibold">Name:</span> {selectedRequest.contact_name}</div>
@@ -291,9 +291,9 @@ export default function AdminSetupRequests() {
                   </Card>
 
                   {/* Technical Details */}
-                  <Card className="md:col-span-2">
+                  <Card className="md:col-span-2 glass-card rounded-2xl border-gray-100">
                     <CardHeader>
-                      <CardTitle>Technical Details</CardTitle>
+                      <CardTitle className="font-serif text-[#31543A]">Technical Details</CardTitle>
                     </CardHeader>
                     <CardContent>
                       {selectedRequest.technical_details && (
@@ -310,9 +310,9 @@ export default function AdminSetupRequests() {
                   </Card>
 
                   {/* Plan & Features */}
-                  <Card>
+                  <Card className="glass-card rounded-2xl border-gray-100">
                     <CardHeader>
-                      <CardTitle>Plan & Features</CardTitle>
+                      <CardTitle className="font-serif text-[#31543A]">Plan & Features</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       <div><span className="font-semibold">Selected Plan:</span> <span className="capitalize">{selectedRequest.selected_plan}</span></div>
@@ -333,9 +333,9 @@ export default function AdminSetupRequests() {
                   </Card>
 
                   {/* Requirements */}
-                  <Card>
+                  <Card className="glass-card rounded-2xl border-gray-100">
                     <CardHeader>
-                      <CardTitle>Additional Requirements</CardTitle>
+                      <CardTitle className="font-serif text-[#31543A]">Additional Requirements</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       <div>
@@ -351,9 +351,9 @@ export default function AdminSetupRequests() {
                   </Card>
 
                   {/* Admin Actions */}
-                  <Card className="md:col-span-2">
+                  <Card className="md:col-span-2 glass-card rounded-2xl border-gray-100">
                     <CardHeader>
-                      <CardTitle>Admin Actions</CardTitle>
+                      <CardTitle className="font-serif text-[#31543A]">Admin Actions</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -402,14 +402,14 @@ export default function AdminSetupRequests() {
                           <Button
                             onClick={handleActivateAccount}
                             disabled={activating}
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-[#3F8A84] hover:bg-[#31543A] rounded-full"
                           >
                             {activating ? 'Activating...' : 'Activate Account'}
                           </Button>
                         )}
 
                         {selectedRequest.tenant_id && (
-                          <div className="flex items-center text-green-600 font-semibold">
+                          <div className="flex items-center text-[#3F8A84] font-semibold">
                             ✓ Account Activated
                           </div>
                         )}

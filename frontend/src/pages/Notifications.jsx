@@ -133,8 +133,8 @@ export default function Notifications() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
-            <p className="text-gray-600">Manage alerts and notification rules</p>
+            <h1 className="text-3xl font-bold font-serif text-[#31543A]">Notifications</h1>
+            <p className="text-[#2A2A2A]/70 font-light">Manage alerts and notification rules</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => navigate('/dashboard')}>
@@ -161,16 +161,16 @@ export default function Notifications() {
 
         {/* Notifications Tab */}
         {activeTab === 'notifications' && (
-          <Card>
+          <Card className="glass-card rounded-2xl border-gray-100">
             <CardHeader>
-              <CardTitle>Your Notifications</CardTitle>
-              <CardDescription>View and manage your notifications</CardDescription>
+              <CardTitle className="font-serif text-[#31543A]">Your Notifications</CardTitle>
+              <CardDescription className="font-light text-[#2A2A2A]/70">View and manage your notifications</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
                 <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Loading notifications...</p>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#6CA8C2] mx-auto mb-4"></div>
+                  <p className="text-[#2A2A2A]/70 font-light">Loading notifications...</p>
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="text-center py-12 text-gray-600">
@@ -233,12 +233,12 @@ export default function Notifications() {
         {/* Rules Tab */}
         {activeTab === 'rules' && (
           <div className="space-y-6">
-            <Card>
+            <Card className="glass-card rounded-2xl border-gray-100">
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <div>
-                    <CardTitle>Notification Rules</CardTitle>
-                    <CardDescription>Configure when to receive alerts</CardDescription>
+                    <CardTitle className="font-serif text-[#31543A]">Notification Rules</CardTitle>
+                    <CardDescription className="font-light text-[#2A2A2A]/70">Configure when to receive alerts</CardDescription>
                   </div>
                   {user && user.role === 'admin' && (
                     <Button onClick={() => setShowNewRule(!showNewRule)}>
@@ -366,24 +366,24 @@ export default function Notifications() {
                             )}
                             <div className="flex gap-2 mt-2">
                               {rule.notify_inapp && (
-                                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                                <span className="px-2 py-1 bg-[#6CA8C2]/10 text-[#6CA8C2] text-xs rounded-full">
                                   In-App
                                 </span>
                               )}
                               {rule.notify_email && (
-                                <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
+                                <span className="px-2 py-1 bg-[#C89A8F]/10 text-[#C89A8F] text-xs rounded-full">
                                   Email
                                 </span>
                               )}
                               {rule.notify_slack && (
-                                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                <span className="px-2 py-1 bg-[#3F8A84]/10 text-[#3F8A84] text-xs rounded-full">
                                   Slack
                                 </span>
                               )}
                             </div>
                           </div>
-                          <span className={`px-3 py-1 text-xs font-semibold rounded ${
-                            rule.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                            rule.enabled ? 'bg-[#3F8A84]/10 text-[#3F8A84]' : 'bg-gray-100 text-gray-800'
                           }`}>
                             {rule.enabled ? 'Enabled' : 'Disabled'}
                           </span>

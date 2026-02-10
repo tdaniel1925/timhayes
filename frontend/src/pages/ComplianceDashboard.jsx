@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import DashboardLayout from '@/components/DashboardLayout';
 import {
   ArrowLeft,
   Shield,
@@ -153,56 +154,34 @@ export default function ComplianceDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading compliance data...</p>
+      <DashboardLayout title="Compliance Center" subtitle="Monitor regulatory compliance and alerts">
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3F8A84] mx-auto"></div>
+            <p className="mt-4 text-[#2A2A2A]/70 font-light">Loading compliance data...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold">Compliance Center</h1>
-                <p className="text-sm text-muted-foreground">Monitor regulatory compliance and alerts</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                onClick={handleExportReport}
-                className="flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Export Report
-              </Button>
-              <span className="text-sm text-muted-foreground">{user?.email}</span>
-              <Button variant="outline" onClick={logout}>Logout</Button>
-            </div>
-          </div>
+    <DashboardLayout title="Compliance Center" subtitle="Monitor regulatory compliance and alerts">
+      <div className="max-w-7xl mx-auto">
+        {/* Export Button */}
+        <div className="mb-6 flex justify-end">
+          <Button
+            variant="outline"
+            onClick={handleExportReport}
+            className="flex items-center gap-2 border-[#31543A]/20 text-[#31543A] hover:bg-[#31543A] hover:text-white transition-colors rounded-full"
+          >
+            <Download className="h-4 w-4" />
+            Export Report
+          </Button>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-800">{error}</p>
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-2xl p-4">
+            <p className="text-sm text-red-800 font-light">{error}</p>
           </div>
         )}
 
@@ -210,65 +189,65 @@ export default function ComplianceDashboard() {
           <>
             {/* Compliance Summary */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <Card>
+              <Card className="glass-card border-gray-100">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Alerts</CardTitle>
+                  <CardTitle className="text-sm font-medium text-[#2A2A2A]/60 font-light tracking-wide uppercase">Total Alerts</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between">
-                    <span className="text-3xl font-bold">{complianceData.total_alerts || 0}</span>
-                    <Shield className="h-8 w-8 text-blue-600" />
+                    <span className="text-3xl font-bold font-serif text-[#31543A]">{complianceData.total_alerts || 0}</span>
+                    <Shield className="h-8 w-8 text-[#6CA8C2]" />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">All time</p>
+                  <p className="text-xs text-[#2A2A2A]/60 font-light mt-2">All time</p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="glass-card border-gray-100">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Unresolved</CardTitle>
+                  <CardTitle className="text-sm font-medium text-[#2A2A2A]/60 font-light tracking-wide uppercase">Unresolved</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between">
-                    <span className="text-3xl font-bold text-orange-600">
+                    <span className="text-3xl font-bold font-serif text-[#E4B756]">
                       {complianceData.unresolved_alerts || 0}
                     </span>
-                    <AlertTriangle className="h-8 w-8 text-orange-600" />
+                    <AlertTriangle className="h-8 w-8 text-[#E4B756]" />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">Needs attention</p>
+                  <p className="text-xs text-[#2A2A2A]/60 font-light mt-2">Needs attention</p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="glass-card border-gray-100">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Resolved</CardTitle>
+                  <CardTitle className="text-sm font-medium text-[#2A2A2A]/60 font-light tracking-wide uppercase">Resolved</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between">
-                    <span className="text-3xl font-bold text-green-600">
+                    <span className="text-3xl font-bold font-serif text-[#3F8A84]">
                       {complianceData.resolved_alerts || 0}
                     </span>
-                    <CheckCircle className="h-8 w-8 text-green-600" />
+                    <CheckCircle className="h-8 w-8 text-[#3F8A84]" />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">Handled</p>
+                  <p className="text-xs text-[#2A2A2A]/60 font-light mt-2">Handled</p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="glass-card border-gray-100">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Compliance Score</CardTitle>
+                  <CardTitle className="text-sm font-medium text-[#2A2A2A]/60 font-light tracking-wide uppercase">Compliance Score</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between">
-                    <span className="text-3xl font-bold text-green-600">
+                    <span className="text-3xl font-bold font-serif text-[#3F8A84]">
                       {complianceData.compliance_score || 95}%
                     </span>
                     {complianceData.score_trend === 'up' ? (
-                      <TrendingUp className="h-8 w-8 text-green-600" />
+                      <TrendingUp className="h-8 w-8 text-[#3F8A84]" />
                     ) : (
                       <TrendingDown className="h-8 w-8 text-red-600" />
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">
+                  <p className="text-xs text-[#2A2A2A]/60 font-light mt-2">
                     {complianceData.score_trend === 'up' ? 'Improving' : 'Declining'}
                   </p>
                 </CardContent>
@@ -276,10 +255,10 @@ export default function ComplianceDashboard() {
             </div>
 
             {/* Alert Types Breakdown */}
-            <Card className="mb-8">
+            <Card className="mb-8 glass-card border-gray-100">
               <CardHeader>
-                <CardTitle>Alert Types</CardTitle>
-                <CardDescription>Distribution by compliance category</CardDescription>
+                <CardTitle className="font-serif text-[#31543A]">Alert Types</CardTitle>
+                <CardDescription className="text-[#2A2A2A]/60 font-light">Distribution by compliance category</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -304,7 +283,7 @@ export default function ComplianceDashboard() {
             </Card>
 
             {/* Filters and Search */}
-            <Card className="mb-6">
+            <Card className="mb-6 glass-card border-gray-100">
               <CardContent className="pt-6">
                 <div className="flex flex-wrap gap-4">
                   <div className="flex-1 min-w-[200px]">
@@ -345,10 +324,10 @@ export default function ComplianceDashboard() {
             </Card>
 
             {/* Compliance Alerts List */}
-            <Card>
+            <Card className="glass-card border-gray-100">
               <CardHeader>
-                <CardTitle>Compliance Alerts</CardTitle>
-                <CardDescription>
+                <CardTitle className="font-serif text-[#31543A]">Compliance Alerts</CardTitle>
+                <CardDescription className="text-[#2A2A2A]/60 font-light">
                   {filteredAlerts.length} {filteredAlerts.length === 1 ? 'alert' : 'alerts'} found
                 </CardDescription>
               </CardHeader>
@@ -358,7 +337,7 @@ export default function ComplianceDashboard() {
                     {filteredAlerts.map((alert) => (
                       <div
                         key={alert.id}
-                        className={`p-4 border rounded-lg ${getSeverityColor(alert.severity)}`}
+                        className={`p-4 border rounded-2xl ${getSeverityColor(alert.severity)}`}
                       >
                         <div className="flex items-start gap-4">
                           <div className="flex-shrink-0">
@@ -431,9 +410,9 @@ export default function ComplianceDashboard() {
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                    <Shield className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Compliance Alerts</h3>
-                    <p className="text-gray-600">
+                    <Shield className="h-16 w-16 mx-auto mb-4 text-[#3F8A84]/40" />
+                    <h3 className="text-lg font-serif font-medium text-[#31543A] mb-2">No Compliance Alerts</h3>
+                    <p className="text-[#2A2A2A]/70 font-light">
                       {searchQuery || severityFilter !== 'all' || statusFilter !== 'all'
                         ? 'No alerts match your filters'
                         : 'All calls are compliant - great job!'}
@@ -444,7 +423,7 @@ export default function ComplianceDashboard() {
             </Card>
           </>
         )}
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

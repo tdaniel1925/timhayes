@@ -45,32 +45,39 @@ export default function SuperAdminLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-indigo-900 flex items-center justify-center px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#2A2A2A] via-[#31543A] to-[#2A2A2A] flex items-center justify-center px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-[#C89A8F] rounded-full mix-blend-multiply filter blur-[100px] opacity-15"></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-[#31543A] rounded-full mix-blend-multiply filter blur-[120px] opacity-20"></div>
+        <div className="absolute inset-0 bg-grid-pattern"></div>
+      </div>
+
+      <div className="max-w-md w-full relative z-10">
+        <div className="glass-card rounded-3xl p-10 shadow-2xl">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-red-600 to-red-700 rounded-xl mx-auto mb-4 flex items-center justify-center">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-20 h-20 bg-gradient-to-br from-[#C89A8F] to-[#31543A] rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg">
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            <h2 className="text-4xl font-serif text-[#31543A] mb-2">
               Super Admin Portal
             </h2>
-            <p className="text-gray-600">
+            <p className="text-[#2A2A2A]/60 font-light">
               Platform administration access
             </p>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex">
-                <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="mb-6 bg-[#C89A8F]/10 border border-[#C89A8F]/30 rounded-xl p-4">
+              <div className="flex items-start">
+                <svg className="w-5 h-5 text-[#C89A8F] mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p className="text-sm text-red-800">{error}</p>
+                <p className="text-sm text-[#C89A8F] font-light">{error}</p>
               </div>
             </div>
           )}
@@ -78,7 +85,7 @@ export default function SuperAdminLogin() {
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="text-xs font-medium text-[#2A2A2A] uppercase tracking-wide block mb-2">
                 Email Address
               </label>
               <input
@@ -89,13 +96,13 @@ export default function SuperAdminLogin() {
                 value={formData.email}
                 onChange={handleChange}
                 autoComplete="email"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-sm focus:outline-none focus:border-[#31543A] transition-colors"
                 placeholder="superadmin@audiapro.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="text-xs font-medium text-[#2A2A2A] uppercase tracking-wide block mb-2">
                 Password
               </label>
               <input
@@ -106,7 +113,7 @@ export default function SuperAdminLogin() {
                 value={formData.password}
                 onChange={handleChange}
                 autoComplete="current-password"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white text-sm focus:outline-none focus:border-[#31543A] transition-colors"
                 placeholder="Enter your password"
               />
             </div>
@@ -114,19 +121,19 @@ export default function SuperAdminLogin() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-6 py-3 text-lg font-semibold text-white bg-gradient-to-r from-red-600 to-red-700 rounded-lg hover:from-red-700 hover:to-red-800 transform hover:scale-105 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              className="w-full px-6 py-4 text-base font-medium text-white bg-gradient-to-r from-[#31543A] to-[#2A2A2A] rounded-full hover:from-[#2A2A2A] hover:to-[#31543A] transform hover:scale-105 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
             >
               {loading ? 'Signing In...' : 'Sign In'}
             </button>
           </form>
 
           {/* Warning */}
-          <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex">
-              <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="mt-6 bg-[#E4B756]/10 border border-[#E4B756]/30 rounded-xl p-4">
+            <div className="flex items-start">
+              <svg className="w-5 h-5 text-[#E4B756] mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <p className="text-xs text-yellow-800">
+              <p className="text-xs text-[#E4B756] font-light">
                 This is a restricted area. All activities are logged and monitored.
               </p>
             </div>
@@ -137,9 +144,9 @@ export default function SuperAdminLogin() {
         <div className="text-center mt-6">
           <button
             onClick={() => navigate('/')}
-            className="text-white hover:text-blue-200 text-sm"
+            className="text-white/80 hover:text-white text-sm font-light transition-colors"
           >
-            Back to AudiaPro
+            ← Back to AudiaPro
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from '../components/ui/button';
 import { Activity, RefreshCw, Phone, Mic, Sparkles, Download, AlertCircle, CheckCircle } from 'lucide-react';
 import { api } from '../lib/api';
+import DashboardLayout from '../components/DashboardLayout';
 
 const ActivityLogs = () => {
   const navigate = useNavigate();
@@ -50,17 +51,17 @@ const ActivityLogs = () => {
   const getActivityColor = (type) => {
     switch (type) {
       case 'call_received':
-        return 'bg-blue-50 border-blue-200';
+        return 'bg-[#6CA8C2]/10 border-[#6CA8C2]/30';
       case 'recording_downloaded':
-        return 'bg-green-50 border-green-200';
+        return 'bg-[#3F8A84]/10 border-[#3F8A84]/30';
       case 'transcription_completed':
-        return 'bg-purple-50 border-purple-200';
+        return 'bg-[#C89A8F]/10 border-[#C89A8F]/30';
       case 'ai_analysis_completed':
-        return 'bg-yellow-50 border-yellow-200';
+        return 'bg-[#E4B756]/10 border-[#E4B756]/30';
       case 'error':
         return 'bg-red-50 border-red-200';
       default:
-        return 'bg-gray-50 border-gray-200';
+        return 'bg-[#F9FAFA] border-gray-200';
     }
   };
 
@@ -77,15 +78,15 @@ const ActivityLogs = () => {
   };
 
   return (
-    <div className="container mx-auto p-6">
-      <Card>
+    <DashboardLayout title="Activity Logs" subtitle="Real-time system activity and events">
+      <Card className="glass-card border-gray-100">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Activity className="h-6 w-6 text-blue-600" />
+              <Activity className="h-6 w-6 text-[#3F8A84]" />
               <div>
-                <CardTitle>Activity Logs</CardTitle>
-                <CardDescription>Real-time system activity and events</CardDescription>
+                <CardTitle className="font-serif text-[#31543A]">Activity Logs</CardTitle>
+                <CardDescription className="text-[#2A2A2A]/60 font-light">Real-time system activity and events</CardDescription>
               </div>
             </div>
             <Button
@@ -93,7 +94,7 @@ const ActivityLogs = () => {
               size="sm"
               onClick={fetchLogs}
               disabled={loading}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border-[#31543A]/20 text-[#31543A] hover:bg-[#31543A] hover:text-white transition-colors"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
@@ -103,8 +104,8 @@ const ActivityLogs = () => {
         <CardContent>
           {loading && logs.length === 0 ? (
             <div className="flex items-center justify-center py-12">
-              <RefreshCw className="h-6 w-6 animate-spin text-blue-600" />
-              <span className="ml-2">Loading activity logs...</span>
+              <RefreshCw className="h-6 w-6 animate-spin text-[#3F8A84]" />
+              <span className="ml-2 text-[#2A2A2A]/70 font-light">Loading activity logs...</span>
             </div>
           ) : (
             <>
@@ -112,7 +113,7 @@ const ActivityLogs = () => {
                 {logs.map((log, index) => (
                   <div
                     key={index}
-                    className={`p-4 rounded-lg border ${getActivityColor(log.type)} transition-all hover:shadow-md cursor-pointer`}
+                    className={`p-4 rounded-2xl border ${getActivityColor(log.type)} transition-all hover:shadow-md cursor-pointer`}
                     onClick={() => log.call_id && navigate(`/call/${log.call_id}`)}
                   >
                     <div className="flex items-start gap-3">
@@ -121,13 +122,13 @@ const ActivityLogs = () => {
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
-                          <span className="font-medium text-sm">{log.message}</span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="font-medium text-sm text-[#2A2A2A]">{log.message}</span>
+                          <span className="text-xs text-[#2A2A2A]/60 font-light">
                             {formatDateTime(log.timestamp)}
                           </span>
                         </div>
                         {log.details && (
-                          <p className="text-xs text-muted-foreground mt-1">{log.details}</p>
+                          <p className="text-xs text-[#2A2A2A]/60 font-light mt-1">{log.details}</p>
                         )}
                       </div>
                     </div>
@@ -136,8 +137,8 @@ const ActivityLogs = () => {
               </div>
 
               {/* Pagination */}
-              <div className="flex justify-between items-center mt-6 pt-4 border-t">
-                <div className="text-sm text-muted-foreground">
+              <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
+                <div className="text-sm text-[#2A2A2A]/60 font-light">
                   Page {page} of {totalPages}
                 </div>
                 <div className="flex gap-2">
@@ -146,6 +147,7 @@ const ActivityLogs = () => {
                     size="sm"
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     disabled={page === 1}
+                    className="border-[#31543A]/20 text-[#31543A] hover:bg-[#31543A] hover:text-white transition-colors rounded-full"
                   >
                     Previous
                   </Button>
@@ -154,6 +156,7 @@ const ActivityLogs = () => {
                     size="sm"
                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
+                    className="border-[#31543A]/20 text-[#31543A] hover:bg-[#31543A] hover:text-white transition-colors rounded-full"
                   >
                     Next
                   </Button>
@@ -163,7 +166,7 @@ const ActivityLogs = () => {
           )}
         </CardContent>
       </Card>
-    </div>
+    </DashboardLayout>
   );
 };
 

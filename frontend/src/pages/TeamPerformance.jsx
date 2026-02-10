@@ -47,17 +47,17 @@ export default function TeamPerformance() {
   };
 
   const getScoreColor = (score) => {
-    if (score >= 80) return 'text-green-600 bg-green-100';
-    if (score >= 60) return 'text-yellow-600 bg-yellow-100';
-    return 'text-red-600 bg-red-100';
+    if (score >= 80) return 'text-[#3F8A84] bg-[#3F8A84]/10';
+    if (score >= 60) return 'text-[#E4B756] bg-[#E4B756]/10';
+    return 'text-[#C89A8F] bg-[#C89A8F]/10';
   };
 
   const getScoreBadge = (score) => {
-    if (score >= 90) return { label: 'Excellent', color: 'bg-purple-100 text-purple-800' };
-    if (score >= 80) return { label: 'Great', color: 'bg-green-100 text-green-800' };
-    if (score >= 70) return { label: 'Good', color: 'bg-blue-100 text-blue-800' };
-    if (score >= 60) return { label: 'Fair', color: 'bg-yellow-100 text-yellow-800' };
-    return { label: 'Needs Improvement', color: 'bg-red-100 text-red-800' };
+    if (score >= 90) return { label: 'Excellent', color: 'bg-[#C89A8F]/10 text-[#C89A8F]' };
+    if (score >= 80) return { label: 'Great', color: 'bg-[#3F8A84]/10 text-[#3F8A84]' };
+    if (score >= 70) return { label: 'Good', color: 'bg-[#6CA8C2]/10 text-[#6CA8C2]' };
+    if (score >= 60) return { label: 'Fair', color: 'bg-[#E4B756]/10 text-[#E4B756]' };
+    return { label: 'Needs Improvement', color: 'bg-[#C89A8F]/20 text-[#C89A8F]' };
   };
 
   const getRankIcon = (index) => {
@@ -72,8 +72,8 @@ export default function TeamPerformance() {
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading team performance...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#6CA8C2] mx-auto"></div>
+            <p className="mt-4 text-[#2A2A2A]/70 font-light">Loading team performance...</p>
           </div>
         </div>
       </DashboardLayout>
@@ -95,8 +95,8 @@ export default function TeamPerformance() {
               Back to Dashboard
             </Button>
             <div>
-              <h1 className="text-2xl font-bold">Team Performance</h1>
-              <p className="text-sm text-muted-foreground">Leaderboards and analytics</p>
+              <h1 className="text-2xl font-bold font-serif text-[#31543A]">Team Performance</h1>
+              <p className="text-sm text-[#2A2A2A]/70 font-light">Leaderboards and analytics</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -112,36 +112,36 @@ export default function TeamPerformance() {
           <>
             {/* Team Overview Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <Card>
+              <Card className="glass-card rounded-2xl border-gray-100">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-sm font-medium text-[#2A2A2A]/70 font-light">
                     Team Members
                   </CardTitle>
-                  <Users className="h-4 w-4 text-blue-600" />
+                  <Users className="h-4 w-4 text-[#6CA8C2]" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold">{teamData.total_team_members}</div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="glass-card rounded-2xl border-gray-100">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-sm font-medium text-[#2A2A2A]/70 font-light">
                     Total Calls
                   </CardTitle>
-                  <Phone className="h-4 w-4 text-green-600" />
+                  <Phone className="h-4 w-4 text-[#3F8A84]" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold">{teamData.team_total_calls}</div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="glass-card rounded-2xl border-gray-100">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-sm font-medium text-[#2A2A2A]/70 font-light">
                     Avg Quality Score
                   </CardTitle>
-                  <BarChart3 className="h-4 w-4 text-purple-600" />
+                  <BarChart3 className="h-4 w-4 text-[#C89A8F]" />
                 </CardHeader>
                 <CardContent>
                   <div className={`text-3xl font-bold ${getScoreColor(teamData.team_avg_quality).split(' ')[0]}`}>
@@ -150,12 +150,12 @@ export default function TeamPerformance() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="glass-card rounded-2xl border-gray-100">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-sm font-medium text-[#2A2A2A]/70 font-light">
                     Avg Answer Rate
                   </CardTitle>
-                  <Target className="h-4 w-4 text-orange-600" />
+                  <Target className="h-4 w-4 text-[#E4B756]" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold">{teamData.team_avg_answer_rate}%</div>
@@ -165,13 +165,13 @@ export default function TeamPerformance() {
 
             {/* Top Performers Podium */}
             {teamData.team_members.length >= 3 && (
-              <Card className="mb-8">
+              <Card className="mb-8 glass-card rounded-2xl border-gray-100">
                 <CardHeader>
-                  <CardTitle className="flex items-center text-2xl">
-                    <Trophy className="mr-3 h-8 w-8 text-yellow-500" />
+                  <CardTitle className="flex items-center text-2xl font-serif text-[#31543A]">
+                    <Trophy className="mr-3 h-8 w-8 text-[#E4B756]" />
                     Top Performers
                   </CardTitle>
-                  <CardDescription>This month's highest quality scores</CardDescription>
+                  <CardDescription className="font-light text-[#2A2A2A]/70">This month's highest quality scores</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex justify-center items-end gap-4 py-8">
@@ -243,13 +243,13 @@ export default function TeamPerformance() {
             )}
 
             {/* Full Leaderboard Table */}
-            <Card>
+            <Card className="glass-card rounded-2xl border-gray-100">
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <BarChart3 className="mr-2 h-5 w-5" />
+                <CardTitle className="flex items-center font-serif text-[#31543A]">
+                  <BarChart3 className="mr-2 h-5 w-5 text-[#6CA8C2]" />
                   Complete Leaderboard
                 </CardTitle>
-                <CardDescription>Detailed performance metrics for all team members</CardDescription>
+                <CardDescription className="font-light text-[#2A2A2A]/70">Detailed performance metrics for all team members</CardDescription>
               </CardHeader>
               <CardContent>
                 {teamData.team_members.length === 0 ? (
@@ -306,9 +306,9 @@ export default function TeamPerformance() {
                             </td>
                             <td className="p-4 text-center">
                               <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                member.answer_rate >= 80 ? 'bg-green-100 text-green-800' :
-                                member.answer_rate >= 60 ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-red-100 text-red-800'
+                                member.answer_rate >= 80 ? 'bg-[#3F8A84]/10 text-[#3F8A84]' :
+                                member.answer_rate >= 60 ? 'bg-[#E4B756]/10 text-[#E4B756]' :
+                                'bg-[#C89A8F]/10 text-[#C89A8F]'
                               }`}>
                                 {member.answer_rate}%
                               </span>
@@ -330,7 +330,7 @@ export default function TeamPerformance() {
                                     <span className="font-semibold">{member.sentiment_breakdown.Positive.toFixed(0)}%</span>
                                   </div>
                                   <div className="w-full bg-gray-200 rounded-full h-1.5">
-                                    <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${member.sentiment_breakdown.Positive}%` }}></div>
+                                    <div className="h-1.5 rounded-full" style={{ width: `${member.sentiment_breakdown.Positive}%`, backgroundColor: '#3F8A84' }}></div>
                                   </div>
                                 </div>
                                 <div className="flex-1">
@@ -339,7 +339,7 @@ export default function TeamPerformance() {
                                     <span className="font-semibold">{member.sentiment_breakdown.Negative.toFixed(0)}%</span>
                                   </div>
                                   <div className="w-full bg-gray-200 rounded-full h-1.5">
-                                    <div className="bg-red-500 h-1.5 rounded-full" style={{ width: `${member.sentiment_breakdown.Negative}%` }}></div>
+                                    <div className="h-1.5 rounded-full" style={{ width: `${member.sentiment_breakdown.Negative}%`, backgroundColor: '#C89A8F' }}></div>
                                   </div>
                                 </div>
                               </div>

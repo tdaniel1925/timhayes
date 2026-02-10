@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import axios from 'axios';
+import DashboardLayout from '@/components/DashboardLayout';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -102,121 +103,109 @@ export default function PromptPerformance() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center mr-4">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    <DashboardLayout
+      title="Prompt Performance"
+      subtitle="Monitor usage and discover optimization opportunities"
+    >
+      <div className="max-w-7xl mx-auto px-8 py-8">
+        <div className="mb-8 flex justify-end">
+          <button
+            onClick={analyzeOptimizations}
+            disabled={analyzing}
+            className="px-6 py-3 bg-[#31543A] text-white rounded-full hover:bg-[#31543A]/90 font-serif font-light flex items-center disabled:opacity-50"
+          >
+            {analyzing ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Prompt Performance</h1>
-                <p className="text-gray-600 mt-1">Monitor usage and discover optimization opportunities</p>
-              </div>
-            </div>
-
-            <button
-              onClick={analyzeOptimizations}
-              disabled={analyzing}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 font-medium flex items-center disabled:opacity-50"
-            >
-              {analyzing ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  Find Optimizations
-                </>
-              )}
-            </button>
-          </div>
+                Find Optimizations
+              </>
+            )}
+          </button>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-red-800">{error}</p>
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6">
+            <p className="text-sm text-red-800 font-serif font-light">{error}</p>
           </div>
         )}
 
         {success && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-green-800">{success}</p>
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6">
+            <p className="text-sm text-green-800 font-serif font-light">{success}</p>
           </div>
         )}
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3F8A84]"></div>
           </div>
         ) : (
           <>
             {/* Overview Cards */}
             {overview && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="glass-card rounded-2xl p-6">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-10 h-10 bg-[#6CA8C2]/20 rounded-2xl flex items-center justify-center">
+                      <svg className="w-5 h-5 text-[#6CA8C2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
                       </svg>
                     </div>
                   </div>
-                  <div className="text-3xl font-bold text-gray-900">{overview.overview.total_features}</div>
-                  <div className="text-sm text-gray-600 mt-1">AI Features</div>
+                  <div className="text-3xl font-serif font-light text-[#2A2A2A]">{overview.overview.total_features}</div>
+                  <div className="text-sm text-[#2A2A2A]/70 mt-1 font-serif font-light">AI Features</div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="glass-card rounded-2xl p-6">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-10 h-10 bg-[#3F8A84]/20 rounded-2xl flex items-center justify-center">
+                      <svg className="w-5 h-5 text-[#3F8A84]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                       </svg>
                     </div>
                   </div>
-                  <div className="text-3xl font-bold text-gray-900">{overview.overview.total_usage.toLocaleString()}</div>
-                  <div className="text-sm text-gray-600 mt-1">Total Usage</div>
+                  <div className="text-3xl font-serif font-light text-[#2A2A2A]">{overview.overview.total_usage.toLocaleString()}</div>
+                  <div className="text-sm text-[#2A2A2A]/70 mt-1 font-serif font-light">Total Usage</div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="glass-card rounded-2xl p-6">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-10 h-10 bg-[#31543A]/20 rounded-2xl flex items-center justify-center">
+                      <svg className="w-5 h-5 text-[#31543A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
                   </div>
-                  <div className="text-3xl font-bold text-gray-900">{overview.overview.custom_prompts_active}</div>
-                  <div className="text-sm text-gray-600 mt-1">Custom Prompts Active</div>
+                  <div className="text-3xl font-serif font-light text-[#2A2A2A]">{overview.overview.custom_prompts_active}</div>
+                  <div className="text-sm text-[#2A2A2A]/70 mt-1 font-serif font-light">Custom Prompts Active</div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="glass-card rounded-2xl p-6">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-10 h-10 bg-[#F9FAFA] rounded-2xl flex items-center justify-center">
+                      <svg className="w-5 h-5 text-[#2A2A2A]/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
                       </svg>
                     </div>
                   </div>
-                  <div className="text-3xl font-bold text-gray-900">{overview.overview.default_prompts_in_use}</div>
-                  <div className="text-sm text-gray-600 mt-1">Using Default Prompts</div>
+                  <div className="text-3xl font-serif font-light text-[#2A2A2A]">{overview.overview.default_prompts_in_use}</div>
+                  <div className="text-sm text-[#2A2A2A]/70 mt-1 font-serif font-light">Using Default Prompts</div>
                 </div>
               </div>
             )}
 
             {/* Optimization Opportunities */}
             {optimizationOpportunities.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+              <div className="glass-card rounded-2xl p-6 mb-8">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">Optimization Opportunities</h2>
+                  <h2 className="text-xl font-serif font-light text-[#2A2A2A]">Optimization Opportunities</h2>
                   <div className="flex items-center space-x-2 text-sm">
                     <span className="px-2 py-1 bg-red-100 text-red-800 rounded font-medium">
                       {optimizationOpportunities.filter(o => o.priority === 'critical').length} Critical
@@ -283,10 +272,10 @@ export default function PromptPerformance() {
 
             {/* Feature Performance Table */}
             {overview && overview.features && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-                <div className="p-6 border-b border-gray-200">
-                  <h2 className="text-xl font-bold text-gray-900">Feature Performance</h2>
-                  <p className="text-sm text-gray-600 mt-1">Click any feature to see detailed analytics</p>
+              <div className="glass-card rounded-2xl">
+                <div className="p-6 border-b border-[#F9FAFA]">
+                  <h2 className="text-xl font-serif font-light text-[#2A2A2A]">Feature Performance</h2>
+                  <p className="text-sm text-[#2A2A2A]/70 mt-1 font-serif font-light">Click any feature to see detailed analytics</p>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -345,7 +334,7 @@ export default function PromptPerformance() {
         {/* Feature Details Modal */}
         {featureDetails && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="glass-card rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <div>
@@ -435,6 +424,6 @@ export default function PromptPerformance() {
           </div>
         )}
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

@@ -82,18 +82,18 @@ export default function CallDetailNew() {
   };
 
   const getSentimentColor = (sentiment) => {
-    if (!sentiment) return 'bg-gray-100 text-gray-700';
+    if (!sentiment) return 'bg-gray-100 text-gray-700 border-gray-200';
     const s = sentiment.toLowerCase();
-    if (s === 'positive') return 'bg-success-100 text-success-700';
-    if (s === 'negative') return 'bg-error-100 text-error-700';
-    return 'bg-gray-100 text-gray-700';
+    if (s === 'positive') return 'bg-[#3F8A84]/10 text-[#3F8A84] border-[#3F8A84]/30';
+    if (s === 'negative') return 'bg-[#C89A8F]/10 text-[#C89A8F] border-[#C89A8F]/30';
+    return 'bg-[#E4B756]/10 text-[#E4B756] border-[#E4B756]/30';
   };
 
   const getScoreColor = (score) => {
     if (!score) return 'text-gray-600';
-    if (score >= 80) return 'text-success-600';
-    if (score >= 60) return 'text-warning-600';
-    return 'text-error-600';
+    if (score >= 80) return 'text-[#3F8A84]';
+    if (score >= 60) return 'text-[#E4B756]';
+    return 'text-[#C89A8F]';
   };
 
   const copyTranscript = () => {
@@ -158,59 +158,59 @@ export default function CallDetailNew() {
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div>
-          <Button
-            variant="outline"
+          <button
             onClick={() => navigate('/dashboard')}
-            className="mb-4"
+            className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-[#31543A]/20 text-[#31543A] text-sm font-medium hover:bg-[#31543A] hover:text-white transition-all mb-4"
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
-          </Button>
+          </button>
         </div>
 
-        {/* Hero Section - Call Overview */}
-        <Card className="overflow-hidden border-2 border-primary-100">
-          <div className="bg-gradient-to-r from-primary-50 to-primary-100 p-6 md:p-8">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {/* Hero Section - Call Overview - SUSTAIN Style */}
+        <div className="glass-card rounded-3xl overflow-hidden shadow-md">
+          <div className="bg-gradient-to-r from-[#31543A] to-[#3F8A84] p-6 md:p-10">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
               {/* Call Info */}
               <div className="flex-1">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-white p-3 rounded-full shadow-sm">
-                    <Phone className="h-6 w-6 text-primary-600" />
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="bg-white/20 backdrop-blur-sm p-3 rounded-full">
+                    <Phone className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h1 className="text-2xl font-bold text-gray-900">
+                    <h1 className="text-3xl font-serif text-white mb-1">
                       {call.src} → {call.dst}
                     </h1>
                     {call.caller_name && (
-                      <p className="text-gray-600">{call.caller_name}</p>
+                      <p className="text-white/80 font-light">{call.caller_name}</p>
                     )}
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-4 text-sm">
                   <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-gray-600" />
-                    <span className="text-gray-700">{formatDateTime(call.start_time)}</span>
+                    <Clock className="h-4 w-4 text-white/70" />
+                    <span className="text-white/90 font-light">{formatDateTime(call.start_time)}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-white">
+                    <span className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-white font-light">
                       Duration: {formatDuration(call.duration)}
-                    </Badge>
+                    </span>
                   </div>
                   <div>
-                    <Badge className={cn(
+                    <span className={cn(
+                      "px-3 py-1 rounded-full border inline-flex items-center gap-1",
                       call.disposition === 'ANSWERED'
-                        ? 'bg-success-100 text-success-700 hover:bg-success-200'
-                        : 'bg-error-100 text-error-700 hover:bg-error-200'
+                        ? 'bg-[#E4B756]/20 text-white border-[#E4B756]/40'
+                        : 'bg-white/10 text-white border-white/30'
                     )}>
                       {call.disposition === 'ANSWERED' ? (
-                        <CheckCircle className="mr-1 h-3 w-3" />
+                        <CheckCircle className="h-3 w-3" />
                       ) : (
-                        <XCircle className="mr-1 h-3 w-3" />
+                        <XCircle className="h-3 w-3" />
                       )}
                       {call.disposition}
-                    </Badge>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -218,21 +218,21 @@ export default function CallDetailNew() {
               {/* Quick Stats */}
               <div className="flex gap-3">
                 {call.quality_score && (
-                  <div className="bg-white rounded-lg p-4 shadow-sm text-center min-w-[100px]">
-                    <BarChart3 className="h-5 w-5 mx-auto mb-1 text-primary-600" />
-                    <div className={cn("text-2xl font-bold", getScoreColor(call.quality_score.overall_score))}>
+                  <div className="glass-card rounded-2xl p-5 text-center min-w-[110px] hover:scale-105 transition-transform">
+                    <BarChart3 className="h-5 w-5 mx-auto mb-2 text-[#3F8A84]" />
+                    <div className={cn("text-3xl font-serif mb-1", getScoreColor(call.quality_score.overall_score))}>
                       {call.quality_score.overall_score}
                     </div>
-                    <div className="text-xs text-gray-600 mt-1">Quality</div>
+                    <div className="text-xs text-[#2A2A2A]/60 font-light uppercase tracking-wide">Quality</div>
                   </div>
                 )}
                 {call.sentiment && (
-                  <div className="bg-white rounded-lg p-4 shadow-sm text-center min-w-[100px]">
-                    <Heart className="h-5 w-5 mx-auto mb-1 text-pink-600" />
-                    <div className="text-sm font-semibold text-gray-900 capitalize">
+                  <div className="glass-card rounded-2xl p-5 text-center min-w-[110px] hover:scale-105 transition-transform">
+                    <Heart className="h-5 w-5 mx-auto mb-2 text-[#C89A8F]" />
+                    <div className="text-sm font-medium text-[#31543A] capitalize mb-1">
                       {call.sentiment.sentiment}
                     </div>
-                    <div className="text-xs text-gray-600 mt-1">Sentiment</div>
+                    <div className="text-xs text-[#2A2A2A]/60 font-light uppercase tracking-wide">Sentiment</div>
                   </div>
                 )}
               </div>
@@ -240,7 +240,7 @@ export default function CallDetailNew() {
 
             {/* Audio Player (Inline) */}
             {call.has_recording && (
-              <div className="mt-6 bg-white rounded-lg p-4 shadow-sm">
+              <div className="mt-6 glass-card rounded-2xl p-4">
                 <div className="flex items-center gap-3">
                   <audio
                     controls
@@ -251,18 +251,17 @@ export default function CallDetailNew() {
                   >
                     <source src={`/api/recording/${call.id}`} type="audio/wav" />
                   </audio>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  <button
                     onClick={downloadRecording}
+                    className="p-3 rounded-full bg-[#31543A] text-white hover:bg-[#2A2A2A] transition-colors"
                   >
                     <Download className="h-4 w-4" />
-                  </Button>
+                  </button>
                 </div>
               </div>
             )}
           </div>
-        </Card>
+        </div>
 
         {/* AI Insights Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

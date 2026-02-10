@@ -50,9 +50,9 @@ export default function CallDetail() {
   const getSentimentColor = (sentiment) => {
     if (!sentiment) return 'gray'
     const sentimentLower = sentiment.toLowerCase()
-    if (sentimentLower === 'positive') return 'green'
-    if (sentimentLower === 'negative') return 'red'
-    return 'yellow'
+    if (sentimentLower === 'positive') return '#3F8A84'
+    if (sentimentLower === 'negative') return '#C89A8F'
+    return '#E4B756'
   }
 
   const getSentimentIcon = (sentiment) => {
@@ -68,8 +68,8 @@ export default function CallDetail() {
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading call details...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#6CA8C2] mx-auto"></div>
+            <p className="mt-4 text-[#2A2A2A]/70 font-light">Loading call details...</p>
           </div>
         </div>
       </DashboardLayout>
@@ -105,8 +105,8 @@ export default function CallDetail() {
             <Button variant="outline" onClick={() => navigate('/dashboard')} className="mb-2">
               ← Back to Dashboard
             </Button>
-            <h1 className="text-3xl font-bold text-gray-900">Call Details</h1>
-            <p className="text-gray-600">Call ID: {call.uniqueid}</p>
+            <h1 className="text-3xl font-bold font-serif text-[#31543A]">Call Details</h1>
+            <p className="text-[#2A2A2A]/70 font-light">Call ID: {call.uniqueid}</p>
           </div>
         </div>
 
@@ -114,9 +114,9 @@ export default function CallDetail() {
           {/* Left Column - Call Info & Recording */}
           <div className="lg:col-span-1 space-y-6">
             {/* Call Information */}
-            <Card>
+            <Card className="glass-card rounded-2xl border-gray-100">
               <CardHeader>
-                <CardTitle>Call Information</CardTitle>
+                <CardTitle className="font-serif text-[#31543A]">Call Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
@@ -143,9 +143,9 @@ export default function CallDetail() {
                 </div>
 
                 <div>
-                  <p className="text-sm text-gray-600">Status</p>
-                  <span className={`inline-block px-2 py-1 text-xs font-semibold rounded ${
-                    call.disposition === 'ANSWERED' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  <p className="text-sm text-[#2A2A2A]/70 font-light">Status</p>
+                  <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
+                    call.disposition === 'ANSWERED' ? 'bg-[#3F8A84]/10 text-[#3F8A84]' : 'bg-[#C89A8F]/10 text-[#C89A8F]'
                   }`}>
                     {call.disposition}
                   </span>
@@ -155,9 +155,9 @@ export default function CallDetail() {
 
             {/* Audio Player */}
             {call.has_recording && (
-              <Card>
+              <Card className="glass-card rounded-2xl border-gray-100">
                 <CardHeader>
-                  <CardTitle>Call Recording</CardTitle>
+                  <CardTitle className="font-serif text-[#31543A]">Call Recording</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <audio controls className="w-full" preload="metadata">
@@ -177,18 +177,17 @@ export default function CallDetail() {
 
             {/* Sentiment Analysis */}
             {call.sentiment && (
-              <Card>
+              <Card className="glass-card rounded-2xl border-gray-100">
                 <CardHeader>
-                  <CardTitle>Sentiment Analysis</CardTitle>
+                  <CardTitle className="font-serif text-[#31543A]">Sentiment Analysis</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="text-center">
                     <div className="text-6xl mb-2">
                       {getSentimentIcon(call.sentiment.sentiment)}
                     </div>
-                    <p className="text-2xl font-bold capitalize" style={{
-                      color: getSentimentColor(call.sentiment.sentiment) === 'green' ? '#10B981' :
-                             getSentimentColor(call.sentiment.sentiment) === 'red' ? '#EF4444' : '#F59E0B'
+                    <p className="text-2xl font-bold font-serif capitalize" style={{
+                      color: getSentimentColor(call.sentiment.sentiment)
                     }}>
                       {call.sentiment.sentiment}
                     </p>
@@ -205,8 +204,8 @@ export default function CallDetail() {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className="bg-green-500 h-2 rounded-full"
-                          style={{ width: `${call.sentiment.positive_score * 100}%` }}
+                          className="h-2 rounded-full"
+                          style={{ width: `${call.sentiment.positive_score * 100}%`, backgroundColor: '#3F8A84' }}
                         ></div>
                       </div>
                     </div>
@@ -218,8 +217,8 @@ export default function CallDetail() {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className="bg-yellow-500 h-2 rounded-full"
-                          style={{ width: `${call.sentiment.neutral_score * 100}%` }}
+                          className="h-2 rounded-full"
+                          style={{ width: `${call.sentiment.neutral_score * 100}%`, backgroundColor: '#E4B756' }}
                         ></div>
                       </div>
                     </div>
@@ -231,8 +230,8 @@ export default function CallDetail() {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className="bg-red-500 h-2 rounded-full"
-                          style={{ width: `${call.sentiment.negative_score * 100}%` }}
+                          className="h-2 rounded-full"
+                          style={{ width: `${call.sentiment.negative_score * 100}%`, backgroundColor: '#C89A8F' }}
                         ></div>
                       </div>
                     </div>
@@ -253,10 +252,10 @@ export default function CallDetail() {
           <div className="lg:col-span-2 space-y-6">
             {/* AI Summary */}
             {call.ai_summary && (
-              <Card>
+              <Card className="glass-card rounded-2xl border-gray-100">
                 <CardHeader>
-                  <CardTitle>AI Summary</CardTitle>
-                  <CardDescription>Automatically generated call summary</CardDescription>
+                  <CardTitle className="font-serif text-[#31543A]">AI Summary</CardTitle>
+                  <CardDescription className="font-light text-[#2A2A2A]/70">Automatically generated call summary</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
@@ -268,7 +267,7 @@ export default function CallDetail() {
                       <p className="text-sm font-semibold text-gray-700 mb-2">Topics Discussed:</p>
                       <div className="flex flex-wrap gap-2">
                         {call.ai_summary.topics.map((topic, idx) => (
-                          <span key={idx} className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                          <span key={idx} className="px-3 py-1 bg-[#6CA8C2]/10 text-[#6CA8C2] text-sm rounded-full">
                             {topic}
                           </span>
                         ))}
@@ -315,12 +314,12 @@ export default function CallDetail() {
 
             {/* Full Transcription */}
             {call.transcription && (
-              <Card>
+              <Card className="glass-card rounded-2xl border-gray-100">
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <div>
-                      <CardTitle>Call Transcription</CardTitle>
-                      <CardDescription>
+                      <CardTitle className="font-serif text-[#31543A]">Call Transcription</CardTitle>
+                      <CardDescription className="font-light text-[#2A2A2A]/70">
                         Language: {call.transcription.language || 'en'} | Duration: {formatDuration(call.transcription.duration)}
                       </CardDescription>
                     </div>
@@ -353,9 +352,9 @@ export default function CallDetail() {
             )}
 
             {!call.transcription && (
-              <Card>
+              <Card className="glass-card rounded-2xl border-gray-100">
                 <CardHeader>
-                  <CardTitle>Transcription</CardTitle>
+                  <CardTitle className="font-serif text-[#31543A]">Transcription</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600">

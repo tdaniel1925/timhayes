@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import axios from 'axios';
+import DashboardLayout from '@/components/DashboardLayout';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -163,42 +164,30 @@ export default function PromptCopilot() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center mr-4">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">AI Prompt Copilot</h1>
-              <p className="text-gray-600 mt-1">Describe what you want, and I'll refine your AI prompts for you</p>
-            </div>
-          </div>
-
-          {/* Info Banner */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start">
-            <svg className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div className="text-sm text-blue-800">
-              <strong>No prompt editing required!</strong> Just tell me what outcomes you want (e.g., "Make sentiment more sensitive to frustration" or "Focus more on price objections") and I'll handle the technical details.
-            </div>
+    <DashboardLayout
+      title="AI Prompt Copilot"
+      subtitle="Describe what you want, and I'll refine your AI prompts for you"
+    >
+      <div className="max-w-7xl mx-auto px-8 py-8">
+        {/* Info Banner */}
+        <div className="bg-[#6CA8C2]/10 border border-[#6CA8C2]/30 rounded-2xl p-4 flex items-start mb-8">
+          <svg className="w-5 h-5 text-[#3F8A84] mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="text-sm text-[#2A2A2A] font-serif font-light">
+            <strong className="font-medium">No prompt editing required!</strong> Just tell me what outcomes you want (e.g., "Make sentiment more sensitive to frustration" or "Focus more on price objections") and I'll handle the technical details.
           </div>
         </div>
 
         <div className="grid grid-cols-12 gap-6">
           {/* Feature Selector */}
           <div className="col-span-3">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Select AI Feature</h2>
+            <div className="glass-card rounded-2xl p-6">
+              <h2 className="text-lg font-serif font-light text-[#2A2A2A] mb-4">Select AI Feature</h2>
 
               {loading && !selectedFeature ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3F8A84]"></div>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -206,15 +195,15 @@ export default function PromptCopilot() {
                     <button
                       key={feature.slug}
                       onClick={() => handleFeatureSelect(feature)}
-                      className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                      className={`w-full text-left px-4 py-3 rounded-full transition-all font-serif font-light ${
                         selectedFeature?.slug === feature.slug
-                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                          ? 'bg-[#31543A] text-white shadow-md'
+                          : 'bg-[#F9FAFA] text-[#2A2A2A] hover:bg-[#6CA8C2]/10'
                       }`}
                     >
                       <div className="font-medium">{feature.name}</div>
                       <div className={`text-xs mt-1 ${
-                        selectedFeature?.slug === feature.slug ? 'text-purple-100' : 'text-gray-500'
+                        selectedFeature?.slug === feature.slug ? 'text-white/80' : 'text-[#2A2A2A]/60'
                       }`}>
                         {feature.industry_count} variations
                       </div>
@@ -228,28 +217,28 @@ export default function PromptCopilot() {
           {/* Chat Interface */}
           <div className="col-span-9">
             {!selectedFeature ? (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-                <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-10 h-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="glass-card rounded-2xl p-12 text-center">
+                <div className="w-20 h-20 bg-[#E4B756]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-10 h-10 text-[#E4B756]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Select an AI Feature to Get Started</h3>
-                <p className="text-gray-600">Choose a feature from the left to begin refining its prompts</p>
+                <h3 className="text-xl font-serif font-light text-[#2A2A2A] mb-2">Select an AI Feature to Get Started</h3>
+                <p className="text-[#2A2A2A]/70 font-serif font-light">Choose a feature from the left to begin refining its prompts</p>
               </div>
             ) : (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-[700px]">
+              <div className="glass-card rounded-2xl flex flex-col h-[700px]">
                 {/* Chat Header */}
-                <div className="border-b border-gray-200 p-6">
+                <div className="border-b border-[#F9FAFA] p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-xl font-semibold text-gray-900">{selectedFeature.name}</h2>
-                      <p className="text-sm text-gray-600 mt-1">Chat with your AI copilot to refine this feature</p>
+                      <h2 className="text-xl font-serif font-light text-[#2A2A2A]">{selectedFeature.name}</h2>
+                      <p className="text-sm text-[#2A2A2A]/70 mt-1 font-serif font-light">Chat with your AI copilot to refine this feature</p>
                     </div>
                     <div className="flex space-x-2">
                       <button
                         onClick={handleResetToDefault}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                        className="px-4 py-2 text-sm font-medium text-[#2A2A2A] bg-[#F9FAFA] rounded-full hover:bg-[#6CA8C2]/10 font-serif font-light"
                       >
                         Reset to Default
                       </button>
@@ -257,7 +246,7 @@ export default function PromptCopilot() {
                         <button
                           onClick={handleApplyRefinement}
                           disabled={loading}
-                          className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50"
+                          className="px-4 py-2 text-sm font-medium text-white bg-[#31543A] rounded-full hover:bg-[#31543A]/90 disabled:opacity-50 font-serif font-light"
                         >
                           Apply Changes
                         </button>
@@ -269,14 +258,14 @@ export default function PromptCopilot() {
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
                   {error && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                      <p className="text-sm text-red-800">{error}</p>
+                    <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
+                      <p className="text-sm text-red-800 font-serif font-light">{error}</p>
                     </div>
                   )}
 
                   {success && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                      <p className="text-sm text-green-800">{success}</p>
+                    <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-4">
+                      <p className="text-sm text-green-800 font-serif font-light">{success}</p>
                     </div>
                   )}
 
@@ -287,23 +276,23 @@ export default function PromptCopilot() {
                     >
                       <div className={`max-w-3xl ${
                         message.role === 'system' ? 'w-full' :
-                        message.role === 'user' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-900'
-                      } rounded-lg p-4`}>
+                        message.role === 'user' ? 'bg-[#31543A] text-white' : 'bg-[#F9FAFA] text-[#2A2A2A]'
+                      } rounded-2xl p-4 font-serif font-light`}>
                         {message.role === 'system' ? (
-                          <div className="text-center text-sm text-gray-600 italic">
+                          <div className="text-center text-sm text-[#2A2A2A]/70 italic">
                             {message.content}
                           </div>
                         ) : (
                           <>
                             <div className="flex items-center mb-2">
                               {message.role === 'assistant' && (
-                                <div className="w-6 h-6 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center mr-2">
+                                <div className="w-6 h-6 bg-[#3F8A84] rounded-full flex items-center justify-center mr-2">
                                   <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                                     <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
                                   </svg>
                                 </div>
                               )}
-                              <span className="text-xs font-semibold">
+                              <span className="text-xs font-medium">
                                 {message.role === 'user' ? 'You' : message.role === 'assistant' ? 'AI Copilot' : 'System'}
                               </span>
                             </div>
@@ -311,31 +300,31 @@ export default function PromptCopilot() {
                             <div className="text-sm whitespace-pre-wrap">{message.content}</div>
 
                             {message.explanation && (
-                              <div className="mt-3 pt-3 border-t border-gray-200">
-                                <div className="text-xs font-semibold text-gray-700 mb-1">Details:</div>
-                                <div className="text-xs text-gray-600">{message.explanation}</div>
+                              <div className="mt-3 pt-3 border-t border-[#F9FAFA]">
+                                <div className="text-xs font-medium text-[#2A2A2A]/80 mb-1">Details:</div>
+                                <div className="text-xs text-[#2A2A2A]/70">{message.explanation}</div>
                               </div>
                             )}
 
                             {message.confidence && (
                               <div className="mt-2 flex items-center">
-                                <div className="text-xs text-gray-600 mr-2">Confidence:</div>
-                                <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-xs">
+                                <div className="text-xs text-[#2A2A2A]/70 mr-2">Confidence:</div>
+                                <div className="flex-1 bg-[#F9FAFA] rounded-full h-2 max-w-xs">
                                   <div
-                                    className="bg-gradient-to-r from-purple-600 to-indigo-600 h-2 rounded-full"
+                                    className="bg-[#3F8A84] h-2 rounded-full"
                                     style={{ width: `${message.confidence * 100}%` }}
                                   ></div>
                                 </div>
-                                <span className="text-xs text-gray-600 ml-2">
+                                <span className="text-xs text-[#2A2A2A]/70 ml-2">
                                   {Math.round(message.confidence * 100)}%
                                 </span>
                               </div>
                             )}
 
                             {message.suggestions && message.suggestions.length > 0 && (
-                              <div className="mt-3 pt-3 border-t border-gray-200">
-                                <div className="text-xs font-semibold text-gray-700 mb-2">Suggestions:</div>
-                                <ul className="text-xs text-gray-600 space-y-1">
+                              <div className="mt-3 pt-3 border-t border-[#F9FAFA]">
+                                <div className="text-xs font-medium text-[#2A2A2A]/80 mb-2">Suggestions:</div>
+                                <ul className="text-xs text-[#2A2A2A]/70 space-y-1">
                                   {message.suggestions.map((suggestion, i) => (
                                     <li key={i} className="flex items-start">
                                       <span className="mr-2">•</span>
@@ -353,14 +342,14 @@ export default function PromptCopilot() {
 
                   {refining && (
                     <div className="flex justify-start">
-                      <div className="bg-gray-100 rounded-lg p-4">
+                      <div className="bg-[#F9FAFA] rounded-2xl p-4">
                         <div className="flex items-center space-x-2">
                           <div className="flex space-x-1">
-                            <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                            <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                            <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                            <div className="w-2 h-2 bg-[#3F8A84] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                            <div className="w-2 h-2 bg-[#3F8A84] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                            <div className="w-2 h-2 bg-[#3F8A84] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                           </div>
-                          <span className="text-sm text-gray-600">Refining your prompt...</span>
+                          <span className="text-sm text-[#2A2A2A]/70 font-serif font-light">Refining your prompt...</span>
                         </div>
                       </div>
                     </div>
@@ -370,7 +359,7 @@ export default function PromptCopilot() {
                 </div>
 
                 {/* Input */}
-                <div className="border-t border-gray-200 p-6">
+                <div className="border-t border-[#F9FAFA] p-6">
                   <div className="flex space-x-3">
                     <input
                       type="text"
@@ -378,18 +367,18 @@ export default function PromptCopilot() {
                       onChange={(e) => setUserMessage(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                       placeholder="Describe what you want to improve (e.g., 'Make sentiment more sensitive to frustration')"
-                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="flex-1 px-4 py-3 border border-[#F9FAFA] rounded-full focus:ring-2 focus:ring-[#3F8A84] focus:border-transparent font-serif font-light"
                       disabled={refining}
                     />
                     <button
                       onClick={handleSendMessage}
                       disabled={!userMessage.trim() || refining}
-                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                      className="px-6 py-3 bg-[#31543A] text-white rounded-full hover:bg-[#31543A]/90 disabled:opacity-50 disabled:cursor-not-allowed font-serif font-light"
                     >
                       Send
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-[#2A2A2A]/60 mt-2 font-serif font-light">
                     Examples: "Focus more on price objections" • "Be stricter about professionalism" • "Detect frustration earlier"
                   </p>
                 </div>
@@ -398,6 +387,6 @@ export default function PromptCopilot() {
           </div>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

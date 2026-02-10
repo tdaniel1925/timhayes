@@ -4,10 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Building2, Users, Phone, ArrowLeft, Plus } from 'lucide-react';
+import SuperAdminLayout from '@/components/SuperAdminLayout';
+import { Building2, Users, Phone, Plus } from 'lucide-react';
 
 export default function TenantsPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,33 +51,11 @@ export default function TenantsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Dashboard
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">Tenant Management</h1>
-              <p className="text-sm text-muted-foreground">View and manage all customer accounts</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">{user?.email}</span>
-            <Button variant="outline" onClick={logout}>Logout</Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <SuperAdminLayout
+      title="Tenant Management"
+      subtitle="View and manage all customer accounts"
+    >
+      <div className="max-w-7xl mx-auto px-8 py-8">
         {/* Action Bar */}
         <div className="mb-6 flex justify-between items-center">
           <div>
@@ -85,7 +64,7 @@ export default function TenantsPage() {
           </div>
           <Button
             onClick={() => navigate('/tenants/create')}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-[#31543A] hover:bg-[#31543A]/90 text-white rounded-full font-serif font-light"
           >
             <Plus className="h-4 w-4 mr-2" />
             Create New Tenant
@@ -206,7 +185,7 @@ export default function TenantsPage() {
             )}
           </CardContent>
         </Card>
-      </main>
-    </div>
+      </div>
+    </SuperAdminLayout>
   );
 }

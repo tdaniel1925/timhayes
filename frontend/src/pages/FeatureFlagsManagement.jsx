@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import DashboardLayout from '../components/DashboardLayout';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -104,82 +105,36 @@ export default function FeatureFlagsManagement() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('superadmin_token');
-    navigate('/superadmin/login');
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading feature flags...</p>
+      <DashboardLayout title="Feature Flags" subtitle="Gradual rollouts and A/B testing">
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3F8A84] mx-auto"></div>
+            <p className="mt-4 text-[#2A2A2A]/70 font-light">Loading feature flags...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-lg flex items-center justify-center mr-3">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Feature Flags</h1>
-                <p className="text-sm text-gray-600">Gradual rollouts and A/B testing</p>
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Navigation */}
-      <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8 overflow-x-auto">
-            <Link to="/superadmin/dashboard" className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap">Dashboard</Link>
-            <Link to="/superadmin/tenants" className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap">Tenants</Link>
-            <Link to="/superadmin/plans" className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap">Plans & Pricing</Link>
-            <Link to="/superadmin/revenue" className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap">Revenue</Link>
-            <Link to="/superadmin/costs" className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap">Cost Tracking</Link>
-            <Link to="/superadmin/monitoring" className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap">Monitoring</Link>
-            <Link to="/superadmin/feature-flags" className="px-3 py-4 text-sm font-medium text-blue-600 border-b-2 border-blue-600 whitespace-nowrap">Feature Flags</Link>
-            <Link to="/superadmin/alerts" className="px-3 py-4 text-sm font-medium text-gray-600 hover:text-gray-900 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap">Alerts</Link>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <DashboardLayout title="Feature Flags" subtitle="Gradual rollouts and A/B testing">
+      <div className="space-y-6">
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
             <p className="text-sm text-red-800">{error}</p>
           </div>
         )}
 
         {/* Header Actions */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Feature Flags</h2>
-            <p className="text-sm text-gray-600 mt-1">{flags.length} {flags.length === 1 ? 'flag' : 'flags'} configured</p>
+            <p className="text-sm text-[#2A2A2A]/60 font-light">{flags.length} {flags.length === 1 ? 'flag' : 'flags'} configured</p>
           </div>
           <button
             onClick={handleCreateFlag}
-            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-6 py-2 bg-[#3F8A84] text-white font-medium rounded-full hover:bg-[#31543A] transition-colors"
           >
             Create Feature Flag
           </button>
@@ -188,11 +143,11 @@ export default function FeatureFlagsManagement() {
         {/* Flags List */}
         <div className="space-y-4">
           {flags.map((flag) => (
-            <div key={flag.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div key={flag.id} className="glass-card rounded-2xl p-6">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-bold text-gray-900">{flag.name}</h3>
+                    <h3 className="text-lg font-serif font-bold text-[#2A2A2A]">{flag.name}</h3>
                     <span className={`px-2 py-1 text-xs font-medium rounded ${
                       flag.is_enabled
                         ? 'bg-green-100 text-green-800'
@@ -203,10 +158,10 @@ export default function FeatureFlagsManagement() {
                   </div>
 
                   {flag.description && (
-                    <p className="text-sm text-gray-600 mb-3">{flag.description}</p>
+                    <p className="text-sm text-[#2A2A2A]/70 font-light mb-3">{flag.description}</p>
                   )}
 
-                  <div className="flex items-center gap-6 text-sm text-gray-600">
+                  <div className="flex items-center gap-6 text-sm text-[#2A2A2A]/60 font-light">
                     <div className="flex items-center">
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -236,12 +191,13 @@ export default function FeatureFlagsManagement() {
                   {/* Rollout Progress Bar */}
                   {flag.rollout_percentage > 0 && (
                     <div className="mt-3">
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="w-full bg-[#F9FAFA] rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full transition-all duration-300 ${
-                            flag.is_enabled ? 'bg-green-600' : 'bg-gray-400'
-                          }`}
-                          style={{ width: `${flag.rollout_percentage}%` }}
+                          className="h-2 rounded-full transition-all duration-300"
+                          style={{
+                            width: `${flag.rollout_percentage}%`,
+                            backgroundColor: flag.is_enabled ? '#3F8A84' : '#C89A8F'
+                          }}
                         ></div>
                       </div>
                     </div>
@@ -253,7 +209,7 @@ export default function FeatureFlagsManagement() {
                   <button
                     onClick={() => handleToggleFlag(flag)}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      flag.is_enabled ? 'bg-green-600' : 'bg-gray-300'
+                      flag.is_enabled ? 'bg-[#3F8A84]' : 'bg-gray-300'
                     }`}
                   >
                     <span
@@ -265,7 +221,7 @@ export default function FeatureFlagsManagement() {
 
                   <button
                     onClick={() => handleEditFlag(flag)}
-                    className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 font-medium border border-blue-600 rounded-lg hover:bg-blue-50"
+                    className="px-3 py-1 text-sm text-[#3F8A84] hover:text-[#31543A] font-medium border border-[#3F8A84] rounded-full hover:bg-[#3F8A84]/10"
                   >
                     Edit
                   </button>
@@ -276,57 +232,57 @@ export default function FeatureFlagsManagement() {
         </div>
 
         {flags.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
-            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="text-center py-12 glass-card rounded-2xl">
+            <svg className="w-16 h-16 text-[#2A2A2A]/40 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
             </svg>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Feature Flags</h3>
-            <p className="text-gray-600 mb-4">Create feature flags to control gradual rollouts and A/B testing</p>
+            <h3 className="text-lg font-serif font-medium text-[#2A2A2A] mb-2">No Feature Flags</h3>
+            <p className="text-[#2A2A2A]/60 font-light mb-4">Create feature flags to control gradual rollouts and A/B testing</p>
             <button
               onClick={handleCreateFlag}
-              className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700"
+              className="px-6 py-2 bg-[#3F8A84] text-white font-medium rounded-full hover:bg-[#31543A]"
             >
               Create First Flag
             </button>
           </div>
         )}
-      </main>
+      </div>
 
       {/* Create/Edit Modal */}
       {showCreateModal && editingFlag && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-gray-900">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-xl font-serif font-bold text-[#2A2A2A]">
                 {editingFlag.id ? 'Edit Feature Flag' : 'Create Feature Flag'}
               </h3>
             </div>
 
             <div className="px-6 py-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Flag Name *</label>
+                <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Flag Name *</label>
                 <input
                   type="text"
                   value={editingFlag.name}
                   onChange={(e) => setEditingFlag({ ...editingFlag, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3F8A84] focus:border-transparent"
                   placeholder="e.g., New Dashboard UI"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-[#2A2A2A] mb-1">Description</label>
                 <textarea
                   value={editingFlag.description || ''}
                   onChange={(e) => setEditingFlag({ ...editingFlag, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3F8A84] focus:border-transparent font-light"
                   rows="3"
                   placeholder="What does this flag control?"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-[#2A2A2A] mb-1">
                   Rollout Percentage: {editingFlag.rollout_percentage}%
                 </label>
                 <input
@@ -338,7 +294,7 @@ export default function FeatureFlagsManagement() {
                   onChange={(e) => setEditingFlag({ ...editingFlag, rollout_percentage: parseInt(e.target.value) })}
                   className="w-full"
                 />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <div className="flex justify-between text-xs text-[#2A2A2A]/60 font-light mt-1">
                   <span>0%</span>
                   <span>50%</span>
                   <span>100%</span>
@@ -350,25 +306,25 @@ export default function FeatureFlagsManagement() {
                   type="checkbox"
                   checked={editingFlag.is_enabled}
                   onChange={(e) => setEditingFlag({ ...editingFlag, is_enabled: e.target.checked })}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="rounded border-gray-300 text-[#3F8A84] focus:ring-[#3F8A84]"
                 />
-                <span className="ml-2 text-sm text-gray-700">Enable this flag</span>
+                <span className="ml-2 text-sm text-[#2A2A2A] font-light">Enable this flag</span>
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+            <div className="px-6 py-4 bg-[#F9FAFA] border-t border-gray-100 flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowCreateModal(false);
                   setEditingFlag(null);
                 }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 text-sm font-medium text-[#2A2A2A] bg-white border border-gray-300 rounded-full hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveFlag}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                className="px-4 py-2 text-sm font-medium text-white bg-[#3F8A84] rounded-full hover:bg-[#31543A]"
               >
                 {editingFlag.id ? 'Update Flag' : 'Create Flag'}
               </button>
@@ -376,6 +332,6 @@ export default function FeatureFlagsManagement() {
           </div>
         </div>
       )}
-    </div>
+    </DashboardLayout>
   );
 }

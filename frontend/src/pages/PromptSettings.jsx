@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import DashboardLayout from '@/components/DashboardLayout';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -91,78 +92,65 @@ export default function PromptSettings() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
+    <DashboardLayout
+      title="Prompt Settings"
+      subtitle="View and manage your AI prompts"
+    >
+      <div className="max-w-7xl mx-auto px-8 py-8">
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-gray-600 to-gray-800 rounded-xl flex items-center justify-center mr-4">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Prompt Settings</h1>
-                <p className="text-gray-600 mt-1">View and manage your AI prompts</p>
-              </div>
-            </div>
-
-            <div className="flex space-x-3">
-              <Link
-                to="/prompts/copilot"
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Open Copilot
-              </Link>
-              <Link
-                to="/prompts/scenarios"
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Browse Scenarios
-              </Link>
-              <Link
-                to="/prompts/performance"
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                View Performance
-              </Link>
-            </div>
+          <div className="flex justify-end space-x-3 mb-6">
+            <Link
+              to="/prompts/copilot"
+              className="px-4 py-2 text-sm font-medium text-[#2A2A2A] bg-[#F9FAFA] border border-[#F9FAFA] rounded-full hover:bg-[#6CA8C2]/10 font-serif font-light"
+            >
+              Open Copilot
+            </Link>
+            <Link
+              to="/prompts/scenarios"
+              className="px-4 py-2 text-sm font-medium text-[#2A2A2A] bg-[#F9FAFA] border border-[#F9FAFA] rounded-full hover:bg-[#6CA8C2]/10 font-serif font-light"
+            >
+              Browse Scenarios
+            </Link>
+            <Link
+              to="/prompts/performance"
+              className="px-4 py-2 text-sm font-medium text-[#2A2A2A] bg-[#F9FAFA] border border-[#F9FAFA] rounded-full hover:bg-[#6CA8C2]/10 font-serif font-light"
+            >
+              View Performance
+            </Link>
           </div>
 
           {/* Info Banner */}
-          <div className="bg-gray-100 border border-gray-300 rounded-lg p-4 flex items-start">
-            <svg className="w-5 h-5 text-gray-600 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-[#F9FAFA] border border-[#2A2A2A]/10 rounded-2xl p-4 flex items-start">
+            <svg className="w-5 h-5 text-[#2A2A2A]/60 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <div className="text-sm text-gray-700">
-              <strong>Advanced Mode:</strong> You can view prompts here, but we recommend using the Copilot or Scenarios for making changes. Direct prompt editing is available if you enable Advanced Mode.
+            <div className="text-sm text-[#2A2A2A]/80 font-serif font-light">
+              <strong className="font-medium">Advanced Mode:</strong> You can view prompts here, but we recommend using the Copilot or Scenarios for making changes. Direct prompt editing is available if you enable Advanced Mode.
             </div>
           </div>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-red-800">{error}</p>
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6">
+            <p className="text-sm text-red-800 font-serif font-light">{error}</p>
           </div>
         )}
 
         {success && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-green-800">{success}</p>
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6">
+            <p className="text-sm text-green-800 font-serif font-light">{success}</p>
           </div>
         )}
 
         <div className="grid grid-cols-12 gap-6">
           {/* Feature List */}
           <div className="col-span-4">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">AI Features</h2>
+            <div className="glass-card rounded-2xl p-6">
+              <h2 className="text-lg font-serif font-light text-[#2A2A2A] mb-4">AI Features</h2>
 
               {loading && !selectedFeature ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3F8A84]"></div>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -170,15 +158,15 @@ export default function PromptSettings() {
                     <button
                       key={feature.slug}
                       onClick={() => handleFeatureSelect(feature)}
-                      className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                      className={`w-full text-left px-4 py-3 rounded-full transition-all font-serif font-light ${
                         selectedFeature?.slug === feature.slug
-                          ? 'bg-gray-900 text-white shadow-md'
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                          ? 'bg-[#31543A] text-white shadow-md'
+                          : 'bg-[#F9FAFA] text-[#2A2A2A] hover:bg-[#6CA8C2]/10'
                       }`}
                     >
                       <div className="font-medium">{feature.name}</div>
                       <div className={`text-xs mt-1 ${
-                        selectedFeature?.slug === feature.slug ? 'text-gray-300' : 'text-gray-500'
+                        selectedFeature?.slug === feature.slug ? 'text-white/80' : 'text-[#2A2A2A]/60'
                       }`}>
                         {feature.industry_count} industry variants
                       </div>
@@ -192,7 +180,7 @@ export default function PromptSettings() {
           {/* Prompt Viewer */}
           <div className="col-span-8">
             {!selectedFeature ? (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+              <div className="glass-card rounded-2xl p-12 text-center">
                 <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -202,7 +190,7 @@ export default function PromptSettings() {
                 <p className="text-gray-600">Choose a feature from the left to view its prompt</p>
               </div>
             ) : (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+              <div className="glass-card rounded-2xl">
                 {/* Header */}
                 <div className="border-b border-gray-200 p-6">
                   <div className="flex items-center justify-between mb-4">
@@ -398,6 +386,6 @@ export default function PromptSettings() {
           </div>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

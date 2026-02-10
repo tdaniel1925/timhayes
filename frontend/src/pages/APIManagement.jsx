@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import DashboardLayout from '@/components/DashboardLayout';
 import {
   ArrowLeft,
   Key,
@@ -151,63 +152,38 @@ export default function APIManagement() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading API management...</p>
+      <DashboardLayout title="API Management" subtitle="Manage API keys and integration">
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3F8A84] mx-auto"></div>
+            <p className="mt-4 text-[#2A2A2A]/70 font-light">Loading API management...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold">API Access</h1>
-                <p className="text-sm text-muted-foreground">Manage API keys and integration</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">{user?.email}</span>
-              <Button variant="outline" onClick={logout}>Logout</Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <DashboardLayout title="API Management" subtitle="Manage API keys and integration">
+      <div className="max-w-7xl mx-auto">
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-800">{error}</p>
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-2xl p-4">
+            <p className="text-sm text-red-800 font-light">{error}</p>
           </div>
         )}
 
         {/* API Documentation Link */}
-        <Card className="mb-8 border-blue-200 bg-blue-50">
+        <Card className="mb-8 border-[#6CA8C2]/30 bg-[#6CA8C2]/10 glass-card">
           <CardContent className="pt-6">
             <div className="flex items-start gap-4">
-              <FileText className="h-8 w-8 text-blue-600 flex-shrink-0" />
+              <FileText className="h-8 w-8 text-[#6CA8C2] flex-shrink-0" />
               <div className="flex-1">
-                <h3 className="font-semibold text-blue-900 mb-2">API Documentation</h3>
-                <p className="text-sm text-blue-800 mb-4">
+                <h3 className="font-serif font-semibold text-[#31543A] mb-2">API Documentation</h3>
+                <p className="text-sm text-[#2A2A2A]/70 font-light mb-4">
                   Learn how to integrate AudiaPro's API into your applications. Access full documentation,
                   code examples, and best practices.
                 </p>
-                <Button variant="outline" className="flex items-center gap-2" size="sm">
+                <Button variant="outline" className="flex items-center gap-2 border-[#31543A]/20 text-[#31543A] hover:bg-[#31543A] hover:text-white transition-colors rounded-full" size="sm">
                   <ExternalLink className="h-4 w-4" />
                   View Documentation
                 </Button>
@@ -217,17 +193,17 @@ export default function APIManagement() {
         </Card>
 
         {/* API Keys */}
-        <Card className="mb-8">
+        <Card className="mb-8 glass-card border-gray-100">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="h-5 w-5" />
+                <CardTitle className="flex items-center gap-2 font-serif text-[#31543A]">
+                  <Key className="h-5 w-5 text-[#3F8A84]" />
                   API Keys
                 </CardTitle>
-                <CardDescription>Manage your API authentication keys</CardDescription>
+                <CardDescription className="text-[#2A2A2A]/60 font-light">Manage your API authentication keys</CardDescription>
               </div>
-              <Button onClick={() => setShowNewKeyModal(true)} className="flex items-center gap-2">
+              <Button onClick={() => setShowNewKeyModal(true)} className="flex items-center gap-2 bg-[#31543A] hover:bg-[#3F8A84] text-white rounded-full transition-colors">
                 <Plus className="h-4 w-4" />
                 Create New Key
               </Button>
@@ -237,30 +213,30 @@ export default function APIManagement() {
             {apiKeys && apiKeys.length > 0 ? (
               <div className="space-y-4">
                 {apiKeys.map((key) => (
-                  <div key={key.id} className="p-4 border rounded-lg">
+                  <div key={key.id} className="p-4 border border-gray-200 rounded-2xl bg-white">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h4 className="font-semibold">{key.name}</h4>
-                          <Badge className={key.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                          <h4 className="font-semibold text-[#2A2A2A]">{key.name}</h4>
+                          <Badge className={key.is_active ? 'bg-[#3F8A84]/10 text-[#3F8A84] border-[#3F8A84]/30' : 'bg-gray-100 text-gray-800'}>
                             {key.is_active ? 'Active' : 'Inactive'}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-2 mb-2">
-                          <code className="text-sm bg-gray-100 px-3 py-1 rounded">
+                          <code className="text-sm bg-[#F9FAFA] text-[#2A2A2A] px-3 py-1 rounded-lg font-mono">
                             {key.key_preview}...
                           </code>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => copyToClipboard(key.full_key || key.key_preview)}
-                            className="flex items-center gap-1"
+                            className="flex items-center gap-1 text-[#3F8A84] hover:bg-[#3F8A84]/10"
                           >
                             <Copy className="h-3 w-3" />
                             Copy
                           </Button>
                         </div>
-                        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-6 text-sm text-[#2A2A2A]/60 font-light">
                           <span>Created: {new Date(key.created_at).toLocaleDateString()}</span>
                           {key.last_used_at && (
                             <span>Last used: {new Date(key.last_used_at).toLocaleDateString()}</span>
@@ -271,7 +247,7 @@ export default function APIManagement() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteKey(key.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded-full"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -280,23 +256,23 @@ export default function APIManagement() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Key className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <p className="mb-2">No API keys created yet</p>
-                <p className="text-sm">Create your first API key to start integrating</p>
+              <div className="text-center py-8 text-[#2A2A2A]/60">
+                <Key className="h-12 w-12 mx-auto mb-4 text-[#3F8A84]/40" />
+                <p className="mb-2 font-light">No API keys created yet</p>
+                <p className="text-sm font-light">Create your first API key to start integrating</p>
               </div>
             )}
           </CardContent>
         </Card>
 
         {/* Webhook Logs */}
-        <Card>
+        <Card className="glass-card border-gray-100">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Code className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 font-serif text-[#31543A]">
+              <Code className="h-5 w-5 text-[#3F8A84]" />
               Recent Webhook Activity
             </CardTitle>
-            <CardDescription>Last 50 webhook requests received</CardDescription>
+            <CardDescription className="text-[#2A2A2A]/60 font-light">Last 50 webhook requests received</CardDescription>
           </CardHeader>
           <CardContent>
             {webhookLogs && webhookLogs.length > 0 ? (
@@ -336,23 +312,23 @@ export default function APIManagement() {
                 </table>
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Code className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <p className="mb-2">No webhook activity yet</p>
-                <p className="text-sm">Webhook logs will appear here once you start receiving calls</p>
+              <div className="text-center py-8 text-[#2A2A2A]/60">
+                <Code className="h-12 w-12 mx-auto mb-4 text-[#3F8A84]/40" />
+                <p className="mb-2 font-light">No webhook activity yet</p>
+                <p className="text-sm font-light">Webhook logs will appear here once you start receiving calls</p>
               </div>
             )}
           </CardContent>
         </Card>
-      </main>
+      </div>
 
       {/* Create New Key Modal */}
       {showNewKeyModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-md w-full">
+          <Card className="max-w-md w-full glass-card rounded-3xl">
             <CardHeader>
-              <CardTitle>Create New API Key</CardTitle>
-              <CardDescription>Generate a new API key for your integrations</CardDescription>
+              <CardTitle className="font-serif text-[#31543A]">Create New API Key</CardTitle>
+              <CardDescription className="text-[#2A2A2A]/60 font-light">Generate a new API key for your integrations</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -370,27 +346,28 @@ export default function APIManagement() {
                   </p>
                 </div>
 
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="p-3 bg-[#E4B756]/10 border border-[#E4B756]/30 rounded-2xl">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-yellow-800">
+                    <AlertTriangle className="h-4 w-4 text-[#E4B756] mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-[#2A2A2A]/70 font-light">
                       Make sure to copy your API key now. You won't be able to see it again!
                     </p>
                   </div>
                 </div>
               </div>
             </CardContent>
-            <div className="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">
+            <div className="px-6 py-4 bg-[#F9FAFA] border-t border-gray-100 flex justify-end gap-3">
               <Button
                 variant="outline"
                 onClick={() => {
                   setShowNewKeyModal(false);
                   setNewKeyName('');
                 }}
+                className="border-[#31543A]/20 text-[#31543A] hover:bg-[#31543A]/10 rounded-full"
               >
                 Cancel
               </Button>
-              <Button onClick={handleCreateKey}>
+              <Button onClick={handleCreateKey} className="bg-[#31543A] hover:bg-[#3F8A84] text-white rounded-full">
                 Create Key
               </Button>
             </div>
@@ -401,13 +378,13 @@ export default function APIManagement() {
       {/* Newly Created Key Modal */}
       {newlyCreatedKey && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-md w-full">
+          <Card className="max-w-md w-full glass-card rounded-3xl">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-green-600">
+              <CardTitle className="flex items-center gap-2 text-[#3F8A84] font-serif">
                 <CheckCircle className="h-5 w-5" />
                 API Key Created
               </CardTitle>
-              <CardDescription>Save this key securely - you won't be able to see it again</CardDescription>
+              <CardDescription className="text-[#2A2A2A]/60 font-light">Save this key securely - you won't be able to see it again</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -417,33 +394,35 @@ export default function APIManagement() {
                     <Input
                       value={newlyCreatedKey}
                       readOnly
-                      className="font-mono text-sm"
+                      className="font-mono text-sm bg-[#F9FAFA] border-gray-200 rounded-lg"
                     />
                     <Button
                       variant="outline"
                       onClick={() => copyToClipboard(newlyCreatedKey)}
+                      className="border-[#31543A]/20 text-[#31543A] hover:bg-[#31543A]/10 rounded-full"
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
 
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="p-3 bg-red-50 border border-red-200 rounded-2xl">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-red-800">
+                    <p className="text-xs text-red-800 font-light">
                       This is the only time you'll see this key. Store it securely!
                     </p>
                   </div>
                 </div>
               </div>
             </CardContent>
-            <div className="px-6 py-4 bg-gray-50 border-t flex justify-end">
+            <div className="px-6 py-4 bg-[#F9FAFA] border-t border-gray-100 flex justify-end">
               <Button
                 onClick={() => {
                   setNewlyCreatedKey(null);
                   setShowNewKeyModal(false);
                 }}
+                className="bg-[#31543A] hover:bg-[#3F8A84] text-white rounded-full"
               >
                 I've Saved My Key
               </Button>
@@ -451,6 +430,6 @@ export default function APIManagement() {
           </Card>
         </div>
       )}
-    </div>
+    </DashboardLayout>
   );
 }

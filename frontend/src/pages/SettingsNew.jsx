@@ -186,44 +186,87 @@ export default function SettingsNew() {
   return (
     <DashboardLayout>
       <div className="p-4 md:p-8 max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        {/* Header - SUSTAIN Style */}
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-            <p className="text-gray-600 mt-1">Manage your account and integrations</p>
+            <span className="section-label text-[#6CA8C2] mb-2">
+              Configuration
+            </span>
+            <h1 className="text-4xl font-serif text-[#31543A] mt-2">Settings</h1>
+            <p className="text-[#2A2A2A]/60 mt-2 font-light">Manage your account and integrations</p>
           </div>
           {hasChanges && (
-            <Badge className="bg-warning-100 text-warning-700">
+            <span className="px-4 py-2 rounded-full bg-[#E4B756]/10 text-[#E4B756] border border-[#E4B756]/30 text-sm font-medium">
               Unsaved changes
-            </Badge>
+            </span>
           )}
         </div>
 
-        {/* Tabs */}
-        <Card>
+        {/* Tabs - SUSTAIN Style */}
+        <Card className="glass-card rounded-3xl overflow-hidden shadow-sm border-0">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full justify-start border-b rounded-none p-0">
-              <TabsTrigger value="account" className="rounded-none border-b-2">
-                <Building className="h-4 w-4 mr-2" />
+            <div className="flex border-b border-gray-100 bg-white/50 overflow-x-auto">
+              <button
+                onClick={() => setActiveTab('account')}
+                className={cn(
+                  "px-6 py-4 text-sm font-medium transition-all whitespace-nowrap inline-flex items-center gap-2",
+                  activeTab === 'account'
+                    ? "text-[#31543A] border-b-2 border-[#31543A]"
+                    : "text-[#2A2A2A]/60 hover:text-[#31543A]"
+                )}
+              >
+                <Building className="h-4 w-4" />
                 Account
-              </TabsTrigger>
-              <TabsTrigger value="pbx" className="rounded-none border-b-2">
-                <Server className="h-4 w-4 mr-2" />
+              </button>
+              <button
+                onClick={() => setActiveTab('pbx')}
+                className={cn(
+                  "px-6 py-4 text-sm font-medium transition-all whitespace-nowrap inline-flex items-center gap-2",
+                  activeTab === 'pbx'
+                    ? "text-[#31543A] border-b-2 border-[#31543A]"
+                    : "text-[#2A2A2A]/60 hover:text-[#31543A]"
+                )}
+              >
+                <Server className="h-4 w-4" />
                 Phone System
-              </TabsTrigger>
-              <TabsTrigger value="webhook" className="rounded-none border-b-2">
-                <Webhook className="h-4 w-4 mr-2" />
+              </button>
+              <button
+                onClick={() => setActiveTab('webhook')}
+                className={cn(
+                  "px-6 py-4 text-sm font-medium transition-all whitespace-nowrap inline-flex items-center gap-2",
+                  activeTab === 'webhook'
+                    ? "text-[#31543A] border-b-2 border-[#31543A]"
+                    : "text-[#2A2A2A]/60 hover:text-[#31543A]"
+                )}
+              >
+                <Webhook className="h-4 w-4" />
                 Webhook
-              </TabsTrigger>
-              <TabsTrigger value="features" className="rounded-none border-b-2">
-                <Sliders className="h-4 w-4 mr-2" />
+              </button>
+              <button
+                onClick={() => setActiveTab('features')}
+                className={cn(
+                  "px-6 py-4 text-sm font-medium transition-all whitespace-nowrap inline-flex items-center gap-2",
+                  activeTab === 'features'
+                    ? "text-[#31543A] border-b-2 border-[#31543A]"
+                    : "text-[#2A2A2A]/60 hover:text-[#31543A]"
+                )}
+              >
+                <Sliders className="h-4 w-4" />
                 Features
-              </TabsTrigger>
-              <TabsTrigger value="profile" className="rounded-none border-b-2">
-                <User className="h-4 w-4 mr-2" />
+              </button>
+              <button
+                onClick={() => setActiveTab('profile')}
+                className={cn(
+                  "px-6 py-4 text-sm font-medium transition-all whitespace-nowrap inline-flex items-center gap-2",
+                  activeTab === 'profile'
+                    ? "text-[#31543A] border-b-2 border-[#31543A]"
+                    : "text-[#2A2A2A]/60 hover:text-[#31543A]"
+                )}
+              >
+                <User className="h-4 w-4" />
                 Profile
-              </TabsTrigger>
-            </TabsList>
+              </button>
+            </div>
 
             {/* Account Tab */}
             <TabsContent value="account" className="p-6 space-y-6">
@@ -521,20 +564,20 @@ export default function SettingsNew() {
           </Tabs>
         </Card>
 
-        {/* Action Buttons */}
+        {/* Action Buttons - SUSTAIN Style */}
         {hasChanges && (
-          <div className="flex items-center justify-end gap-3 mt-6">
-            <Button
-              variant="outline"
+          <div className="flex items-center justify-end gap-3 mt-8">
+            <button
               onClick={handleReset}
               disabled={saving}
+              className="px-6 py-3 rounded-full border border-[#31543A]/20 text-[#31543A] text-sm font-medium hover:bg-[#31543A]/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Discard Changes
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2"
+              className="px-6 py-3 bg-[#31543A] text-white rounded-full text-sm font-medium hover:bg-[#2A2A2A] transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-md inline-flex items-center gap-2"
             >
               {saving ? (
                 <>
@@ -547,7 +590,7 @@ export default function SettingsNew() {
                   Save Changes
                 </>
               )}
-            </Button>
+            </button>
           </div>
         )}
       </div>

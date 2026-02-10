@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import axios from 'axios';
+import DashboardLayout from '@/components/DashboardLayout';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -108,42 +109,30 @@ export default function PromptScenarios() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center mr-4">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Quick Scenario Library</h1>
-              <p className="text-gray-600 mt-1">Apply pre-built optimizations with one click</p>
-            </div>
-          </div>
-
-          {/* Info Banner */}
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 flex items-start">
-            <svg className="w-5 h-5 text-indigo-600 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div className="text-sm text-indigo-800">
-              Browse 60+ pre-built optimization scenarios. Click any scenario to preview the changes, then activate with one click.
-            </div>
+    <DashboardLayout
+      title="Quick Scenario Library"
+      subtitle="Apply pre-built optimizations with one click"
+    >
+      <div className="max-w-7xl mx-auto px-8 py-8">
+        {/* Info Banner */}
+        <div className="bg-[#3F8A84]/10 border border-[#3F8A84]/30 rounded-2xl p-4 flex items-start mb-8">
+          <svg className="w-5 h-5 text-[#3F8A84] mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="text-sm text-[#2A2A2A] font-serif font-light">
+            Browse 60+ pre-built optimization scenarios. Click any scenario to preview the changes, then activate with one click.
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="glass-card rounded-2xl p-6 mb-6">
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Feature</label>
+              <label className="block text-sm font-medium text-[#2A2A2A] mb-2 font-serif font-light">Filter by Feature</label>
               <select
                 value={selectedFeature}
                 onChange={(e) => setSelectedFeature(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border border-[#F9FAFA] rounded-full focus:ring-2 focus:ring-[#3F8A84] font-serif font-light"
               >
                 {features.map(feature => (
                   <option key={feature} value={feature}>
@@ -154,11 +143,11 @@ export default function PromptScenarios() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Category</label>
+              <label className="block text-sm font-medium text-[#2A2A2A] mb-2 font-serif font-light">Filter by Category</label>
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2 border border-[#F9FAFA] rounded-full focus:ring-2 focus:ring-[#3F8A84] font-serif font-light"
               >
                 {categories.map(category => (
                   <option key={category} value={category}>
@@ -172,21 +161,21 @@ export default function PromptScenarios() {
 
         {/* Results */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-red-800">{error}</p>
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6">
+            <p className="text-sm text-red-800 font-serif font-light">{error}</p>
           </div>
         )}
 
         {success && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-green-800">{success}</p>
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6">
+            <p className="text-sm text-green-800 font-serif font-light">{success}</p>
           </div>
         )}
 
         {/* Refinement Preview Modal */}
         {refinementResult && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="glass-card rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <div>
@@ -266,10 +255,10 @@ export default function PromptScenarios() {
         {/* Scenarios Grid */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3F8A84]"></div>
           </div>
         ) : Object.keys(filteredScenarios).length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+          <div className="glass-card rounded-2xl p-12 text-center">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -281,8 +270,8 @@ export default function PromptScenarios() {
         ) : (
           <div className="space-y-8">
             {Object.entries(filteredScenarios).map(([featureSlug, scenarios]) => (
-              <div key={featureSlug} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">
+              <div key={featureSlug} className="glass-card rounded-2xl p-6">
+                <h2 className="text-xl font-serif font-light text-[#2A2A2A] mb-4">
                   {featureSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                 </h2>
 
@@ -322,6 +311,6 @@ export default function PromptScenarios() {
           </div>
         )}
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
