@@ -657,6 +657,21 @@ const CallTableRow = ({ call, onCallClick, formatDate, formatDuration, getStatus
                 controls
                 preload="none"
                 className="h-8 max-w-[200px]"
+                aria-label={`Recording for call from ${call.src || 'Unknown'} to ${call.dst || 'Unknown'}`}
+                onLoadStart={(e) => {
+                  e.target.classList.add('opacity-50');
+                }}
+                onCanPlay={(e) => {
+                  e.target.classList.remove('opacity-50');
+                }}
+                onError={(e) => {
+                  console.error('Audio playback error:', e);
+                  e.target.style.display = 'none';
+                  const fallback = document.createElement('span');
+                  fallback.className = 'text-xs text-red-500';
+                  fallback.textContent = 'Playback error';
+                  e.target.parentNode.insertBefore(fallback, e.target);
+                }}
               >
                 <source src={call.recording_url} type="audio/wav" />
                 <source src={call.recording_url} type="audio/mpeg" />
@@ -665,10 +680,10 @@ const CallTableRow = ({ call, onCallClick, formatDate, formatDuration, getStatus
               </audio>
               <a
                 href={call.recording_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#31543A] hover:text-[#3F8A84]"
-                title="Open in new tab"
+                download
+                className="text-[#31543A] hover:text-[#3F8A84] transition-colors"
+                title="Download recording"
+                aria-label="Download recording"
               >
                 <Download className="h-4 w-4" />
               </a>
@@ -768,6 +783,21 @@ const CallCard = ({ call, onCallClick, formatDate, formatDuration, getStatusColo
               controls
               preload="none"
               className="h-8 flex-1"
+              aria-label={`Recording for call from ${call.src || 'Unknown'} to ${call.dst || 'Unknown'}`}
+              onLoadStart={(e) => {
+                e.target.classList.add('opacity-50');
+              }}
+              onCanPlay={(e) => {
+                e.target.classList.remove('opacity-50');
+              }}
+              onError={(e) => {
+                console.error('Audio playback error:', e);
+                e.target.style.display = 'none';
+                const fallback = document.createElement('span');
+                fallback.className = 'text-xs text-red-500';
+                fallback.textContent = 'Playback error';
+                e.target.parentNode.insertBefore(fallback, e.target);
+              }}
             >
               <source src={call.recording_url} type="audio/wav" />
               <source src={call.recording_url} type="audio/mpeg" />
@@ -776,10 +806,10 @@ const CallCard = ({ call, onCallClick, formatDate, formatDuration, getStatusColo
             </audio>
             <a
               href={call.recording_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#31543A] hover:text-[#3F8A84]"
-              title="Open in new tab"
+              download
+              className="text-[#31543A] hover:text-[#3F8A84] transition-colors"
+              title="Download recording"
+              aria-label="Download recording"
             >
               <Download className="h-4 w-4" />
             </a>
