@@ -265,7 +265,7 @@ export default function ComplianceDashboard() {
                   {complianceData.alert_types && Object.entries(complianceData.alert_types).map(([type, count]) => (
                     <div key={type} className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium capitalize">{type.replace(/_/g, ' ')}</span>
+                        <span className="font-medium capitalize">{type?.replace(/_/g, ' ') || type || 'Unknown'}</span>
                         <Badge variant="secondary">{count}</Badge>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
@@ -348,7 +348,7 @@ export default function ComplianceDashboard() {
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
                                   <h4 className="font-semibold text-sm">
-                                    {alert.alert_type?.replace(/_/g, ' ').toUpperCase()}
+                                    {alert.alert_type?.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN ALERT'}
                                   </h4>
                                   <Badge className={getSeverityColor(alert.severity)}>
                                     {alert.severity}

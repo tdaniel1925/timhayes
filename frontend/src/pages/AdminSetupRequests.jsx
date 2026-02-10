@@ -220,7 +220,7 @@ export default function AdminSetupRequests() {
                         <TableCell className="capitalize">{request.selected_plan}</TableCell>
                         <TableCell>
                           <span className={`px-2 py-1 text-xs font-semibold rounded ${getStatusColor(request.status)}`}>
-                            {request.status.replace('_', ' ')}
+                            {request.status?.replace('_', ' ') || 'N/A'}
                           </span>
                         </TableCell>
                         <TableCell>

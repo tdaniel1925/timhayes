@@ -650,18 +650,31 @@ const CallTableRow = ({ call, onCallClick, formatDate, formatDuration, getStatus
       </td>
       <td className="py-5 px-4 text-right">
         <div className="flex items-center justify-end gap-2">
-          {/* Play Recording */}
-          {call.recording_url && (
-            <a
-              href={call.recording_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="p-2 text-[#31543A] hover:bg-[#31543A]/10 rounded-full transition-colors"
-              title="Play recording"
-            >
-              <Play className="h-4 w-4" />
-            </a>
+          {/* Recording Player */}
+          {call.recording_url ? (
+            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <audio
+                controls
+                preload="none"
+                className="h-8 max-w-[200px]"
+              >
+                <source src={call.recording_url} type="audio/wav" />
+                <source src={call.recording_url} type="audio/mpeg" />
+                <source src={call.recording_url} type="audio/ogg" />
+                Your browser does not support audio playback.
+              </audio>
+              <a
+                href={call.recording_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#31543A] hover:text-[#3F8A84]"
+                title="Open in new tab"
+              >
+                <Download className="h-4 w-4" />
+              </a>
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">No recording</span>
           )}
           {/* View Details */}
           <button
@@ -748,20 +761,33 @@ const CallCard = ({ call, onCallClick, formatDate, formatDuration, getStatusColo
         </div>
       )}
 
-      <div className="flex gap-3 pt-3 border-t border-gray-50">
-        {call.recording_url && (
-          <a
-            href={call.recording_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="px-4 py-2 text-xs font-medium text-[#31543A] hover:bg-[#31543A]/10 rounded-full transition-colors inline-flex items-center gap-2"
-          >
-            <Play className="h-4 w-4" />
-            Play Recording
-          </a>
+      <div className="flex flex-col gap-3 pt-3 border-t border-gray-50">
+        {call.recording_url ? (
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <audio
+              controls
+              preload="none"
+              className="h-8 flex-1"
+            >
+              <source src={call.recording_url} type="audio/wav" />
+              <source src={call.recording_url} type="audio/mpeg" />
+              <source src={call.recording_url} type="audio/ogg" />
+              Your browser does not support audio playback.
+            </audio>
+            <a
+              href={call.recording_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#31543A] hover:text-[#3F8A84]"
+              title="Open in new tab"
+            >
+              <Download className="h-4 w-4" />
+            </a>
+          </div>
+        ) : (
+          <span className="text-xs text-gray-400">No recording</span>
         )}
-        <button className="flex-1 px-4 py-2 text-xs font-medium text-white bg-[#31543A] rounded-full hover:bg-[#2A2A2A] transition-all">
+        <button className="w-full px-4 py-2 text-xs font-medium text-white bg-[#31543A] rounded-full hover:bg-[#2A2A2A] transition-all">
           View Details
         </button>
       </div>

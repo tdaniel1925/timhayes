@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 @import './styles/tokens.css';
 
 @tailwind base;
@@ -6,6 +7,16 @@
 
 @layer base {
   :root {
+    /* SUSTAIN Education Color Palette */
+    --muskeg-pine: #31543A;
+    --boreal-sky: #6CA8C2;
+    --cree-teal: #3F8A84;
+    --prairie-gold: #E4B756;
+    --calm-clay: #C89A8F;
+    --charcoal: #2A2A2A;
+    --fog-grey: #F9FAFA;
+
+    /* Shadcn compatibility */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -57,5 +68,38 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+    color: var(--charcoal);
+    background-color: var(--fog-grey);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+
+  .section-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .bg-grid-pattern {
+    background-image: radial-gradient(var(--boreal-sky) 1px, transparent 1px);
+    background-size: 32px 32px;
+    opacity: 0.15;
   }
 }

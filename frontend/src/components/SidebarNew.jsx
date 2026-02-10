@@ -324,7 +324,7 @@ export default function SidebarNew() {
       {/* Desktop Sidebar - SUSTAIN Muskeg Pine */}
       <div className={cn(
         "hidden md:flex h-screen bg-[#31543A] border-r border-[#31543A]/20 flex-col transition-all duration-300",
-        collapsed ? "w-20" : "w-64"
+        collapsed ? "w-20" : "w-80"
       )}>
         <SidebarContent />
       </div>

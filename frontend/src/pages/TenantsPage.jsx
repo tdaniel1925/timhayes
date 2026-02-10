@@ -63,7 +63,7 @@ export default function TenantsPage() {
             <p className="text-sm text-gray-600">Quick stats for all tenant accounts</p>
           </div>
           <Button
-            onClick={() => navigate('/tenants/create')}
+            onClick={() => navigate('/superadmin/tenants/create')}
             className="bg-[#31543A] hover:bg-[#31543A]/90 text-white rounded-full font-serif font-light"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -144,7 +144,7 @@ export default function TenantsPage() {
                       <tr
                         key={tenant.id}
                         className="border-b hover:bg-gray-50 cursor-pointer"
-                        onClick={() => navigate(`/tenants/${tenant.id}`)}
+                        onClick={() => navigate(`/superadmin/tenants/${tenant.id}`)}
                       >
                         <td className="p-4 font-medium">{tenant.company_name}</td>
                         <td className="p-4 text-sm text-muted-foreground">{tenant.subdomain}</td>

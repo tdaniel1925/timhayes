@@ -136,7 +136,7 @@ export default function PromptScenarios() {
               >
                 {features.map(feature => (
                   <option key={feature} value={feature}>
-                    {feature === 'all' ? 'All Features' : feature.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    {feature === 'all' ? 'All Features' : (feature?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'N/A')}
                   </option>
                 ))}
               </select>
@@ -180,7 +180,7 @@ export default function PromptScenarios() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900">{selectedScenario?.title}</h2>
-                    <p className="text-sm text-gray-600 mt-1">{selectedScenario?.feature_slug.replace(/-/g, ' ').toUpperCase()}</p>
+                    <p className="text-sm text-gray-600 mt-1">{selectedScenario?.feature_slug?.replace(/-/g, ' ').toUpperCase() || 'N/A'}</p>
                   </div>
                   <button
                     onClick={() => {
@@ -272,7 +272,7 @@ export default function PromptScenarios() {
             {Object.entries(filteredScenarios).map(([featureSlug, scenarios]) => (
               <div key={featureSlug} className="glass-card rounded-2xl p-6">
                 <h2 className="text-xl font-serif font-light text-[#2A2A2A] mb-4">
-                  {featureSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  {featureSlug?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'N/A'}
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

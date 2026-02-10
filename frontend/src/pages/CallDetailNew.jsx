@@ -431,7 +431,7 @@ export default function CallDetailNew() {
                           <div key={key} className="bg-gray-50 rounded-lg p-4">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-sm text-gray-700 capitalize">
-                                {key.replace(/_/g, ' ')}
+                                {key?.replace(/_/g, ' ') || key || 'Unknown'}
                               </span>
                               <span className={cn("font-bold", getScoreColor(value))}>
                                 {value}
