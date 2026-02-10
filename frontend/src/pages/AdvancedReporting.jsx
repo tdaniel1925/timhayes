@@ -428,11 +428,11 @@ export default function AdvancedReporting() {
               <CardContent>
                 {savedReports && savedReports.length > 0 ? (
                   <div className="space-y-3">
-                    {savedReports.map((report) => (
+                    {savedReports.filter(report => report && report.id).map((report) => (
                       <div key={report.id} className="p-3 border rounded-2xl hover:bg-[#F9FAFA]">
                         <div className="flex items-start justify-between mb-2">
-                          <h4 className="font-medium text-sm font-serif text-[#31543A]">{report.name}</h4>
-                          {report.schedule !== 'none' && (
+                          <h4 className="font-medium text-sm font-serif text-[#31543A]">{report.name || 'Unnamed Report'}</h4>
+                          {report.schedule && report.schedule !== 'none' && (
                             <Clock className="h-4 w-4 text-[#6CA8C2]" />
                           )}
                         </div>
