@@ -19,6 +19,7 @@ import LoadingSkeleton, { DashboardSkeleton, CallListSkeleton } from '@/componen
 import EmptyState, { NoCallsYet, NoSearchResults } from '@/components/EmptyState';
 import { useToast } from '@/components/Toast';
 import { cn } from '@/lib/utils';
+import { getFriendlyError } from '@/lib/friendlyErrors';
 
 /**
  * SUSTAIN-Inspired Premium Dashboard
@@ -82,8 +83,8 @@ export default function Dashboard() {
       console.error('Failed to load data:', error);
       showToast({
         type: 'error',
-        title: 'Failed to load data',
-        message: 'Please try refreshing the page'
+        title: 'Dashboard Temporarily Unavailable',
+        message: getFriendlyError('loadDashboard', error)
       });
     } finally {
       setLoading(false);

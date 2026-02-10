@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import SuperAdminLayout from '@/components/SuperAdminLayout';
+import { getFriendlyError } from '@/lib/friendlyErrors';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -51,7 +52,7 @@ export default function TenantList() {
         localStorage.removeItem('superadmin_token');
         navigate('/superadmin/login');
       } else {
-        setError('Failed to load tenants');
+        setError(getFriendlyError('loadTenants', err));
       }
     } finally {
       setLoading(false);

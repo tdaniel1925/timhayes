@@ -15,6 +15,7 @@ import { LoadingSkeleton } from '@/components/LoadingSkeleton';
 import { ErrorState } from '@/components/EmptyState';
 import DashboardLayout from '@/components/DashboardLayout';
 import { cn } from '@/lib/utils';
+import { getFriendlyError } from '@/lib/friendlyErrors';
 
 /**
  * Redesigned Call Detail Page
@@ -47,7 +48,7 @@ export default function CallDetailNew() {
       const response = await api.getCallDetail(callId);
       setCall(response);
     } catch (err) {
-      setError(err.message || 'Failed to load call details');
+      setError(getFriendlyError('loadCallDetails', err));
     } finally {
       setLoading(false);
     }

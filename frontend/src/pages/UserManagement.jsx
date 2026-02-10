@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { api } from '@/lib/api'
 import { UserPlus, Trash2, Edit, Mail } from 'lucide-react'
 import DashboardLayout from '@/components/DashboardLayout'
+import { getFriendlyError } from '@/lib/friendlyErrors'
 
 export default function UserManagement() {
   const navigate = useNavigate()
@@ -43,7 +44,7 @@ export default function UserManagement() {
       const data = await api.getUsers()
       setUsers(data.users || [])
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load users')
+      setError(getFriendlyError('loadUsers', err))
     } finally {
       setLoading(false)
     }

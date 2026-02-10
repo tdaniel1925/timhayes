@@ -15,6 +15,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 import { useToast } from '@/components/Toast';
 import { LoadingSkeleton } from '@/components/LoadingSkeleton';
 import { cn } from '@/lib/utils';
+import { getFriendlyError } from '@/lib/friendlyErrors';
 
 /**
  * Redesigned Settings Page
@@ -70,10 +71,10 @@ export default function SettingsNew() {
     } catch (error) {
       showToast({
         type: 'error',
-        title: 'Failed to load settings',
-        message: error.message
+        title: 'Settings Temporarily Unavailable',
+        message: getFriendlyError('loadSettings', error)
       });
-    } finally {
+    } finally{
       setLoading(false);
     }
   };

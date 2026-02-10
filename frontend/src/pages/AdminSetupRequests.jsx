@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 import DashboardLayout from '@/components/DashboardLayout'
+import { getFriendlyError } from '@/lib/friendlyErrors'
 
 export default function AdminSetupRequests() {
   const navigate = useNavigate()
@@ -39,7 +40,7 @@ export default function AdminSetupRequests() {
       const data = await api.getSetupRequests(statusFilter)
       setRequests(data.requests || [])
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load setup requests')
+      setError(getFriendlyError('loadSetupRequests', err))
     } finally {
       setLoading(false)
     }
@@ -54,7 +55,7 @@ export default function AdminSetupRequests() {
       setNewStatus(data.status || '')
       setShowDetail(true)
     } catch (err) {
-      alert('Failed to load request details')
+      alert('Unable to load request details at the moment')
     }
   }
 
