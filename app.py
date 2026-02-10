@@ -3027,8 +3027,21 @@ def login():
 def refresh():
     """Refresh access token"""
     current_user_id = get_jwt_identity()
-    user = User.query.get(current_user_id)
 
+    # Check if this is a super admin first
+    super_admin = SuperAdmin.query.get(current_user_id)
+    if super_admin:
+        access_token = create_access_token(
+            identity=super_admin.id,
+            additional_claims={
+                'role': 'super_admin',
+                'is_super_admin': True
+            }
+        )
+        return jsonify({'access_token': access_token}), 200
+
+    # Otherwise, it's a regular user
+    user = User.query.get(current_user_id)
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
