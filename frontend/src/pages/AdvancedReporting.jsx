@@ -154,36 +154,9 @@ export default function AdvancedReporting() {
   ];
 
   return (
-    <DashboardLayout>
-      {/* Header */}
-      <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold font-serif text-[#31543A]">Advanced Reporting</h1>
-                <p className="text-sm text-[#2A2A2A]/70 font-light">Create custom reports and analytics</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">{user?.email}</span>
-              <Button variant="outline" onClick={logout}>Logout</Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <DashboardLayout title="Advanced Reporting" subtitle="Create custom reports and analytics">
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Report Builder */}
           <div className="lg:col-span-2 space-y-6">
             <Card className="glass-card rounded-2xl border-gray-100">
@@ -464,7 +437,7 @@ export default function AdvancedReporting() {
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mb-3">
-                          {report.type.replace(/_/g, ' ')} • {report.dateRange} days
+                          {report.type?.replace(/_/g, ' ') || 'N/A'} • {report.dateRange || '0'} days
                         </p>
                         <div className="flex gap-2">
                           <Button
@@ -515,7 +488,7 @@ export default function AdvancedReporting() {
             </Card>
           </div>
         </div>
-      </main>
+      </div>
     </DashboardLayout>
   );
 }
