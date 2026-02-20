@@ -1,0 +1,67 @@
+Subject: UCM Cloud API Authentication Failure - Challenge Endpoint Returns "Invalid parameters!"
+
+Dear Grandstream Technical Support,
+
+We are experiencing an issue with our cloud-hosted UCM API authentication and need your assistance.
+
+ISSUE:
+The /api/challenge endpoint at our UCM (071ffb.c.myucm.cloud:8443) returns:
+{"response": {"error_msg": "Invalid parameters!"}, "status": -1}
+
+This prevents us from obtaining the challenge token required for authentication.
+
+WHAT WE'VE TESTED:
+- Both Python and Node.js implementations
+- GET and POST methods with various payloads
+- Different usernames (admin1, cdrapi)
+- All request formats (JSON, form data, query params)
+Result: All methods fail with the same "Invalid parameters!" error
+
+VERIFICATION NEEDED:
+Could you please verify these settings in our UCM (System Settings → API):
+□ Enable API Access - enabled?
+□ Enable Challenge/Response Authentication - enabled?
+□ Allow RECAPI (Recording API) - enabled?
+□ Allow CDRAPI (CDR API) - enabled?
+□ API user configured with proper permissions?
+
+QUESTIONS:
+1. Does cloud UCM (*.c.myucm.cloud) have different API requirements than on-premise?
+2. Is there an API key or additional authentication required?
+3. What is our UCM firmware version and where can we find the correct API docs?
+4. Are there any known issues with the /api/challenge endpoint?
+
+USE CASE:
+We're building AudiaPro, an AI call analytics platform that needs to:
+- Receive CDR data via webhook ✅
+- Download recordings via RECAPI ❌ BLOCKED
+
+We have completed all development except recording downloads, which requires working API access.
+
+CODE SAMPLE (Python - following official documentation):
+```python
+import requests
+response = requests.get(
+    "https://071ffb.c.myucm.cloud:8443/api/challenge",
+    verify=False
+)
+print(response.json())
+# Expected: {"challenge": "1234567890123456"}
+# Actual: {"response": {"error_msg": "Invalid parameters!"}, "status": -1}
+```
+
+URGENCY: High - blocking production deployment
+
+Please advise on proper API configuration or alternative authentication method for cloud UCM.
+
+Thank you for your prompt assistance.
+
+Best regards,
+[Your Name]
+BotMakers Inc.
+[Your Email]
+[Your Phone]
+
+---
+UCM Host: 071ffb.c.myucm.cloud:8443
+Account: [Your account info]

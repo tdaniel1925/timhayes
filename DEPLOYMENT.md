@@ -1,384 +1,534 @@
-# AudiaPro - Enhanced Multi-Tenant SaaS Deployment Guide
+# AudiaPro Deployment Guide
 
-## 🎉 ENHANCED & COMPLETE! The platform is 100% built with advanced analytics!
+Complete guide to deploying AudiaPro to production.
 
-## What You Have
+---
 
-### ✅ Enhanced Full-Stack Multi-Tenant SaaS Platform
-- **Backend**: Flask + SQLAlchemy + JWT Authentication + Analytics
-- **Frontend**: React + Vite + Tailwind CSS + shadcn/ui + Recharts
-- **Database**: Multi-tenant with complete isolation + Multi-platform support
-- **Features**: Login, Signup, Enhanced Dashboard, Settings, Webhooks, API
+## Architecture Overview
 
-### 🆕 NEW FEATURES (Enhanced Version)
-- **📊 Advanced Analytics**: Call volume charts (30-day trends)
-- **😊 Sentiment Analysis Charts**: Pie charts showing sentiment distribution
-- **🔍 Search & Pagination**: Searchable call list with 25 calls per page
-- **🎵 Recording Downloads**: Direct download links for call recordings
-- **⚙️ Settings Page**: Configure phone system type, PBX credentials, features
-- **📞 Multi-Platform Support**: Pre-configured for 8 phone systems:
-  - Grandstream UCM
-  - RingCentral
-  - 3CX Phone System
-  - FreePBX / Asterisk
-  - Yeastar PBX
-  - VitalPBX
-  - FusionPBX
-  - Twilio
-- **🎨 Enhanced UI**: Professional charts, better navigation, improved layout
+AudiaPro consists of two services:
 
-## Quick Deploy to Railway
+1. **Frontend + API** → Deployed to **Vercel**
+   - Next.js 15 application (App Router)
+   - API routes for webhooks, tenants, calls, etc.
+   - Public-facing dashboard and admin panel
 
-### Step 1: Install Backend Dependencies Locally (Test First)
+2. **Background Worker** → Deployed to **Render**
+   - Node.js service that processes jobs
+   - Downloads recordings, transcribes, analyzes with AI
+   - Runs independently from the main app
 
-```bash
-pip install -r requirements.txt
-```
+---
 
-### Step 2: Install Frontend Dependencies
+## Prerequisites
 
-```bash
-cd frontend
-npm install
-```
+Before deploying, ensure you have:
 
-### Step 3: Test Locally
+- [ ] Supabase project created
+- [ ] Deepgram API key
+- [ ] Anthropic (Claude) API key
+- [ ] Resend API key (optional, for emails)
+- [ ] Sentry account (optional, for error tracking)
+- [ ] Vercel account
+- [ ] Render account
+- [ ] GitHub repository with your code
 
-**Terminal 1 - Backend:**
-```bash
-python app.py
-```
+---
 
-**Terminal 2 - Frontend:**
-```bash
-cd frontend
-npm run dev
-```
+## Step 1: Set Up Supabase
 
-Visit: http://localhost:3000
+### 1.1 Create Supabase Project
 
-- Try signup: Create an account
-- Login with your new account
-- View dashboard
+1. Go to https://app.supabase.com
+2. Click "New Project"
+3. Name: `audiapro-production`
+4. Choose region closest to your users
+5. Set a strong database password
+6. Click "Create new project"
 
-### Step 4: Deploy to Railway
+### 1.2 Get Supabase Credentials
 
-**Option A: Automatic (Recommended)**
+From your Supabase dashboard:
+- Go to **Project Settings → API**
+- Copy:
+  - `URL` → `NEXT_PUBLIC_SUPABASE_URL`
+  - `anon public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY`
 
-1. Push to GitHub (already done!)
-2. Railway will detect the repo
-3. Railway will automatically:
-   - Install Python dependencies
-   - Install Node dependencies
-   - Build frontend (`npm run build`)
-   - Start backend (`gunicorn app:app`)
+- Go to **Project Settings → Database**
+- Copy **Connection string** (URI mode) → `DATABASE_URL`
+  - Replace `[YOUR-PASSWORD]` with your database password
 
-**Option B: Manual Build**
+### 1.3 Run Database Migrations
+
+**Option A: Use Drizzle Kit (Recommended)**
 
 ```bash
-# Build frontend
-cd frontend
-npm run build
+# Install Drizzle Kit globally
+npm install -g drizzle-kit
 
-# This creates frontend/dist folder
-# Flask serves it automatically
+# Set environment variable
+export DATABASE_URL="postgresql://postgres:[PASSWORD]@db.your-project.supabase.co:5432/postgres"
+
+# Push schema to Supabase
+npx drizzle-kit push
 ```
 
-### Step 5: Set Railway Environment Variables
+**Option B: Manual SQL Migration**
 
-In Railway Dashboard → Variables:
+1. Go to Supabase **SQL Editor**
+2. Run the SQL from `supabase/migrations/` in order:
+   - `001_initial_schema.sql`
+   - `002_rls_policies.sql`
+   - `003_storage_buckets.sql`
+   - `004_indexes.sql`
 
-```
-DATABASE_URL=sqlite:///callinsight.db
-JWT_SECRET_KEY=your-super-secret-random-string-here-change-this
-DEBUG=false
-```
+### 1.4 Create Storage Buckets
 
-**Important:** Generate a secure JWT secret:
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
+In Supabase dashboard:
+1. Go to **Storage**
+2. Create three buckets:
+   - `call-recordings` (Private)
+   - `call-transcripts` (Private)
+   - `call-analyses` (Private)
 
-### Step 6: Generate Domain
-
-Railway → Settings → Networking → Generate Domain
-
-You'll get: `https://timhayes-production.up.railway.app`
-
-### Step 7: Test the Platform!
-
-Visit your Railway URL and:
-
-1. **Signup**: Create first tenant account
-2. **Dashboard**: View your company dashboard
-3. **Webhook URL**: Copy from dashboard for CloudUCM config
-
-## CloudUCM Configuration (Per Client)
-
-Each client gets their own webhook endpoint!
-
-**Example - Client A:**
-```
-Company: Acme Corp
-Subdomain: acme-corp (auto-generated)
-
-CloudUCM Settings:
-Server Address: https://66.33.22.184
-Port: 443
-Delivery Method: HTTPS
-Format: JSON
-Endpoint: /api/webhook/cdr/acme-corp
-Username: (set during signup via dashboard)
-Password: (set during signup via dashboard)
-```
-
-**Example - Client B:**
-```
-Company: Tech Solutions
-Subdomain: tech-solutions
-
-CloudUCM Settings:
-Server Address: https://66.33.22.184
-Port: 443
-Endpoint: /api/webhook/cdr/tech-solutions
-Username: (different credentials)
-Password: (different credentials)
-```
-
-## Architecture
-
-```
-┌─────────────────┐
-│   CloudUCM A    │
-│  (Acme Corp)    │
-└────────┬────────┘
-         │
-         ├─────► /api/webhook/cdr/acme-corp
-         │
-┌────────▼────────────────┐
-│   Flask API (Multi)     │
-│  - JWT Auth             │
-│  - Tenant Isolation     │
-│  - SQLAlchemy ORM       │
-└────────┬────────────────┘
-         │
-┌────────▼────────────────┐
-│   React Dashboard       │
-│  - Login per tenant     │
-│  - Isolated data view   │
-│  - Real-time stats      │
-└─────────────────────────┘
-```
-
-## Database Schema
+3. For each bucket, set RLS policies:
 
 ```sql
--- Each tenant is isolated
-tenants
-  ├─ id
-  ├─ company_name
-  ├─ subdomain (unique)
-  ├─ ucm_ip, ucm_username, ucm_password
-  ├─ webhook_username, webhook_password
-  └─ plan (starter/professional/enterprise)
+-- Allow authenticated users to read their tenant's files
+CREATE POLICY "Tenant access"
+ON storage.objects FOR SELECT
+USING (
+  auth.role() = 'authenticated' AND
+  (storage.foldername(name))[1] = auth.uid()::text
+);
 
-users
-  ├─ id
-  ├─ tenant_id (FK → tenants)
-  ├─ email (unique)
-  ├─ password_hash
-  └─ role (admin/user)
-
-cdr_records
-  ├─ id
-  ├─ tenant_id (FK → tenants)
-  ├─ uniqueid, src, dst
-  ├─ duration, disposition
-  └─ transcription (relationship)
+-- Allow service role to do everything
+CREATE POLICY "Service role access"
+ON storage.objects FOR ALL
+USING (auth.role() = 'service_role');
 ```
 
-## API Endpoints
+### 1.5 Create Super Admin User
 
-### Public Endpoints
-- `POST /api/auth/signup` - Create tenant & admin user
-- `POST /api/auth/login` - Login
-- `POST /api/auth/refresh` - Refresh token
-- `GET /api/phone-systems` - Get supported phone systems
+1. Go to **Authentication → Users**
+2. Click "Add user"
+3. Email: `admin@yourdomain.com`
+4. Password: [Strong password]
+5. After creation, go to **SQL Editor** and run:
 
-### Protected Endpoints (JWT Required)
-- `GET /api/auth/me` - Get current user
-- `GET /api/calls?page=1&per_page=25&search=` - Get paginated calls with search
-- `GET /api/stats` - Get comprehensive stats (total, answered, missed, avg duration)
-- `GET /api/analytics/call-volume?days=30` - Get call volume over time
-- `GET /api/analytics/sentiment-trends` - Get sentiment distribution
-- `GET /api/recording/{call_id}` - Download recording file
-- `GET /api/settings` - Get tenant settings
-- `PUT /api/settings` - Update tenant settings (PBX, webhook, features)
+```sql
+-- Mark user as super admin
+UPDATE auth.users
+SET raw_user_meta_data = jsonb_set(
+  COALESCE(raw_user_meta_data, '{}'::jsonb),
+  '{is_super_admin}',
+  'true'::jsonb
+)
+WHERE email = 'admin@yourdomain.com';
+```
 
-### Webhook Endpoints
-- `POST /api/webhook/cdr/{subdomain}` - Receive CDR (per tenant)
+---
 
-## Features Included
+## Step 2: Generate Encryption Key
 
-### ✅ Authentication
-- JWT-based auth
-- Secure password hashing (bcrypt)
-- Token refresh
-- Protected routes
+The encryption key is used to encrypt PBX credentials in the database.
 
-### ✅ Multi-Tenancy
-- Complete data isolation
-- Subdomain-based webhooks
-- Tenant-specific configuration
-- Per-tenant feature flags
+**IMPORTANT: This must be the same on both Vercel and Render.**
 
-### ✅ Modern UI
-- Tailwind CSS
-- shadcn/ui components
-- Responsive design
-- Professional dashboard
+```bash
+# Generate 32-byte hex string
+openssl rand -hex 32
+```
 
-### ✅ Call Analytics
-- Real-time CDR capture
-- Call stats and metrics
-- Transcription ready
-- Sentiment analysis ready
+Save this output - you'll need it for both deployments.
 
-## Onboarding New Clients
+Example output: `a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456`
 
-### Self-Service (Current)
-1. Client visits your URL
-2. Clicks "Sign Up"
-3. Enters company info
-4. Gets webhook URL
-5. Configures CloudUCM
-6. Starts receiving calls
+---
 
-### Manual Onboarding (Future)
-Create admin panel to add clients without signup.
+## Step 3: Deploy to Vercel (Main App)
 
-## Pricing Model Integration
+### 3.1 Install Vercel CLI
 
-The platform supports 3 tiers (stored in DB):
-- **Starter**: $249/mo
-- **Professional**: $499/mo
-- **Enterprise**: $999/mo
+```bash
+npm install -g vercel
+```
 
-To add Stripe billing:
-1. Install `stripe` package
-2. Add subscription endpoints
-3. Create checkout flow
-4. Webhook for payment events
+### 3.2 Link Project to Vercel
 
-## Security Features
+```bash
+cd "C:\dev\1 - Tim Hayes"
+vercel login
+vercel link
+```
 
-✅ **Password Hashing**: bcrypt with salt
-✅ **JWT Tokens**: Secure, expiring tokens
-✅ **CORS**: Configured for security
-✅ **SQL Injection**: Protected by SQLAlchemy ORM
-✅ **Data Isolation**: Tenant_id on all queries
-✅ **Auth Middleware**: JWT validation on protected routes
+Follow prompts:
+- Set up and deploy? **Yes**
+- Which scope? **Your account**
+- Link to existing project? **No**
+- Project name? `audiapro`
+- Directory? `.`
+- Override settings? **No**
 
-## Production Checklist
+### 3.3 Set Environment Variables
 
-Before going live:
+```bash
+# Set production environment variables
+vercel env add NEXT_PUBLIC_SUPABASE_URL
+# Paste your Supabase URL when prompted
 
-- [ ] Change JWT_SECRET_KEY to random string
-- [ ] Set DEBUG=false
-- [ ] Use PostgreSQL instead of SQLite (optional)
-- [ ] Set up SSL certificate (Railway handles this)
-- [ ] Configure custom domain
-- [ ] Set up monitoring/logging
-- [ ] Add rate limiting
-- [ ] Enable HTTPS only
-- [ ] Backup strategy for database
+vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY
+# Paste your anon key
 
-## Monitoring & Logs
+vercel env add SUPABASE_SERVICE_ROLE_KEY
+# Paste your service role key
 
-View logs in Railway:
-- Deployments → Latest → View Logs
-- See all requests, errors, webhook activity
+vercel env add DATABASE_URL
+# Paste your database connection string
+
+vercel env add DEEPGRAM_API_KEY
+# Paste your Deepgram API key
+
+vercel env add ANTHROPIC_API_KEY
+# Paste your Anthropic API key
+
+vercel env add ENCRYPTION_KEY
+# Paste the encryption key you generated
+
+vercel env add RESEND_API_KEY
+# (Optional) Paste your Resend API key
+
+vercel env add SENTRY_DSN
+# (Optional) Paste your Sentry DSN
+
+vercel env add NEXT_PUBLIC_APP_URL
+# Your production URL, e.g., https://audiapro.vercel.app
+```
+
+**Or set via Vercel Dashboard:**
+1. Go to https://vercel.com/dashboard
+2. Select your `audiapro` project
+3. Go to **Settings → Environment Variables**
+4. Add all variables from `.env.example`
+
+### 3.4 Deploy
+
+```bash
+# Deploy to production
+vercel --prod
+```
+
+Your app will be deployed to: `https://audiapro.vercel.app` (or your custom domain)
+
+### 3.5 Add Custom Domain (Optional)
+
+1. Go to Vercel dashboard → Project → Settings → Domains
+2. Add your domain: `audiapro.com`
+3. Follow DNS configuration instructions
+4. Update `NEXT_PUBLIC_APP_URL` to use your custom domain
+
+---
+
+## Step 4: Deploy Worker to Render
+
+### 4.1 Create Render Account
+
+1. Go to https://render.com
+2. Sign up with GitHub
+3. Authorize Render to access your repositories
+
+### 4.2 Create Web Service for Worker
+
+1. Click **New +** → **Web Service**
+2. Connect your repository
+3. Configure:
+   - **Name**: `audiapro-worker`
+   - **Region**: Oregon (or closest to Supabase)
+   - **Branch**: `main`
+   - **Root Directory**: `worker`
+   - **Runtime**: Node
+   - **Build Command**: `npm install && npm run build`
+   - **Start Command**: `npm start`
+   - **Plan**: Starter ($7/month) or higher
+
+### 4.3 Set Environment Variables in Render
+
+In Render dashboard → Environment:
+
+```
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+DEEPGRAM_API_KEY=dg_your_api_key
+ANTHROPIC_API_KEY=sk-ant-your_api_key
+ENCRYPTION_KEY=your_32_byte_hex_string (MUST match Vercel)
+NODE_ENV=production
+PORT=3001
+```
+
+### 4.4 Configure Health Check
+
+In Render dashboard → Settings:
+- **Health Check Path**: `/health`
+- **Health Check Interval**: 30 seconds
+
+### 4.5 Deploy
+
+Click **Deploy** button. Render will:
+1. Clone your repo
+2. Run `npm install && npm run build` in `worker/` directory
+3. Start the worker with `npm start`
+4. Poll health endpoint every 30 seconds
+
+Monitor logs in Render dashboard to ensure successful startup.
+
+---
+
+## Step 5: Configure Webhooks
+
+After both services are deployed, you need to configure webhook endpoints.
+
+### 5.1 Get Webhook URLs
+
+Your Grandstream webhook URL format:
+```
+https://yourdomain.com/api/webhook/grandstream/[CONNECTION_ID]?webhook_secret=[SECRET]
+```
+
+### 5.2 In AudiaPro Admin Panel
+
+1. Log in as super admin
+2. Go to **Admin → Tenants → [Tenant] → Connections**
+3. Create new PBX connection:
+   - Connection type: Grandstream UCM
+   - Host: Your UCM IP/hostname
+   - Port: 8089 (or your HTTPS port)
+   - Username: `cdrapi`
+   - Password: Your API user password
+   - Webhook secret: (auto-generated)
+
+4. Copy the webhook URL displayed
+
+### 5.3 Configure Grandstream UCM
+
+1. Log in to UCM web interface
+2. Go to **System Settings → API Settings**
+3. Enable CDR API
+4. Set webhook URL to the one from AudiaPro
+5. Enable webhook authentication
+6. Save settings
+
+---
+
+## Step 6: Test End-to-End
+
+### 6.1 Make a Test Call
+
+1. Make a call on your PBX system
+2. Ensure it's recorded
+3. Call should complete and end
+
+### 6.2 Verify Webhook Received
+
+1. Check Vercel logs:
+   ```bash
+   vercel logs --follow
+   ```
+
+2. Look for:
+   ```
+   POST /api/webhook/grandstream/[id] 200
+   ```
+
+### 6.3 Verify Job Created
+
+1. Log in to AudiaPro admin panel
+2. Go to **Admin → Jobs**
+3. You should see a new job with status `pending` or `processing`
+
+### 6.4 Verify Worker Processing
+
+1. Check Render logs for worker
+2. You should see:
+   ```
+   [Worker] Claimed job [job-id]
+   [Pipeline] Starting job [job-id]
+   [Pipeline] Step 1/4: Download
+   [Pipeline] Step 2/4: Transcribe
+   [Pipeline] Step 3/4: AI Analysis
+   [Pipeline] Step 4/4: Finalize
+   [Pipeline] Job [job-id] completed
+   ```
+
+### 6.5 Verify Call in Dashboard
+
+1. Log in as tenant admin
+2. Go to **Dashboard → Calls**
+3. Your test call should appear with:
+   - ✅ Recording playback
+   - ✅ Transcript with speakers
+   - ✅ AI sentiment analysis
+   - ✅ Keywords and topics
+   - ✅ Compliance flags
+
+---
+
+## Step 7: Monitoring & Maintenance
+
+### 7.1 Monitor Vercel
+
+- **Logs**: https://vercel.com/your-project/logs
+- **Analytics**: https://vercel.com/your-project/analytics
+- **Performance**: Check Web Vitals
+
+### 7.2 Monitor Render Worker
+
+- **Logs**: Real-time in Render dashboard
+- **Metrics**: CPU, memory usage
+- **Health**: Check `/health` endpoint
+
+### 7.3 Monitor Supabase
+
+- **Database**: https://app.supabase.com/project/_/database/tables
+- **Storage**: Check bucket sizes
+- **Auth**: Monitor user activity
+
+### 7.4 Set Up Alerts
+
+**Sentry (Error Tracking)**:
+- Errors in Next.js app
+- Worker processing failures
+- API route exceptions
+
+**Render Alerts**:
+- Worker health check failures
+- High memory usage
+- Deployment failures
+
+**Supabase**:
+- Database connection issues
+- Storage quota warnings
+
+---
 
 ## Troubleshooting
 
-### Frontend not loading
-- Check `frontend/dist` folder exists
-- Verify build succeeded in Railway logs
-- Check Flask is serving from correct static folder
+### Worker Not Processing Jobs
 
-### Webhooks not working
-- Verify subdomain matches exactly
-- Check webhook credentials match
-- Look at Railway logs for incoming requests
-- Test with curl:
-  ```bash
-  curl -X POST https://your-domain/api/webhook/cdr/test-company \
-    -u "username:password" \
-    -H "Content-Type: application/json" \
-    -d '{"uniqueid":"test","src":"1001","dst":"2002"}'
-  ```
+**Check:**
+1. Worker health endpoint: `https://audiapro-worker.onrender.com/health`
+2. Render logs for errors
+3. Environment variables are set correctly
+4. ENCRYPTION_KEY matches between Vercel and Render
 
-### Login not working
-- Check JWT_SECRET_KEY is set
-- Verify database was created
-- Check browser console for errors
+**Fix:**
+```bash
+# Restart worker in Render dashboard
+# Or redeploy:
+git commit --allow-empty -m "Restart worker"
+git push origin main
+```
 
-## Using the Enhanced Dashboard
+### Webhook Not Receiving CDRs
 
-### 1. Dashboard View
-- **Stats Cards**: See total calls, answered, missed, and transcribed counts
-- **Call Volume Chart**: 30-day area chart showing daily call activity
-- **Sentiment Pie Chart**: Visual breakdown of positive/negative/neutral calls
-- **Call List**: Paginated table with search functionality (25 per page)
-- **Recording Downloads**: Click "Download" button for calls with recordings
+**Check:**
+1. UCM webhook configuration
+2. Webhook secret matches
+3. Connection is active (not suspended)
+4. Vercel logs for incoming requests
 
-### 2. Search & Pagination
-- Use search box to filter by phone number or caller name
-- Navigate pages using Previous/Next or page number buttons
-- Shows "Showing X to Y of Z calls" for context
+**Fix:**
+- Test webhook with curl:
+```bash
+curl -X POST "https://yourdomain.com/api/webhook/grandstream/[id]?webhook_secret=[secret]" \
+  -H "Content-Type: application/json" \
+  -d @test_cdr.json
+```
 
-### 3. Settings Page
-- Click "Settings" button in header to access configuration
-- **Account Info**: View company name, subdomain, plan
-- **Phone System**: Select your PBX type from dropdown
-  - Automatically sets default port for selected system
-  - Links to documentation for each system
-- **PBX Configuration**: Enter IP, username, password, port
-- **Webhook Configuration**:
-  - See your unique webhook URL
-  - Set authentication credentials for your PBX
-- **Features**: Toggle transcription and sentiment analysis
-- Click "Save Settings" when done
+### Transcription Failing
 
-### 4. Supported Phone Systems
-Each system has preset configuration:
-1. **Grandstream UCM** (Port 8443) - Your current system
-2. **RingCentral** (Port 443) - Cloud PBX
-3. **3CX Phone System** (Port 5001) - Popular on-premise
-4. **FreePBX / Asterisk** (Port 80) - Open source
-5. **Yeastar PBX** (Port 8088) - SMB focused
-6. **VitalPBX** (Port 443) - Unified communications
-7. **FusionPBX** (Port 443) - FreeSWITCH based
-8. **Twilio** (Port 443) - Cloud API
+**Check:**
+1. Deepgram API key is valid
+2. Worker logs show audio file download success
+3. Audio file format is supported (WAV recommended)
 
-## Next Steps
+**Fix:**
+- Verify Deepgram quota: https://console.deepgram.com
+- Check audio file in Supabase Storage
 
-1. **Deploy to Railway** ✅
-2. **Test signup flow** ✅
-3. **Configure first CloudUCM** ✅
-4. **Test enhanced dashboard** 🎯
-5. **Configure settings page** 🎯
-6. **Onboard first client** 🎯
-7. **Add Stripe billing** (optional)
-8. **Custom domain** (optional)
+### AI Analysis Failing
 
-## You're Done! 🎉
+**Check:**
+1. Anthropic API key is valid
+2. Claude API quotas
+3. Worker logs for timeout errors
 
-Your multi-tenant SaaS platform is **100% complete** and ready to:
-- Accept signups
-- Authenticate users
-- Receive webhooks from multiple clients
-- Display call analytics
-- Scale to hundreds of clients
+**Fix:**
+- Verify Anthropic account: https://console.anthropic.com
+- Increase worker timeout if needed
 
-**Deploy and start onboarding clients!** 🚀
+---
+
+## Scaling
+
+### Horizontal Scaling (Render Worker)
+
+To process more calls concurrently:
+
+1. Go to Render dashboard → Worker → Settings
+2. Increase instance count to 2+ workers
+3. Each worker processes up to 3 jobs simultaneously
+4. Jobs are claimed atomically (no duplicates)
+
+### Vertical Scaling
+
+For large audio files or high complexity:
+
+1. Upgrade Render plan (more RAM)
+2. Increase `WORKER_JOB_TIMEOUT_MS`
+3. Monitor Render metrics dashboard
+
+---
+
+## Security Checklist
+
+- [ ] All environment variables set
+- [ ] ENCRYPTION_KEY is strong and secret
+- [ ] SUPABASE_SERVICE_ROLE_KEY only in backend (never client)
+- [ ] RLS policies enabled on all Supabase tables
+- [ ] Storage buckets are private
+- [ ] Webhook secrets are strong (32+ characters)
+- [ ] HTTPS enforced on all endpoints
+- [ ] Super admin password is strong
+- [ ] Sentry error tracking enabled
+- [ ] Regular database backups enabled in Supabase
+
+---
+
+## Support
+
+If you encounter issues:
+
+1. Check Vercel logs
+2. Check Render logs
+3. Check Supabase logs
+4. Check Sentry errors (if enabled)
+5. Review this deployment guide
+6. Contact support: support@audiapro.com
+
+---
+
+## Next Steps After Deployment
+
+1. ✅ Create tenant accounts for customers
+2. ✅ Configure PBX connections
+3. ✅ Set up custom keywords for AI analysis
+4. ✅ Configure email reports (optional)
+5. ✅ Set up custom domain
+6. ✅ Enable Sentry monitoring
+7. ✅ Test with real phone calls
+8. ✅ Train team on using the dashboard
+
+---
+
+**Congratulations! AudiaPro is now deployed to production.** 🎉

@@ -1,0 +1,52 @@
+# Environment files
+.env
+.env.local
+.env*.local
+
+# Development
+node_modules
+.next
+dist
+out
+
+# Worker (deployed separately to Render)
+worker/
+
+# Testing
+coverage
+.vitest
+playwright-report
+test-results
+
+# Documentation (not needed in production)
+*.md
+!README.md
+
+# Supabase (migrations run separately)
+supabase/
+
+# Tests
+tests/
+*.test.ts
+*.spec.ts
+vitest.config.ts
+playwright.config.ts
+
+# Legacy/backup files
+*.old
+*.backup
+*_backup.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
