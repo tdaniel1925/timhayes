@@ -19,9 +19,7 @@ export const connectionStatusValues = ['connected', 'disconnected', 'error'] as 
 export const createConnectionSchema = z.object({
   tenantId: z.string().uuid('Invalid tenant ID'),
   name: z.string().min(1, 'Connection name is required').max(255, 'Name is too long'),
-  providerType: z.enum(providerTypeValues, {
-    errorMap: () => ({ message: 'Invalid provider type' }),
-  }),
+  providerType: z.enum(providerTypeValues, { message: 'Invalid provider type' }),
   host: z
     .string()
     .min(1, 'Host is required')
@@ -33,7 +31,7 @@ export const createConnectionSchema = z.object({
   port: z.number().int().min(1, 'Port must be >= 1').max(65535, 'Port must be <= 65535').default(8443),
   apiUsername: z.string().min(1, 'API username is required').max(255, 'Username is too long').optional(),
   apiPassword: z.string().min(1, 'API password is required').max(255, 'Password is too long').optional(),
-  configJson: z.record(z.unknown()).optional().nullable(),
+  configJson: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
 // Update PBX connection schema
@@ -52,7 +50,7 @@ export const updateConnectionSchema = z.object({
   port: z.number().int().min(1).max(65535).optional(),
   apiUsername: z.string().max(255, 'Username is too long').optional().nullable(),
   apiPassword: z.string().max(255, 'Password is too long').optional().nullable(),
-  configJson: z.record(z.unknown()).optional().nullable(),
+  configJson: z.record(z.string(), z.unknown()).optional().nullable(),
   isActive: z.boolean().optional(),
 });
 

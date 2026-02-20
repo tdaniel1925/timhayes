@@ -11,7 +11,7 @@ import { createError, ErrorCode } from '@/lib/errors';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify authentication and authorization
@@ -23,7 +23,7 @@ export async function POST(
       );
     }
 
-    const jobId = params.id;
+    const { id: jobId } = await params;
 
     // Retry the job
     const job = await retryJob(jobId);

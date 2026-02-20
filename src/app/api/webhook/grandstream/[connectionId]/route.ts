@@ -22,10 +22,10 @@ import { createError, ErrorCode } from '@/lib/errors';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { connectionId: string } }
+  { params }: { params: Promise<{ connectionId: string }> }
 ) {
   try {
-    const connectionId = params.connectionId;
+    const { connectionId } = await params;
 
     // 1. Get webhook secret from query param or header
     const webhookSecret =
@@ -128,7 +128,7 @@ export async function POST(
             error: createError(
               ErrorCode.API_PAYLOAD_VALIDATION_FAILED,
               'Invalid webhook payload format',
-              { validationErrors: error.errors }
+              { validationErrors: error.issues }
             ),
           },
           { status: 400 }

@@ -8,34 +8,30 @@ import { z } from 'zod';
 export const userRoleValues = ['super_admin', 'client_admin'] as const;
 
 // Create user schema
-export const createUserSchema = z.object({
-  email: z.string().email('Invalid email address').max(255, 'Email is too long'),
-  fullName: z.string().min(1, 'Full name is required').max(255, 'Name is too long'),
-  role: z.enum(userRoleValues, {
-    errorMap: () => ({ message: 'Invalid role' }),
-  }),
-  tenantId: z
-    .string()
-    .uuid('Invalid tenant ID')
-    .optional()
-    .nullable()
-    .refine(
-      (val, ctx) => {
-        // If role is client_admin, tenantId is required
-        const role = (ctx as any).parent?.role;
-        if (role === 'client_admin' && !val) {
-          return false;
-        }
-        return true;
-      },
-      { message: 'Tenant ID is required for client_admin role' }
-    ),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .max(255, 'Password is too long')
-    .optional(), // Optional because we can send invite email instead
-});
+export const createUserSchema = z
+  .object({
+    email: z.string().email('Invalid email address').max(255, 'Email is too long'),
+    fullName: z.string().min(1, 'Full name is required').max(255, 'Name is too long'),
+    role: z.enum(userRoleValues, {
+      message: 'Invalid role',
+    }),
+    tenantId: z.string().uuid('Invalid tenant ID').optional().nullable(),
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters')
+      .max(255, 'Password is too long')
+      .optional(), // Optional because we can send invite email instead
+  })
+  .superRefine((data, ctx) => {
+    // If role is client_admin, tenantId is required
+    if (data.role === 'client_admin' && !data.tenantId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['tenantId'],
+        message: 'Tenant ID is required for client_admin role',
+      });
+    }
+  });
 
 // Update user schema
 export const updateUserSchema = z.object({

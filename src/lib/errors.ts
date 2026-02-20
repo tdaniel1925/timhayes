@@ -248,16 +248,113 @@ export const SMS_ERRORS = {
   },
 } as const;
 
+// ===== GENERAL ERRORS =====
+export const GENERAL_ERRORS = {
+  INTERNAL_ERROR: {
+    code: 'CB-GEN-001',
+    message: 'Internal server error',
+    statusCode: 500,
+  },
+  NOT_FOUND: {
+    code: 'CB-GEN-002',
+    message: 'Resource not found',
+    statusCode: 404,
+  },
+  BAD_REQUEST: {
+    code: 'CB-GEN-003',
+    message: 'Bad request',
+    statusCode: 400,
+  },
+} as const;
+
+// ===== CONSOLIDATED ERROR CODE NAMESPACE =====
+// This provides a single namespace for all error codes used throughout the app
+export const ErrorCode = {
+  // General
+  GENERAL_INTERNAL_ERROR: GENERAL_ERRORS.INTERNAL_ERROR,
+  GENERAL_NOT_FOUND: GENERAL_ERRORS.NOT_FOUND,
+  GENERAL_BAD_REQUEST: GENERAL_ERRORS.BAD_REQUEST,
+
+  // Auth
+  AUTH_INVALID_CREDENTIALS: AUTH_ERRORS.INVALID_CREDENTIALS,
+  AUTH_SESSION_EXPIRED: AUTH_ERRORS.SESSION_EXPIRED,
+  AUTH_INSUFFICIENT_PERMISSIONS: AUTH_ERRORS.INSUFFICIENT_PERMISSIONS,
+  AUTH_ACCOUNT_SUSPENDED: AUTH_ERRORS.ACCOUNT_SUSPENDED,
+
+  // Database
+  DB_CONNECTION_FAILED: DB_ERRORS.CONNECTION_FAILED,
+  DB_QUERY_TIMEOUT: DB_ERRORS.QUERY_TIMEOUT,
+  DB_RLS_VIOLATION: DB_ERRORS.RLS_VIOLATION,
+  DB_UNIQUE_CONSTRAINT_VIOLATION: DB_ERRORS.UNIQUE_CONSTRAINT_VIOLATION,
+
+  // API
+  API_INVALID_WEBHOOK_SECRET: API_ERRORS.INVALID_WEBHOOK_SECRET,
+  API_CONNECTION_NOT_FOUND: API_ERRORS.CONNECTION_NOT_FOUND,
+  API_TENANT_SUSPENDED: API_ERRORS.TENANT_SUSPENDED,
+  API_PAYLOAD_VALIDATION_FAILED: API_ERRORS.PAYLOAD_VALIDATION_FAILED,
+  API_RATE_LIMIT_EXCEEDED: API_ERRORS.RATE_LIMIT_EXCEEDED,
+
+  // UCM Integration
+  UCM_AUTH_FAILED: UCM_ERRORS.AUTH_FAILED,
+  UCM_RECORDING_NOT_FOUND: UCM_ERRORS.RECORDING_NOT_FOUND,
+  UCM_SESSION_EXPIRED: UCM_ERRORS.SESSION_EXPIRED,
+  UCM_UNREACHABLE: UCM_ERRORS.UNREACHABLE,
+
+  // Deepgram
+  DEEPGRAM_AUTH_FAILED: DEEPGRAM_ERRORS.AUTH_FAILED,
+  DEEPGRAM_TRANSCRIPTION_FAILED: DEEPGRAM_ERRORS.TRANSCRIPTION_FAILED,
+  DEEPGRAM_UNSUPPORTED_FORMAT: DEEPGRAM_ERRORS.UNSUPPORTED_FORMAT,
+
+  // Claude
+  CLAUDE_AUTH_FAILED: CLAUDE_ERRORS.AUTH_FAILED,
+  CLAUDE_ANALYSIS_FAILED: CLAUDE_ERRORS.ANALYSIS_FAILED,
+  CLAUDE_RESPONSE_PARSE_ERROR: CLAUDE_ERRORS.RESPONSE_PARSE_ERROR,
+
+  // UI
+  UI_COMPONENT_RENDER_ERROR: UI_ERRORS.COMPONENT_RENDER_ERROR,
+  UI_FORM_VALIDATION_ERROR: UI_ERRORS.FORM_VALIDATION_ERROR,
+
+  // Cron
+  CRON_EMAIL_REPORT_FAILED: CRON_ERRORS.EMAIL_REPORT_FAILED,
+  CRON_BILLING_CALCULATION_FAILED: CRON_ERRORS.BILLING_CALCULATION_FAILED,
+
+  // Email
+  EMAIL_SEND_FAILED: EMAIL_ERRORS.SEND_FAILED,
+  EMAIL_TEMPLATE_ERROR: EMAIL_ERRORS.TEMPLATE_ERROR,
+  EMAIL_INVALID_RECIPIENT: EMAIL_ERRORS.INVALID_RECIPIENT,
+
+  // Encryption
+  ENCRYPTION_KEY_NOT_SET: ENCRYPTION_ERRORS.KEY_NOT_SET,
+  ENCRYPTION_INVALID_KEY_LENGTH: ENCRYPTION_ERRORS.INVALID_KEY_LENGTH,
+  ENCRYPTION_INVALID_KEY_FORMAT: ENCRYPTION_ERRORS.INVALID_KEY_FORMAT,
+  ENCRYPTION_FAILED: ENCRYPTION_ERRORS.ENCRYPTION_FAILED,
+  DECRYPTION_FAILED: ENCRYPTION_ERRORS.DECRYPTION_FAILED,
+
+  // SMS
+  SMS_SEND_FAILED: SMS_ERRORS.SEND_FAILED,
+} as const;
+
 // ===== HELPER FUNCTIONS =====
 
 /**
  * Create an AppError from a predefined error
+ *
+ * @param errorDef - The error definition with code, message, and statusCode
+ * @param customMessageOrDetails - Optional custom message (string) or details (object)
+ * @param details - Optional details (only if second param is a string)
  */
 export function createError(
   errorDef: { code: string; message: string; statusCode: number },
+  customMessageOrDetails?: string | unknown,
   details?: unknown
 ): AppError {
-  return new AppError(errorDef.message, errorDef.code, errorDef.statusCode, details);
+  // If second param is a string, use it as custom message
+  if (typeof customMessageOrDetails === 'string') {
+    return new AppError(customMessageOrDetails, errorDef.code, errorDef.statusCode, details);
+  }
+
+  // Otherwise, second param is details
+  return new AppError(errorDef.message, errorDef.code, errorDef.statusCode, customMessageOrDetails);
 }
 
 /**

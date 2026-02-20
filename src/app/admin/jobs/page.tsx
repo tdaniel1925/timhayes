@@ -131,7 +131,7 @@ export default function JobsPage() {
       retry: 'outline',
     };
 
-    const icons: Record<string, JSX.Element> = {
+    const icons: Record<string, React.ReactElement> = {
       pending: <Clock className="h-3 w-3" />,
       processing: <RefreshCw className="h-3 w-3 animate-spin" />,
       completed: <CheckCircle className="h-3 w-3" />,

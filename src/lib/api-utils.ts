@@ -18,7 +18,12 @@ export async function verifyAuth(request: NextRequest, allowedRoles: ('super_adm
   } = await supabase.auth.getSession();
 
   if (error || !session) {
-    throw createError(AUTH_ERRORS.SESSION_EXPIRED);
+    const authError = createError(AUTH_ERRORS.SESSION_EXPIRED);
+    return {
+      authorized: false,
+      error: formatErrorResponse(authError).error,
+      status: authError.statusCode,
+    };
   }
 
   // Get user details from database
@@ -29,15 +34,30 @@ export async function verifyAuth(request: NextRequest, allowedRoles: ('super_adm
     .single();
 
   if (userError || !userData) {
-    throw createError(AUTH_ERRORS.INVALID_CREDENTIALS);
+    const authError = createError(AUTH_ERRORS.INVALID_CREDENTIALS);
+    return {
+      authorized: false,
+      error: formatErrorResponse(authError).error,
+      status: authError.statusCode,
+    };
   }
 
   if (!userData.is_active) {
-    throw new AppError('Account is inactive', AUTH_ERRORS.ACCOUNT_SUSPENDED.code, 403);
+    const authError = new AppError('Account is inactive', AUTH_ERRORS.ACCOUNT_SUSPENDED.code, 403);
+    return {
+      authorized: false,
+      error: formatErrorResponse(authError).error,
+      status: authError.statusCode,
+    };
   }
 
   if (!allowedRoles.includes(userData.role as any)) {
-    throw createError(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
+    const authError = createError(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
+    return {
+      authorized: false,
+      error: formatErrorResponse(authError).error,
+      status: authError.statusCode,
+    };
   }
 
   // Check if tenant is active (for client_admin users)
@@ -49,15 +69,26 @@ export async function verifyAuth(request: NextRequest, allowedRoles: ('super_adm
       .single();
 
     if (tenantError || !tenantData) {
-      throw new AppError('Tenant not found', 'CB-AUTH-005', 404);
+      const authError = new AppError('Tenant not found', 'CB-AUTH-005', 404);
+      return {
+        authorized: false,
+        error: formatErrorResponse(authError).error,
+        status: authError.statusCode,
+      };
     }
 
     if (tenantData.status === 'suspended') {
-      throw createError(AUTH_ERRORS.ACCOUNT_SUSPENDED);
+      const authError = createError(AUTH_ERRORS.ACCOUNT_SUSPENDED);
+      return {
+        authorized: false,
+        error: formatErrorResponse(authError).error,
+        status: authError.statusCode,
+      };
     }
   }
 
   return {
+    authorized: true,
     user: userData,
     session,
   };
