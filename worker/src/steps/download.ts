@@ -4,7 +4,7 @@
 
 import { authenticateUCM, downloadRecording } from '../lib/grandstream.js';
 import { supabase, uploadToStorage } from '../lib/supabase.js';
-import { createDecrypt } from 'crypto';
+import { createDecipheriv } from 'crypto';
 
 interface DownloadStepInput {
   cdrRecordId: string;
@@ -31,9 +31,8 @@ function decryptCredentials(encrypted: string, encryptionKey: string): string {
   const encryptedData = Buffer.from(encryptedDataHex, 'hex');
   const key = Buffer.from(encryptionKey, 'hex');
 
-  const decipher = createDecrypt('aes-256-gcm', key);
+  const decipher = createDecipheriv('aes-256-gcm', key, iv);
   decipher.setAuthTag(authTag);
-  decipher.setAAD(iv);
 
   let decrypted = decipher.update(encryptedData);
   decrypted = Buffer.concat([decrypted, decipher.final()]);

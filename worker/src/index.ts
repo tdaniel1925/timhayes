@@ -3,7 +3,7 @@
  * Polls job queue and processes call recordings through AI pipeline
  */
 
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { supabase } from './lib/supabase.js';
 import { processPipeline } from './pipeline.js';
 
@@ -15,12 +15,26 @@ const MAX_CONCURRENT_JOBS = 3;
 const activeJobs = new Set<string>();
 let isShuttingDown = false;
 
+// Job type from database
+interface Job {
+  id: string;
+  tenant_id: string;
+  cdr_record_id: string;
+  job_type: string;
+  status: string;
+  priority: number;
+  attempts: number;
+  metadata?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
 /**
  * Health check server for Render
  */
 const app = express();
 
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   const status = {
     status: 'healthy',
     uptime: process.uptime(),
@@ -33,7 +47,7 @@ app.get('/health', (req, res) => {
   res.json(status);
 });
 
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
   res.json({
     service: 'AudiaPro Worker',
     version: '1.0.0',
@@ -61,7 +75,7 @@ async function claimAndProcessJob(): Promise<void> {
 
   try {
     // Claim next job atomically using FOR UPDATE SKIP LOCKED
-    const { data: job, error } = await supabase.rpc('claim_next_job').single();
+    const { data: job, error } = await supabase.rpc('claim_next_job').single() as { data: Job | null; error: any };
 
     if (error) {
       if (error.code !== 'PGRST116') {

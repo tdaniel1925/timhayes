@@ -47,7 +47,7 @@ export async function authenticateUCM(
     throw new Error(`UCM challenge failed: ${challengeResponse.statusText}`);
   }
 
-  const challengeData: UCMApiResponse = await challengeResponse.json();
+  const challengeData = (await challengeResponse.json()) as UCMApiResponse;
 
   if (challengeData.status !== 0) {
     throw new Error(
@@ -85,7 +85,7 @@ export async function authenticateUCM(
     throw new Error(`UCM login failed: ${loginResponse.statusText}`);
   }
 
-  const loginData: UCMApiResponse = await loginResponse.json();
+  const loginData = (await loginResponse.json()) as UCMApiResponse;
 
   if (loginData.status !== 0) {
     throw new Error(
@@ -139,7 +139,7 @@ export async function downloadRecording(
   const contentType = response.headers.get('content-type');
 
   if (contentType?.includes('application/json')) {
-    const errorData: UCMApiResponse = await response.json();
+    const errorData = (await response.json()) as UCMApiResponse;
     if (errorData.status !== 0) {
       throw new Error(
         `Recording download failed: ${errorData.response?.error_msg || 'Unknown error'}`
