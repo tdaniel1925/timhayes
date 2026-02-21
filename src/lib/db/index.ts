@@ -20,9 +20,6 @@ function getClient() {
     }
     _client = postgres(process.env.DATABASE_URL, {
       prepare: false, // Required for Vercel Edge
-      connect_timeout: 10, // 10 seconds connection timeout
-      idle_timeout: 30, // 30 seconds idle timeout
-      max: 10, // Max 10 connections
     });
   }
   return _client;
