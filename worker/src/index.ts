@@ -6,9 +6,11 @@
 import express, { Request, Response } from 'express';
 import { supabase } from './lib/supabase.js';
 import { processPipeline } from './pipeline.js';
+import { processEmailReports } from './cron/email-reports.js';
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const POLL_INTERVAL_MS = 5000; // 5 seconds
+const EMAIL_CRON_INTERVAL_MS = 3600000; // 1 hour
 const MAX_CONCURRENT_JOBS = 3;
 
 // Track active jobs
@@ -155,6 +157,28 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Email reports cron loop
+ * Runs every hour to check for due email reports
+ */
+async function emailCronLoop(): Promise<void> {
+  while (!isShuttingDown) {
+    try {
+      console.log('[EmailCron] Checking for due email reports...');
+      await processEmailReports();
+    } catch (error) {
+      console.error(
+        `[EmailCron] Error in email cron loop: ${error instanceof Error ? error.message : 'Unknown'}`
+      );
+    }
+
+    // Wait before next check (1 hour)
+    await sleep(EMAIL_CRON_INTERVAL_MS);
+  }
+
+  console.log('[EmailCron] Email cron loop stopped');
+}
+
+/**
  * Graceful shutdown
  */
 async function shutdown(signal: string): Promise<void> {
@@ -210,4 +234,13 @@ pollLoop().catch((error) => {
     `[Worker] Fatal error in poll loop: ${error instanceof Error ? error.message : 'Unknown'}`
   );
   process.exit(1);
+});
+
+// Start the email cron loop
+console.log('[Worker] Starting email reports cron loop...');
+emailCronLoop().catch((error) => {
+  console.error(
+    `[Worker] Fatal error in email cron loop: ${error instanceof Error ? error.message : 'Unknown'}`
+  );
+  // Don't exit on email cron errors, just log them
 });
