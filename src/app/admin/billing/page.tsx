@@ -37,9 +37,16 @@ export default function AdminBillingPage() {
   const fetchBillingData = async () => {
     try {
       setLoading(true);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
       // Fetch all tenants with their billing info
-      const tenantsResponse = await fetch('/api/tenants');
+      const tenantsResponse = await fetch('/api/tenants', {
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
       const tenantsData = await tenantsResponse.json();
 
       if (tenantsData.error) {
@@ -100,9 +107,14 @@ export default function AdminBillingPage() {
         currentMonth,
         tenants: tenantBilling,
       });
-    } catch (err) {
-      setError('Failed to load billing data');
-      console.error('Failed to fetch billing:', err);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        setError('Request timed out. Please try again.');
+        console.error('Request timed out after 15 seconds');
+      } else {
+        setError('Failed to load billing data');
+        console.error('Failed to fetch billing:', err);
+      }
     } finally {
       setLoading(false);
     }

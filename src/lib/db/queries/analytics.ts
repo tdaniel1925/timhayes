@@ -21,23 +21,33 @@ export async function getTenantDashboardStats(tenantId: string, dateFrom?: Date,
         )
       : eq(cdrRecords.tenantId, tenantId);
 
-    // Get total calls
-    const calls = await db
-      .select()
-      .from(cdrRecords)
-      .where(dateFilter);
+    // Get total calls with timeout
+    const calls = await Promise.race([
+      db
+        .select()
+        .from(cdrRecords)
+        .where(dateFilter),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
 
-    // Get calls with analysis
-    const callsWithAnalysis = await db
-      .select({
-        sentiment: callAnalyses.sentimentOverall,
-        satisfactionPrediction: callAnalyses.satisfactionPrediction,
-        escalationRisk: callAnalyses.escalationRisk,
-        cdrId: callAnalyses.cdrRecordId,
-      })
-      .from(callAnalyses)
-      .innerJoin(cdrRecords, eq(callAnalyses.cdrRecordId, cdrRecords.id))
-      .where(dateFilter);
+    // Get calls with analysis with timeout
+    const callsWithAnalysis = await Promise.race([
+      db
+        .select({
+          sentiment: callAnalyses.sentimentOverall,
+          satisfactionPrediction: callAnalyses.satisfactionPrediction,
+          escalationRisk: callAnalyses.escalationRisk,
+          cdrId: callAnalyses.cdrRecordId,
+        })
+        .from(callAnalyses)
+        .innerJoin(cdrRecords, eq(callAnalyses.cdrRecordId, cdrRecords.id))
+        .where(dateFilter),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
 
     // Calculate statistics
     const totalCalls = calls.length;
@@ -91,6 +101,7 @@ export async function getTenantDashboardStats(tenantId: string, dateFrom?: Date,
       answerRate: totalCalls > 0 ? Math.round((answeredCalls / totalCalls) * 100) : 0,
     };
   } catch (error) {
+    console.error('[getTenantDashboardStats] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }
@@ -130,20 +141,30 @@ export async function getTenantCalls(
 
     const whereClause = and(...filters);
 
-    // Get total count
-    const [{ count: totalCount }] = await db
-      .select({ count: count() })
-      .from(cdrRecords)
-      .where(whereClause);
+    // Get total count with timeout
+    const [{ count: totalCount }] = await Promise.race([
+      db
+        .select({ count: count() })
+        .from(cdrRecords)
+        .where(whereClause),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
 
-    // Get paginated calls
-    const calls = await db
-      .select()
-      .from(cdrRecords)
-      .where(whereClause)
-      .orderBy(desc(cdrRecords.startTime))
-      .limit(pageSize)
-      .offset(offset);
+    // Get paginated calls with timeout
+    const calls = await Promise.race([
+      db
+        .select()
+        .from(cdrRecords)
+        .where(whereClause)
+        .orderBy(desc(cdrRecords.startTime))
+        .limit(pageSize)
+        .offset(offset),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
 
     return {
       data: calls,
@@ -155,6 +176,7 @@ export async function getTenantCalls(
       },
     };
   } catch (error) {
+    console.error('[getTenantCalls] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }
@@ -164,28 +186,39 @@ export async function getTenantCalls(
  */
 export async function getCallDetail(callId: string, tenantId: string) {
   try {
-    const call = await db
-      .select()
-      .from(cdrRecords)
-      .where(and(eq(cdrRecords.id, callId), eq(cdrRecords.tenantId, tenantId)))
-      .limit(1);
+    const call = await Promise.race([
+      db
+        .select()
+        .from(cdrRecords)
+        .where(and(eq(cdrRecords.id, callId), eq(cdrRecords.tenantId, tenantId)))
+        .limit(1),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
 
     if (!call[0]) {
       return null;
     }
 
-    // Get analysis if exists
-    const analysis = await db
-      .select()
-      .from(callAnalyses)
-      .where(eq(callAnalyses.cdrRecordId, callId))
-      .limit(1);
+    // Get analysis if exists with timeout
+    const analysis = await Promise.race([
+      db
+        .select()
+        .from(callAnalyses)
+        .where(eq(callAnalyses.cdrRecordId, callId))
+        .limit(1),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
 
     return {
       call: call[0],
       analysis: analysis[0] || null,
     };
   } catch (error) {
+    console.error('[getCallDetail] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }
@@ -227,35 +260,45 @@ export async function getAllCalls(options: {
 
     const whereClause = filters.length > 0 ? and(...filters) : undefined;
 
-    // Get total count
-    const [{ count: totalCount }] = await db
-      .select({ count: count() })
-      .from(cdrRecords)
-      .where(whereClause);
+    // Get total count with timeout
+    const [{ count: totalCount }] = await Promise.race([
+      db
+        .select({ count: count() })
+        .from(cdrRecords)
+        .where(whereClause),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
 
-    // Get paginated calls with tenant info
-    const calls = await db
-      .select({
-        id: cdrRecords.id,
-        tenantId: cdrRecords.tenantId,
-        tenantName: tenants.name,
-        src: cdrRecords.src,
-        dst: cdrRecords.dst,
-        callerName: cdrRecords.callerName,
-        startTime: cdrRecords.startTime,
-        endTime: cdrRecords.endTime,
-        durationSeconds: cdrRecords.durationSeconds,
-        disposition: cdrRecords.disposition,
-        recordingFilename: cdrRecords.recordingFilename,
-        transcriptStatus: cdrRecords.transcriptStatus,
-        analysisStatus: cdrRecords.analysisStatus,
-      })
-      .from(cdrRecords)
-      .leftJoin(tenants, eq(cdrRecords.tenantId, tenants.id))
-      .where(whereClause)
-      .orderBy(desc(cdrRecords.startTime))
-      .limit(pageSize)
-      .offset(offset);
+    // Get paginated calls with tenant info with timeout
+    const calls = await Promise.race([
+      db
+        .select({
+          id: cdrRecords.id,
+          tenantId: cdrRecords.tenantId,
+          tenantName: tenants.name,
+          src: cdrRecords.src,
+          dst: cdrRecords.dst,
+          callerName: cdrRecords.callerName,
+          startTime: cdrRecords.startTime,
+          endTime: cdrRecords.endTime,
+          durationSeconds: cdrRecords.durationSeconds,
+          disposition: cdrRecords.disposition,
+          recordingFilename: cdrRecords.recordingFilename,
+          transcriptStatus: cdrRecords.transcriptStatus,
+          analysisStatus: cdrRecords.analysisStatus,
+        })
+        .from(cdrRecords)
+        .leftJoin(tenants, eq(cdrRecords.tenantId, tenants.id))
+        .where(whereClause)
+        .orderBy(desc(cdrRecords.startTime))
+        .limit(pageSize)
+        .offset(offset),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
 
     return {
       data: calls,
@@ -267,6 +310,7 @@ export async function getAllCalls(options: {
       },
     };
   } catch (error) {
+    console.error('[getAllCalls] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }
@@ -279,24 +323,30 @@ export async function getCallVolumeTrend(tenantId: string, days: number = 30) {
     const dateFrom = new Date();
     dateFrom.setDate(dateFrom.getDate() - days);
 
-    const result = await db
-      .select({
-        date: sql<string>`DATE(${cdrRecords.startTime})`,
-        total: count(),
-        answered: sql<number>`COUNT(CASE WHEN ${cdrRecords.disposition} = 'answered' THEN 1 END)`,
-      })
-      .from(cdrRecords)
-      .where(
-        and(
-          eq(cdrRecords.tenantId, tenantId),
-          gte(cdrRecords.startTime, dateFrom)
+    const result = await Promise.race([
+      db
+        .select({
+          date: sql<string>`DATE(${cdrRecords.startTime})`,
+          total: count(),
+          answered: sql<number>`COUNT(CASE WHEN ${cdrRecords.disposition} = 'answered' THEN 1 END)`,
+        })
+        .from(cdrRecords)
+        .where(
+          and(
+            eq(cdrRecords.tenantId, tenantId),
+            gte(cdrRecords.startTime, dateFrom)
+          )
         )
+        .groupBy(sql`DATE(${cdrRecords.startTime})`)
+        .orderBy(sql`DATE(${cdrRecords.startTime})`),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
       )
-      .groupBy(sql`DATE(${cdrRecords.startTime})`)
-      .orderBy(sql`DATE(${cdrRecords.startTime})`);
+    ]) as any[];
 
     return result;
   } catch (error) {
+    console.error('[getCallVolumeTrend] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }

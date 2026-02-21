@@ -48,8 +48,16 @@ export default function HealthPage() {
       setLoading(true);
       setError(null);
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
       // Fetch system health from API
-      const response = await fetch('/api/health');
+      const response = await fetch('/api/health', {
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
       const result = await response.json();
 
       if (result.error) {
@@ -58,9 +66,14 @@ export default function HealthPage() {
         setData(result.data);
         setLastRefresh(new Date());
       }
-    } catch (err) {
-      setError('Failed to load health data');
-      console.error('Failed to fetch health:', err);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        setError('Request timed out. Please try again.');
+        console.error('Request timed out after 15 seconds');
+      } else {
+        setError('Failed to load health data');
+        console.error('Failed to fetch health:', err);
+      }
     } finally {
       setLoading(false);
     }

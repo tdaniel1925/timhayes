@@ -41,6 +41,9 @@ export default function AdminCallsPage() {
     async function fetchCalls() {
       try {
         setLoading(true);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
         const params = new URLSearchParams({
           page: page.toString(),
           pageSize: '20',
@@ -50,15 +53,24 @@ export default function AdminCallsPage() {
           params.set('disposition', disposition);
         }
 
-        const response = await fetch(`/api/admin/calls?${params}`);
+        const response = await fetch(`/api/admin/calls?${params}`, {
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
         const data = await response.json();
 
         if (data.data) {
           setCalls(data.data);
           setTotalPages(data.meta?.totalPages || 1);
         }
-      } catch (error) {
-        console.error('Failed to fetch calls:', error);
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.error('Request timed out after 15 seconds');
+        } else {
+          console.error('Failed to fetch calls:', error);
+        }
       } finally {
         setLoading(false);
       }

@@ -44,13 +44,25 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const response = await fetch('/api/dashboard/stats');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+        const response = await fetch('/api/dashboard/stats', {
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
         const data = await response.json();
         if (data.data) {
           setStats(data.data);
         }
-      } catch (error) {
-        console.error('Failed to fetch stats:', error);
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.error('Request timed out after 15 seconds');
+        } else {
+          console.error('Failed to fetch stats:', error);
+        }
       } finally {
         setLoading(false);
       }

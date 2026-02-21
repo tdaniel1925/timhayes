@@ -89,9 +89,14 @@ export async function completeJob(jobId: string) {
  * Marks a job as failed with an error message
  */
 export async function failJob(jobId: string, errorMessage: string) {
-  const job = await db.query.jobQueue.findFirst({
-    where: eq(jobQueue.id, jobId),
-  });
+  const job = await Promise.race([
+    db.query.jobQueue.findFirst({
+      where: eq(jobQueue.id, jobId),
+    }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+    )
+  ]) as any;
 
   if (!job) {
     throw new Error(`Job ${jobId} not found`);
@@ -163,68 +168,98 @@ export interface GetJobsParams {
 }
 
 export async function getJobs(params: GetJobsParams = {}) {
-  const conditions = [];
+  try {
+    const conditions = [];
 
-  if (params.status) {
-    conditions.push(eq(jobQueue.status, params.status));
+    if (params.status) {
+      conditions.push(eq(jobQueue.status, params.status));
+    }
+
+    if (params.tenantId) {
+      conditions.push(eq(jobQueue.tenantId, params.tenantId));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const jobs = await Promise.race([
+      db.query.jobQueue.findMany({
+        where: whereClause,
+        with: {
+          cdrRecord: true,
+        },
+        orderBy: (jobQueue, { desc }) => [desc(jobQueue.createdAt)],
+        limit: params.limit ?? 100,
+        offset: params.offset ?? 0,
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any;
+
+    return jobs;
+  } catch (error) {
+    console.error('[getJobs] Error:', error);
+    throw error;
   }
-
-  if (params.tenantId) {
-    conditions.push(eq(jobQueue.tenantId, params.tenantId));
-  }
-
-  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-  const jobs = await db.query.jobQueue.findMany({
-    where: whereClause,
-    with: {
-      cdrRecord: true,
-    },
-    orderBy: (jobQueue, { desc }) => [desc(jobQueue.createdAt)],
-    limit: params.limit ?? 100,
-    offset: params.offset ?? 0,
-  });
-
-  return jobs;
 }
 
 /**
  * Get job by ID with CDR record details
  */
 export async function getJobById(jobId: string) {
-  const job = await db.query.jobQueue.findFirst({
-    where: eq(jobQueue.id, jobId),
-    with: {
-      cdrRecord: true,
-    },
-  });
+  try {
+    const job = await Promise.race([
+      db.query.jobQueue.findFirst({
+        where: eq(jobQueue.id, jobId),
+        with: {
+          cdrRecord: true,
+        },
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any;
 
-  return job ?? null;
+    return job ?? null;
+  } catch (error) {
+    console.error('[getJobById] Error:', error);
+    throw error;
+  }
 }
 
 /**
  * Get job queue statistics
  */
 export async function getJobStats() {
-  const stats = await db
-    .select({
-      status: jobQueue.status,
-      count: sql<number>`count(*)::int`,
-    })
-    .from(jobQueue)
-    .groupBy(jobQueue.status);
+  try {
+    const stats = await Promise.race([
+      db
+        .select({
+          status: jobQueue.status,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(jobQueue)
+        .groupBy(jobQueue.status),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
 
-  return stats.reduce(
-    (acc, stat) => {
-      acc[stat.status] = stat.count;
-      return acc;
-    },
-    {
-      pending: 0,
-      processing: 0,
-      completed: 0,
-      failed: 0,
-      retry: 0,
-    } as Record<string, number>
-  );
+    return stats.reduce(
+      (acc, stat) => {
+        acc[stat.status] = stat.count;
+        return acc;
+      },
+      {
+        pending: 0,
+        processing: 0,
+        completed: 0,
+        failed: 0,
+        retry: 0,
+      } as Record<string, number>
+    );
+  } catch (error) {
+    console.error('[getJobStats] Error:', error);
+    throw error;
+  }
 }

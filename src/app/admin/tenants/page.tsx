@@ -35,16 +35,32 @@ export default function TenantsPage() {
   const fetchTenants = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/tenants');
+      setError(null);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+      const response = await fetch('/api/tenants', {
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
       const data = await response.json();
 
       if (data.error) {
         setError(data.error.message);
       } else if (data.data) {
         setTenants(data.data);
+      } else {
+        setTenants([]);
       }
-    } catch (err) {
-      setError('Failed to load tenants');
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        setError('Request timed out. Please check your connection and try again.');
+      } else {
+        setError('Failed to load tenants. Please try again.');
+      }
       console.error('Failed to fetch tenants:', err);
     } finally {
       setLoading(false);

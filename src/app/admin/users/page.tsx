@@ -34,13 +34,25 @@ export default function UsersPage() {
   useEffect(() => {
     async function fetchUsers() {
       try {
-        const response = await fetch('/api/users');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+        const response = await fetch('/api/users', {
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
         const data = await response.json();
         if (data.data) {
           setUsers(data.data);
         }
-      } catch (error) {
-        console.error('Failed to fetch users:', error);
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.error('Request timed out after 15 seconds');
+        } else {
+          console.error('Failed to fetch users:', error);
+        }
       } finally {
         setLoading(false);
       }

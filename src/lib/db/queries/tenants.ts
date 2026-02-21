@@ -13,8 +13,15 @@ import type { CreateTenantInput, UpdateTenantInput } from '@/lib/validations/ten
  */
 export async function getAllTenants() {
   try {
-    return await db.select().from(tenants).orderBy(desc(tenants.createdAt));
+    const result = await Promise.race([
+      db.select().from(tenants).orderBy(desc(tenants.createdAt)),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]);
+    return result as any[];
   } catch (error) {
+    console.error('[getAllTenants] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }

@@ -61,20 +61,32 @@ export default function JobsPage() {
   const fetchJobs = async (status?: string) => {
     try {
       setLoading(true);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
       const params = new URLSearchParams();
       if (status && status !== 'all') {
         params.set('status', status);
       }
       params.set('limit', '100');
 
-      const response = await fetch(`/api/jobs?${params.toString()}`);
+      const response = await fetch(`/api/jobs?${params.toString()}`, {
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const data = await response.json();
         setJobs(data.data || []);
         setStats(data.meta?.stats || stats);
       }
-    } catch (error) {
-      console.error('Failed to fetch jobs:', error);
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.error('Request timed out after 15 seconds');
+      } else {
+        console.error('Failed to fetch jobs:', error);
+      }
     } finally {
       setLoading(false);
     }

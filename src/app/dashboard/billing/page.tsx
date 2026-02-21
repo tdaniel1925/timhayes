@@ -30,13 +30,25 @@ export default function BillingPage() {
   useEffect(() => {
     async function fetchUsage() {
       try {
-        const response = await fetch('/api/dashboard/billing');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+        const response = await fetch('/api/dashboard/billing', {
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
         const data = await response.json();
         if (data.data) {
           setUsage(data.data);
         }
-      } catch (error) {
-        console.error('Failed to fetch billing data:', error);
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.error('Request timed out after 15 seconds');
+        } else {
+          console.error('Failed to fetch billing data:', error);
+        }
       } finally {
         setLoading(false);
       }

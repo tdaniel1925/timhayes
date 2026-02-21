@@ -14,26 +14,33 @@ import type { CreateConnectionInput, UpdateConnectionInput } from '@/lib/validat
  */
 export async function getAllConnections() {
   try {
-    return await db
-      .select({
-        id: pbxConnections.id,
-        tenantId: pbxConnections.tenantId,
-        tenantName: tenants.name,
-        name: pbxConnections.name,
-        providerType: pbxConnections.providerType,
-        host: pbxConnections.host,
-        port: pbxConnections.port,
-        isActive: pbxConnections.isActive,
-        lastConnectedAt: pbxConnections.lastConnectedAt,
-        connectionStatus: pbxConnections.connectionStatus,
-        webhookUrl: pbxConnections.webhookUrl,
-        createdAt: pbxConnections.createdAt,
-        updatedAt: pbxConnections.updatedAt,
-      })
-      .from(pbxConnections)
-      .leftJoin(tenants, eq(pbxConnections.tenantId, tenants.id))
-      .orderBy(desc(pbxConnections.createdAt));
+    const result = await Promise.race([
+      db
+        .select({
+          id: pbxConnections.id,
+          tenantId: pbxConnections.tenantId,
+          tenantName: tenants.name,
+          name: pbxConnections.name,
+          providerType: pbxConnections.providerType,
+          host: pbxConnections.host,
+          port: pbxConnections.port,
+          isActive: pbxConnections.isActive,
+          lastConnectedAt: pbxConnections.lastConnectedAt,
+          connectionStatus: pbxConnections.connectionStatus,
+          webhookUrl: pbxConnections.webhookUrl,
+          createdAt: pbxConnections.createdAt,
+          updatedAt: pbxConnections.updatedAt,
+        })
+        .from(pbxConnections)
+        .leftJoin(tenants, eq(pbxConnections.tenantId, tenants.id))
+        .orderBy(desc(pbxConnections.createdAt)),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]);
+    return result as any[];
   } catch (error) {
+    console.error('[getAllConnections] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }
@@ -43,12 +50,19 @@ export async function getAllConnections() {
  */
 export async function getConnectionsByTenantId(tenantId: string) {
   try {
-    return await db
-      .select()
-      .from(pbxConnections)
-      .where(eq(pbxConnections.tenantId, tenantId))
-      .orderBy(desc(pbxConnections.createdAt));
+    const result = await Promise.race([
+      db
+        .select()
+        .from(pbxConnections)
+        .where(eq(pbxConnections.tenantId, tenantId))
+        .orderBy(desc(pbxConnections.createdAt)),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]);
+    return result as any[];
   } catch (error) {
+    console.error('[getConnectionsByTenantId] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }
@@ -58,7 +72,12 @@ export async function getConnectionsByTenantId(tenantId: string) {
  */
 export async function getConnectionById(id: string, includeCredentials: boolean = false) {
   try {
-    const result = await db.select().from(pbxConnections).where(eq(pbxConnections.id, id)).limit(1);
+    const result = await Promise.race([
+      db.select().from(pbxConnections).where(eq(pbxConnections.id, id)).limit(1),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
 
     if (!result[0]) return null;
 
@@ -81,6 +100,7 @@ export async function getConnectionById(id: string, includeCredentials: boolean 
 
     return connection;
   } catch (error) {
+    console.error('[getConnectionById] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }
@@ -202,7 +222,12 @@ export async function deleteConnection(id: string) {
  */
 export async function getConnectionCountByStatus() {
   try {
-    const allConnections = await db.select().from(pbxConnections);
+    const allConnections = await Promise.race([
+      db.select().from(pbxConnections),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
 
     const counts = {
       connected: 0,
@@ -219,6 +244,7 @@ export async function getConnectionCountByStatus() {
 
     return counts;
   } catch (error) {
+    console.error('[getConnectionCountByStatus] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }
@@ -228,16 +254,22 @@ export async function getConnectionCountByStatus() {
  */
 export async function verifyWebhookSecret(connectionId: string, secret: string): Promise<boolean> {
   try {
-    const result = await db
-      .select({ webhookSecret: pbxConnections.webhookSecret })
-      .from(pbxConnections)
-      .where(and(eq(pbxConnections.id, connectionId), eq(pbxConnections.isActive, true)))
-      .limit(1);
+    const result = await Promise.race([
+      db
+        .select({ webhookSecret: pbxConnections.webhookSecret })
+        .from(pbxConnections)
+        .where(and(eq(pbxConnections.id, connectionId), eq(pbxConnections.isActive, true)))
+        .limit(1),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
 
     if (!result[0]) return false;
 
     return result[0].webhookSecret === secret;
   } catch (error) {
+    console.error('[verifyWebhookSecret] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }

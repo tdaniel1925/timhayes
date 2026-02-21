@@ -70,11 +70,21 @@ export async function createCDR(params: CreateCDRParams) {
  * Get CDR by ID
  */
 export async function getCDRById(id: string) {
-  const cdr = await db.query.cdrRecords.findFirst({
-    where: eq(cdrRecords.id, id),
-  });
+  try {
+    const cdr = await Promise.race([
+      db.query.cdrRecords.findFirst({
+        where: eq(cdrRecords.id, id),
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any;
 
-  return cdr ?? null;
+    return cdr ?? null;
+  } catch (error) {
+    console.error('[getCDRById] Error:', error);
+    throw error;
+  }
 }
 
 /**

@@ -13,23 +13,30 @@ import type { CreateUserInput, UpdateUserInput } from '@/lib/validations/user';
  */
 export async function getAllUsers() {
   try {
-    return await db
-      .select({
-        id: users.id,
-        tenantId: users.tenantId,
-        tenantName: tenants.name,
-        email: users.email,
-        fullName: users.fullName,
-        role: users.role,
-        isActive: users.isActive,
-        lastLoginAt: users.lastLoginAt,
-        createdAt: users.createdAt,
-        updatedAt: users.updatedAt,
-      })
-      .from(users)
-      .leftJoin(tenants, eq(users.tenantId, tenants.id))
-      .orderBy(desc(users.createdAt));
+    const result = await Promise.race([
+      db
+        .select({
+          id: users.id,
+          tenantId: users.tenantId,
+          tenantName: tenants.name,
+          email: users.email,
+          fullName: users.fullName,
+          role: users.role,
+          isActive: users.isActive,
+          lastLoginAt: users.lastLoginAt,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+        })
+        .from(users)
+        .leftJoin(tenants, eq(users.tenantId, tenants.id))
+        .orderBy(desc(users.createdAt)),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]);
+    return result as any[];
   } catch (error) {
+    console.error('[getAllUsers] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }
@@ -39,12 +46,19 @@ export async function getAllUsers() {
  */
 export async function getUsersByTenantId(tenantId: string) {
   try {
-    return await db
-      .select()
-      .from(users)
-      .where(eq(users.tenantId, tenantId))
-      .orderBy(desc(users.createdAt));
+    const result = await Promise.race([
+      db
+        .select()
+        .from(users)
+        .where(eq(users.tenantId, tenantId))
+        .orderBy(desc(users.createdAt)),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]);
+    return result as any[];
   } catch (error) {
+    console.error('[getUsersByTenantId] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }
@@ -54,9 +68,15 @@ export async function getUsersByTenantId(tenantId: string) {
  */
 export async function getUserById(id: string) {
   try {
-    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    const result = await Promise.race([
+      db.select().from(users).where(eq(users.id, id)).limit(1),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
     return result[0] || null;
   } catch (error) {
+    console.error('[getUserById] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }
@@ -66,9 +86,15 @@ export async function getUserById(id: string) {
  */
 export async function getUserByEmail(email: string) {
   try {
-    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    const result = await Promise.race([
+      db.select().from(users).where(eq(users.email, email)).limit(1),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
     return result[0] || null;
   } catch (error) {
+    console.error('[getUserByEmail] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }
@@ -183,7 +209,12 @@ export async function deleteUser(id: string) {
  */
 export async function getUserCountByRole() {
   try {
-    const allUsers = await db.select().from(users).where(eq(users.isActive, true));
+    const allUsers = await Promise.race([
+      db.select().from(users).where(eq(users.isActive, true)),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Query timeout after 10s')), 10000)
+      )
+    ]) as any[];
 
     const counts = {
       super_admin: 0,
@@ -198,6 +229,7 @@ export async function getUserCountByRole() {
 
     return counts;
   } catch (error) {
+    console.error('[getUserCountByRole] Error:', error);
     throw createError(DB_ERRORS.QUERY_TIMEOUT, error);
   }
 }

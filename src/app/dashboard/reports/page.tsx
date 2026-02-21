@@ -38,6 +38,9 @@ export default function ReportsPage() {
     async function fetchStats() {
       try {
         setLoading(true);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
         const params = new URLSearchParams();
 
         // Calculate date range
@@ -48,14 +51,23 @@ export default function ReportsPage() {
         params.set('dateFrom', dateFrom.toISOString());
         params.set('dateTo', dateTo.toISOString());
 
-        const response = await fetch(`/api/dashboard/stats?${params}`);
+        const response = await fetch(`/api/dashboard/stats?${params}`, {
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
         const data = await response.json();
 
         if (data.data) {
           setStats(data.data);
         }
-      } catch (error) {
-        console.error('Failed to fetch stats:', error);
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.error('Request timed out after 15 seconds');
+        } else {
+          console.error('Failed to fetch stats:', error);
+        }
       } finally {
         setLoading(false);
       }

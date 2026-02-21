@@ -29,13 +29,25 @@ export default function ConnectionsPage() {
   useEffect(() => {
     async function fetchConnections() {
       try {
-        const response = await fetch('/api/connections');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+        const response = await fetch('/api/connections', {
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
         const data = await response.json();
         if (data.data) {
           setConnections(data.data);
         }
-      } catch (error) {
-        console.error('Failed to fetch connections:', error);
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.error('Request timed out after 15 seconds');
+        } else {
+          console.error('Failed to fetch connections:', error);
+        }
       } finally {
         setLoading(false);
       }
