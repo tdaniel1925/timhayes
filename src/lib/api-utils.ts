@@ -8,6 +8,7 @@ import { AppError, AUTH_ERRORS, createError, formatErrorResponse } from './error
 
 /**
  * Verify that the user is authenticated and has the required role
+ * @throws AppError if authentication fails
  */
 export async function verifyAuth(request: NextRequest, allowedRoles: ('super_admin' | 'client_admin')[]) {
   const supabase = await createServerClient();
@@ -18,12 +19,7 @@ export async function verifyAuth(request: NextRequest, allowedRoles: ('super_adm
   } = await supabase.auth.getSession();
 
   if (error || !session) {
-    const authError = createError(AUTH_ERRORS.SESSION_EXPIRED);
-    return {
-      authorized: false,
-      error: formatErrorResponse(authError).error,
-      status: authError.statusCode,
-    };
+    throw createError(AUTH_ERRORS.SESSION_EXPIRED);
   }
 
   // Get user details from database
@@ -34,30 +30,15 @@ export async function verifyAuth(request: NextRequest, allowedRoles: ('super_adm
     .single();
 
   if (userError || !userData) {
-    const authError = createError(AUTH_ERRORS.INVALID_CREDENTIALS);
-    return {
-      authorized: false,
-      error: formatErrorResponse(authError).error,
-      status: authError.statusCode,
-    };
+    throw createError(AUTH_ERRORS.INVALID_CREDENTIALS);
   }
 
   if (!userData.is_active) {
-    const authError = new AppError('Account is inactive', AUTH_ERRORS.ACCOUNT_SUSPENDED.code, 403);
-    return {
-      authorized: false,
-      error: formatErrorResponse(authError).error,
-      status: authError.statusCode,
-    };
+    throw new AppError('Account is inactive', AUTH_ERRORS.ACCOUNT_SUSPENDED.code, 403);
   }
 
   if (!allowedRoles.includes(userData.role as any)) {
-    const authError = createError(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
-    return {
-      authorized: false,
-      error: formatErrorResponse(authError).error,
-      status: authError.statusCode,
-    };
+    throw createError(AUTH_ERRORS.INSUFFICIENT_PERMISSIONS);
   }
 
   // Check if tenant is active (for client_admin users)
@@ -69,26 +50,15 @@ export async function verifyAuth(request: NextRequest, allowedRoles: ('super_adm
       .single();
 
     if (tenantError || !tenantData) {
-      const authError = new AppError('Tenant not found', 'CB-AUTH-005', 404);
-      return {
-        authorized: false,
-        error: formatErrorResponse(authError).error,
-        status: authError.statusCode,
-      };
+      throw new AppError('Tenant not found', 'CB-AUTH-005', 404);
     }
 
     if (tenantData.status === 'suspended') {
-      const authError = createError(AUTH_ERRORS.ACCOUNT_SUSPENDED);
-      return {
-        authorized: false,
-        error: formatErrorResponse(authError).error,
-        status: authError.statusCode,
-      };
+      throw createError(AUTH_ERRORS.ACCOUNT_SUSPENDED);
     }
   }
 
   return {
-    authorized: true,
     user: userData,
     session,
   };
