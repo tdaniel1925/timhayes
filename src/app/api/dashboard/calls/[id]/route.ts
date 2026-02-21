@@ -6,7 +6,7 @@
 import { NextRequest } from 'next/server';
 import { verifyAuth, handleApiError, successResponse } from '@/lib/api-utils';
 import { getCallDetail } from '@/lib/db/queries/analytics';
-import { AppError, DB_ERRORS } from '@/lib/errors';
+import { AppError } from '@/lib/errors';
 
 /**
  * GET /api/dashboard/calls/[id]
@@ -41,7 +41,7 @@ export async function GET(
     const callDetail = await getCallDetail(id, tenantId);
 
     if (!callDetail) {
-      throw new AppError('Call not found', DB_ERRORS.RECORD_NOT_FOUND.code, 404);
+      throw new AppError('Call not found', 'CB-API-006', 404);
     }
 
     return successResponse(callDetail);
