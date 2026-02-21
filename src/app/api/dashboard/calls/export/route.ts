@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { getDb } from '@/lib/db';
+import { db } from '@/lib/db';
 import { cdrRecords, callAnalyses } from '@/lib/db/schema';
 import { eq, and, gte, lte, desc } from 'drizzle-orm';
 
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate');
     const disposition = searchParams.get('disposition');
 
-    const db = getDb();
+    const db = db;
 
     // Build query
     let query = db

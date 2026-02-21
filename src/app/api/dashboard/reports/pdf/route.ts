@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { getDb } from '@/lib/db';
+import { db } from '@/lib/db';
 import { cdrRecords, callAnalyses } from '@/lib/db/schema';
 import { eq, gte, lte, desc, sql } from 'drizzle-orm';
 import PDFDocument from 'pdfkit';
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { startDate, endDate } = body;
 
-    const db = getDb();
+    const db = db;
 
     // Get summary statistics
     const [stats] = await db

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { getDb } from '@/lib/db';
+import { db } from '@/lib/db';
 import { cdrRecords, callAnalyses } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -21,7 +21,7 @@ export async function GET(
       return NextResponse.json({ error: { message: 'Unauthorized' } }, { status: 401 });
     }
 
-    const db = getDb();
+    const db = db;
 
     // Get the CDR record
     const [cdrRecord] = await db

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { getDb } from '@/lib/db';
+import { db } from '@/lib/db';
 import { cdrRecords } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
@@ -22,7 +22,7 @@ export async function GET(
     }
 
     // Get user from database to check tenant
-    const db = getDb();
+    const db = db;
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) {
       return NextResponse.json({ error: { message: 'Unauthorized' } }, { status: 401 });
