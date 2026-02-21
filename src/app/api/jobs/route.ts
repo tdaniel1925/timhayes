@@ -12,13 +12,7 @@ import { createError, ErrorCode } from '@/lib/errors';
 export async function GET(request: NextRequest) {
   try {
     // Verify authentication and authorization
-    const authResult = await verifyAuth(request, ['super_admin']);
-    if (!authResult.authorized) {
-      return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
-      );
-    }
+    await verifyAuth(request, ['super_admin']);
 
     // Parse query parameters
     const { searchParams } = request.nextUrl;

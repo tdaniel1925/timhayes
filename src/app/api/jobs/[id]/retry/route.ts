@@ -15,13 +15,7 @@ export async function POST(
 ) {
   try {
     // Verify authentication and authorization
-    const authResult = await verifyAuth(request, ['super_admin']);
-    if (!authResult.authorized) {
-      return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
-      );
-    }
+    await verifyAuth(request, ['super_admin']);
 
     const { id: jobId } = await params;
 

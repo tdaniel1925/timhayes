@@ -14,21 +14,11 @@ import { getTenantCalls } from '@/lib/db/queries/analytics';
 export async function GET(request: NextRequest) {
   try {
     // Verify client admin role
-    const authResult = await verifyAuth(request, ['client_admin']);
+    const { user } = await verifyAuth(request, ['client_admin']);
 
-    if (!authResult.authorized || !authResult.user) {
-      return new Response(JSON.stringify(authResult.error), {
-        status: authResult.status,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    const tenantId = authResult.user.tenant_id;
+    const tenantId = user.tenant_id;
     if (!tenantId) {
-      return new Response(
-        JSON.stringify({ error: { code: 'CB-AUTH-006', message: 'User has no tenant' } }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      throw new AppError('User has no tenant', 'CB-AUTH-006', 400);
     }
 
     // Parse query parameters

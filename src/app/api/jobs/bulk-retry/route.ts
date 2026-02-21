@@ -12,13 +12,7 @@ import { createError, ErrorCode } from '@/lib/errors';
 export async function POST(request: NextRequest) {
   try {
     // Verify authentication and authorization
-    const authResult = await verifyAuth(request, ['super_admin']);
-    if (!authResult.authorized) {
-      return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
-      );
-    }
+    await verifyAuth(request, ['super_admin']);
 
     // Retry all failed jobs
     const jobs = await retryAllFailedJobs();

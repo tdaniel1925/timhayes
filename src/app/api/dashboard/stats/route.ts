@@ -6,6 +6,7 @@
 import { NextRequest } from 'next/server';
 import { verifyAuth, handleApiError, successResponse } from '@/lib/api-utils';
 import { getTenantDashboardStats, getCallVolumeTrend } from '@/lib/db/queries/analytics';
+import { AppError } from '@/lib/errors';
 
 /**
  * GET /api/dashboard/stats
@@ -14,21 +15,11 @@ import { getTenantDashboardStats, getCallVolumeTrend } from '@/lib/db/queries/an
 export async function GET(request: NextRequest) {
   try {
     // Verify client admin role
-    const authResult = await verifyAuth(request, ['client_admin']);
+    const { user } = await verifyAuth(request, ['client_admin']);
 
-    if (!authResult.authorized || !authResult.user) {
-      return new Response(JSON.stringify(authResult.error), {
-        status: authResult.status,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    const tenantId = authResult.user.tenant_id;
+    const tenantId = user.tenant_id;
     if (!tenantId) {
-      return new Response(
-        JSON.stringify({ error: { code: 'CB-AUTH-006', message: 'User has no tenant' } }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      throw new AppError('User has no tenant', 'CB-AUTH-006', 400);
     }
 
     // Parse query parameters for date range
