@@ -63,8 +63,10 @@ export async function getTenantDashboardStats(tenantId: string, dateFrom?: Date,
       negative: 0,
       mixed: 0,
     };
-    callsWithAnalysis.forEach(c => {
-      if (c.sentiment) sentimentCounts[c.sentiment]++;
+    callsWithAnalysis.forEach((c: any) => {
+      if (c.sentiment && c.sentiment in sentimentCounts) {
+        sentimentCounts[c.sentiment as keyof typeof sentimentCounts]++;
+      }
     });
 
     // Satisfaction distribution
@@ -73,8 +75,10 @@ export async function getTenantDashboardStats(tenantId: string, dateFrom?: Date,
       neutral: 0,
       dissatisfied: 0,
     };
-    callsWithAnalysis.forEach(c => {
-      if (c.satisfactionPrediction) satisfactionCounts[c.satisfactionPrediction]++;
+    callsWithAnalysis.forEach((c: any) => {
+      if (c.satisfactionPrediction && c.satisfactionPrediction in satisfactionCounts) {
+        satisfactionCounts[c.satisfactionPrediction as keyof typeof satisfactionCounts]++;
+      }
     });
 
     // Escalation risk distribution
@@ -83,8 +87,10 @@ export async function getTenantDashboardStats(tenantId: string, dateFrom?: Date,
       medium: 0,
       high: 0,
     };
-    callsWithAnalysis.forEach(c => {
-      if (c.escalationRisk) escalationCounts[c.escalationRisk]++;
+    callsWithAnalysis.forEach((c: any) => {
+      if (c.escalationRisk && c.escalationRisk in escalationCounts) {
+        escalationCounts[c.escalationRisk as keyof typeof escalationCounts]++;
+      }
     });
 
     // Pending analysis count
