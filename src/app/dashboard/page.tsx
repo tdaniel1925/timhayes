@@ -3,6 +3,10 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { CallVolumeChart } from '@/components/dashboard/call-volume-chart';
+import { SentimentPieChart } from '@/components/dashboard/sentiment-pie-chart';
+import { KeywordsBarChart } from '@/components/dashboard/keywords-bar-chart';
+import { PeakHoursHeatmap } from '@/components/dashboard/peak-hours-heatmap';
 
 interface DashboardStats {
   totalCalls: number;
@@ -179,27 +183,36 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Call Volume Trend */}
-      {stats?.trend && stats.trend.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="text-base">Call Volume (Last 30 Days)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {stats.trend.slice(-7).map((day, idx) => (
-                <div key={idx} className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{day.date}</span>
-                  <div className="flex gap-4">
-                    <span>Total: {day.total}</span>
-                    <span className="text-green-500">Answered: {day.answered}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Charts Grid */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <CallVolumeChart data={stats?.trend || []} isLoading={loading} />
+        <SentimentPieChart data={stats?.sentiment || { positive: 0, neutral: 0, negative: 0, mixed: 0 }} isLoading={loading} />
+      </div>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <KeywordsBarChart
+          data={[
+            { keyword: 'pricing', count: 45 },
+            { keyword: 'support', count: 38 },
+            { keyword: 'delivery', count: 32 },
+            { keyword: 'refund', count: 28 },
+            { keyword: 'technical', count: 25 },
+          ]}
+          isLoading={loading}
+        />
+        <PeakHoursHeatmap
+          data={{
+            Monday: { 9: 5, 10: 8, 11: 12, 14: 15, 15: 18, 16: 10 },
+            Tuesday: { 9: 6, 10: 10, 11: 14, 14: 16, 15: 20, 16: 12 },
+            Wednesday: { 9: 7, 10: 11, 11: 15, 14: 18, 15: 22, 16: 14 },
+            Thursday: { 9: 8, 10: 9, 11: 13, 14: 17, 15: 19, 16: 11 },
+            Friday: { 9: 4, 10: 7, 11: 10, 14: 12, 15: 14, 16: 8 },
+            Saturday: { 10: 2, 11: 3, 14: 4 },
+            Sunday: { 10: 1, 11: 2 },
+          }}
+          isLoading={loading}
+        />
+      </div>
     </div>
   );
 }

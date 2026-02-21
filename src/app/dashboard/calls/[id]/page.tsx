@@ -6,6 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RecordingPlayer } from '@/components/calls/recording-player';
+import { TranscriptViewer } from '@/components/calls/transcript-viewer';
+import {
+  SentimentTimeline,
+  TalkRatioVisualization,
+  ComplianceScoreGauge,
+  EscalationRiskCard,
+} from '@/components/calls/analysis-cards';
 
 interface CallDetail {
   call: {
@@ -55,6 +63,7 @@ export default function CallDetailPage() {
   const [callDetail, setCallDetail] = useState<CallDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPlaybackTime, setCurrentPlaybackTime] = useState(0);
 
   useEffect(() => {
     async function fetchCallDetail() {
@@ -221,21 +230,23 @@ export default function CallDetailPage() {
         </Card>
       </div>
 
-      {/* Recording Player */}
+      {/* Recording Player and Transcript */}
       {call.recordingStoragePath && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Recording</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Recording playback will be implemented in a future update
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              File: {call.recordingFilename || 'Unknown'}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <RecordingPlayer
+            callId={call.id}
+            filename={call.recordingFilename || undefined}
+            onTimeUpdate={(time) => setCurrentPlaybackTime(time)}
+          />
+          <TranscriptViewer
+            callId={call.id}
+            currentTime={currentPlaybackTime}
+            onSeek={(time) => {
+              // This would seek the audio player
+              setCurrentPlaybackTime(time);
+            }}
+          />
+        </div>
       )}
 
       {/* AI Analysis */}
@@ -335,23 +346,33 @@ export default function CallDetailPage() {
               </Card>
             </div>
 
-            {analysis.talkRatio && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Talk Ratio</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {Object.entries(analysis.talkRatio).map(([speaker, ratio]) => (
-                      <div key={speaker} className="flex items-center justify-between">
-                        <span className="capitalize">{speaker}</span>
-                        <span className="font-medium">{((ratio as number) * 100).toFixed(0)}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            <div className="grid gap-4 md:grid-cols-2">
+              {analysis.sentimentTimeline && (
+                <SentimentTimeline data={analysis.sentimentTimeline} />
+              )}
+
+              {analysis.talkRatio && analysis.talkTimeSeconds && (
+                <TalkRatioVisualization
+                  talkRatio={analysis.talkRatio}
+                  talkTimeSeconds={analysis.talkTimeSeconds}
+                  silenceSeconds={analysis.silenceSeconds || undefined}
+                />
+              )}
+
+              {analysis.complianceScore !== null && analysis.complianceScore !== undefined && (
+                <ComplianceScoreGauge
+                  score={parseFloat(analysis.complianceScore as any) || 0}
+                  flags={analysis.complianceFlags || []}
+                />
+              )}
+
+              {analysis.escalationRisk && (
+                <EscalationRiskCard
+                  risk={analysis.escalationRisk as any}
+                  reasons={analysis.escalationReasons || []}
+                />
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="keywords" className="space-y-4">

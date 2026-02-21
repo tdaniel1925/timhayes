@@ -28,6 +28,7 @@
     "lucide-react": "^0.564.0",
     "next": "16.1.6",
     "openai": "^6.22.0",
+    "pdfkit": "^0.17.2",
     "postgres": "^3.4.8",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
@@ -42,6 +43,7 @@
   "devDependencies": {
     "@playwright/test": "^1.48.2",
     "@types/node": "^20",
+    "@types/pdfkit": "^0.17.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitest/ui": "^2.1.8",

@@ -7,6 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { createClient } from '@/lib/supabase/client';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Plus, Trash2 } from 'lucide-react';
 
 interface TenantInfo {
   id: string;
@@ -29,6 +39,12 @@ export default function SettingsPage() {
   const [tenant, setTenant] = useState<TenantInfo | null>(null);
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [emailReportFreq, setEmailReportFreq] = useState<string>('');
+  const [emailReportAddress, setEmailReportAddress] = useState<string>('');
+  const [keywords, setKeywords] = useState<Array<{ id: string; keyword: string; category: string }>>([]);
+  const [newKeyword, setNewKeyword] = useState('');
+  const [newKeywordCategory, setNewKeywordCategory] = useState('Custom');
+  const [showKeywordDialog, setShowKeywordDialog] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -190,6 +206,147 @@ export default function SettingsPage() {
                 </Badge>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Email Reports */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Email Reports</CardTitle>
+            <CardDescription>Schedule automated analytics reports to your inbox</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="report-freq">Report Frequency</Label>
+                <Select value={emailReportFreq} onValueChange={setEmailReportFreq}>
+                  <SelectTrigger id="report-freq">
+                    <SelectValue placeholder="Select frequency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="report-email">Email Address</Label>
+                <Input
+                  id="report-email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={emailReportAddress}
+                  onChange={(e) => setEmailReportAddress(e.target.value)}
+                />
+              </div>
+            </div>
+            <Button>Save Email Report Settings</Button>
+          </CardContent>
+        </Card>
+
+        {/* Custom Keywords */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Custom Keywords</CardTitle>
+                <CardDescription>Track specific keywords in your call transcripts</CardDescription>
+              </div>
+              <Dialog open={showKeywordDialog} onOpenChange={setShowKeywordDialog}>
+                <DialogTrigger asChild>
+                  <Button size="sm">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Keyword
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Custom Keyword</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div>
+                      <Label htmlFor="keyword">Keyword or Phrase</Label>
+                      <Input
+                        id="keyword"
+                        placeholder="e.g., pricing, refund policy"
+                        value={newKeyword}
+                        onChange={(e) => setNewKeyword(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="category">Category</Label>
+                      <Select value={newKeywordCategory} onValueChange={setNewKeywordCategory}>
+                        <SelectTrigger id="category">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Sales">Sales</SelectItem>
+                          <SelectItem value="Support">Support</SelectItem>
+                          <SelectItem value="Compliance">Compliance</SelectItem>
+                          <SelectItem value="Custom">Custom</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        if (newKeyword.trim()) {
+                          setKeywords([
+                            ...keywords,
+                            {
+                              id: Date.now().toString(),
+                              keyword: newKeyword,
+                              category: newKeywordCategory,
+                            },
+                          ]);
+                          setNewKeyword('');
+                          setShowKeywordDialog(false);
+                        }
+                      }}
+                      className="w-full"
+                    >
+                      Add Keyword
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {keywords.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Keyword</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {keywords.map((kw) => (
+                    <TableRow key={kw.id}>
+                      <TableCell className="font-medium">{kw.keyword}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{kw.category}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setKeywords(keywords.filter((k) => k.id !== kw.id))}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-center text-sm text-muted-foreground">
+                No custom keywords configured
+              </p>
+            )}
           </CardContent>
         </Card>
 
