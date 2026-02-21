@@ -1,14 +1,13 @@
 -- AudiaPro Initial Schema Migration
 -- Creates all tables with proper constraints and relationships
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Note: gen_random_uuid() is built-in to PostgreSQL 13+ (used by Supabase)
 
 -- ============================================
 -- TENANTS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS tenants (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     slug TEXT NOT NULL UNIQUE,
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'cancelled')),
@@ -46,6 +45,7 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT NOT NULL,
     full_name TEXT,
     role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('super_admin', 'tenant_admin', 'manager', 'viewer')),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
     -- Preferences
     timezone TEXT DEFAULT 'UTC',
@@ -68,7 +68,7 @@ CREATE INDEX idx_users_role ON users(role);
 -- PBX CONNECTIONS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS pbx_connections (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
 
     name TEXT NOT NULL,
@@ -104,7 +104,7 @@ CREATE INDEX idx_pbx_connections_status ON pbx_connections(status);
 -- CDR RECORDS TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS cdr_records (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     pbx_connection_id UUID NOT NULL REFERENCES pbx_connections(id) ON DELETE CASCADE,
 
@@ -192,7 +192,7 @@ CREATE INDEX idx_cdr_records_processing_status ON cdr_records(processing_status)
 -- CALL ANALYSES TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS call_analyses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cdr_record_id UUID NOT NULL REFERENCES cdr_records(id) ON DELETE CASCADE,
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
 
@@ -258,7 +258,7 @@ CREATE INDEX idx_call_analyses_escalation_risk ON call_analyses(escalation_risk)
 -- JOB QUEUE TABLE
 -- ============================================
 CREATE TABLE IF NOT EXISTS job_queue (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     cdr_record_id UUID NOT NULL REFERENCES cdr_records(id) ON DELETE CASCADE,
 
