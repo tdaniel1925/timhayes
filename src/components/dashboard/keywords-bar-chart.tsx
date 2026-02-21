@@ -87,7 +87,7 @@ export function KeywordsBarChart({ data, isLoading }: KeywordsBarChartProps) {
                 borderRadius: '8px',
               }}
               labelStyle={{ color: 'hsl(var(--foreground))' }}
-              formatter={(value: number) => [`${value} mentions`, 'Count']}
+              formatter={(value: number | undefined) => [`${value || 0} mentions`, 'Count']}
             />
             <Bar dataKey="count" fill="#FF7F50" radius={[0, 4, 4, 0]} />
           </BarChart>

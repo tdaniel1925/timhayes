@@ -39,6 +39,7 @@ interface CallDetail {
     summary: string | null;
     sentimentOverall: string | null;
     sentimentScore: string | null;
+    sentimentTimeline: any;
     talkRatio: any;
     talkTimeSeconds: any;
     silenceSeconds: number | null;
@@ -46,6 +47,8 @@ interface CallDetail {
     topics: any;
     actionItems: any;
     callDispositionAi: string | null;
+    complianceScore: string | null;
+    complianceFlags: any;
     escalationRisk: string | null;
     escalationReasons: any;
     satisfactionPrediction: string | null;

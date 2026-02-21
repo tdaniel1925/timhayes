@@ -112,7 +112,7 @@ export function SentimentPieChart({ data, isLoading }: SentimentPieChartProps) {
                 border: '1px solid hsl(var(--border))',
                 borderRadius: '8px',
               }}
-              formatter={(value: number) => [`${value} calls`, '']}
+              formatter={(value: number | undefined) => [`${value} calls`, '']}
             />
             <Legend
               verticalAlign="bottom"
