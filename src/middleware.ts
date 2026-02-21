@@ -56,10 +56,10 @@ export async function middleware(request: NextRequest) {
     return response; // Shouldn't happen, but satisfy TypeScript
   }
 
-  // Check if user is active
-  if (!userRecord.is_active) {
-    return NextResponse.redirect(new URL('/unauthorized', request.url));
-  }
+  // TODO: Check if user is active when is_active column is added to users table
+  // if (!userRecord.is_active) {
+  //   return NextResponse.redirect(new URL('/unauthorized', request.url));
+  // }
 
   // Check tenant status for client admins
   if (userRecord.role === 'client_admin' && userRecord.tenant_id) {

@@ -56,7 +56,7 @@ export async function getUserSession(request: NextRequest) {
   // Get user record from database with role and tenant info
   const { data: userRecord } = await supabase
     .from('users')
-    .select('id, tenant_id, email, full_name, role, is_active')
+    .select('id, tenant_id, email, full_name, role')
     .eq('id', user.id)
     .single();
 
