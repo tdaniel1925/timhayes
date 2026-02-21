@@ -22,7 +22,6 @@ export async function GET(
     }
 
     // Get user from database to check tenant
-    const db = db;
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) {
       return NextResponse.json({ error: { message: 'Unauthorized' } }, { status: 401 });

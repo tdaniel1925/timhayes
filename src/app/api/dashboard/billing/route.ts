@@ -17,7 +17,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: { message: 'Unauthorized' } }, { status: 401 });
     }
 
-    const db = db;
 
     // Get user's tenant
     const { data: userData } = await supabase.auth.getUser();

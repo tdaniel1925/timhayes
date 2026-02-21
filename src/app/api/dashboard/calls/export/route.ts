@@ -23,7 +23,6 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate');
     const disposition = searchParams.get('disposition');
 
-    const db = db;
 
     // Build query
     let query = db

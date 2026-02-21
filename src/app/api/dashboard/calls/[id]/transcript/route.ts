@@ -21,7 +21,6 @@ export async function GET(
       return NextResponse.json({ error: { message: 'Unauthorized' } }, { status: 401 });
     }
 
-    const db = db;
 
     // Get the CDR record
     const [cdrRecord] = await db

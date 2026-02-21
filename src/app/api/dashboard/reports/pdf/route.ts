@@ -21,7 +21,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { startDate, endDate } = body;
 
-    const db = db;
 
     // Get summary statistics
     const [stats] = await db
